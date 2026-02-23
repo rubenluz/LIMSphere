@@ -1,4 +1,4 @@
-# culture_app
+# BlueOpenLIMS
 
 A new Flutter project.
 
