@@ -59,7 +59,7 @@ class SupabaseManager {
       final temp = SupabaseClient(conn.url, conn.anonKey);
       await temp
           .from('app_meta')
-          .select('id')
+          .select('meta_initialized')
           .limit(1)
           .maybeSingle();
       await temp.dispose();
@@ -79,33 +79,18 @@ class SupabaseManager {
     await LocalStorage.clearLastConnection();
   }
 
-  /// TABLE CHECK
-  static Future<bool> checkTables() async {
+  /// TABLE CHECK (used in setup flow)
+  static Future<bool> checkInitialized() async {
     if (!isInitialized) return false;
-    const requiredTables = [
-      'app_meta',
-      'audit_log',
-      'equipment',
-      'fishlines',
-      'messages',
-      'protocols',
-      'reagents',
-      'requested_strains',
-      'reservations',
-      'samples',
-      'storage_locations',
-      'strains',
-      'users',
-      'zebrafish_facility',
-    ];
+
     try {
       final res = await client
-          .from('information_schema.tables')
-          .select('table_name')
-          .eq('table_schema', 'public');
-      final existing =
-          (res as List).map((e) => e['table_name'] as String).toSet();
-      return requiredTables.every(existing.contains);
+          .from('app_meta')
+          .select('meta_initialized')
+          .limit(1)
+          .maybeSingle();
+
+      return res?['meta_initialized'] == true;
     } catch (_) {
       return false;
     }

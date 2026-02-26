@@ -33,7 +33,7 @@ class _TransferStatusWidgetState extends State<TransferStatusWidget> {
   }
 
   DateTime? _resolveNextTransfer(Map<String, dynamic> row) {
-    final raw = row['next_transfer'];
+    final raw = row['strain_next_transfer'];
     if (raw != null) {
       if (raw is DateTime) return raw;
       if (raw is String && raw.trim().isNotEmpty) {
@@ -42,8 +42,8 @@ class _TransferStatusWidgetState extends State<TransferStatusWidget> {
       }
     }
 
-    final lastRaw = row['last_transfer'];
-    final daysRaw = row['time_days'];
+    final lastRaw = row['strain_last_transfer'];
+    final daysRaw = row['strain_periodicity'];
 
     DateTime? last;
     if (lastRaw is DateTime) {
@@ -74,8 +74,8 @@ class _TransferStatusWidgetState extends State<TransferStatusWidget> {
     try {
       final data = await Supabase.instance.client
           .from('strains')
-          .select('next_transfer, last_transfer, time_days')
-          .neq('status', 'DEAD');
+          .select('strain_next_transfer, strain_last_transfer, strain_periodicity')
+          .neq('strain_status', 'DEAD');
 
       int overdue = 0, soon = 0, ok = 0, unknown = 0;
       final nowUtc = DateTime.now().toUtc();

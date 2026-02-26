@@ -26,7 +26,7 @@ class _SetupPageState extends State<SetupPage> {
     setState(() => isLoading = true);
 
     try {
-      final ready = await SupabaseManager.checkTables();
+      final ready = await SupabaseManager.checkInitialized();
       if (!mounted) return;
 
       if (ready) {

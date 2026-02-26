@@ -32,11 +32,11 @@ class _StrainsByOriginWidgetState extends State<StrainsByOriginWidget> {
   Future<void> _loadOriginData() async {
     try {
       final supabase = Supabase.instance.client;
-      final data = await supabase.from('strains').select('origin');
+      final data = await supabase.from('strains').select('strain_origin');
 
       final Map<String, int> counts = {};
       for (var row in data) {
-        final origin = row['origin'] as String?;
+        final origin = row['strain_origin'] as String?;
         if (origin != null && origin.isNotEmpty) {
           counts[origin] = (counts[origin] ?? 0) + 1;
         }

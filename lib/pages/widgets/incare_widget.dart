@@ -26,9 +26,9 @@ class _InCareWidgetState extends State<InCareWidget> {
     try {
       final data = await Supabase.instance.client
           .from('strains')
-          .select('id, code, scientific_name, medium, next_transfer, last_transfer, time_days')
-          .eq('status', 'INCARE')
-          .order('code', ascending: true);
+          .select('strain_id, strain_code, strain_scientific_name, strain_medium, strain_next_transfer, strain_last_transfer, strain_periodicity')
+          .eq('strain_status', 'INCARE')
+          .order('strain_code', ascending: true);
 
       if (!mounted) return;
       setState(() {
@@ -54,14 +54,14 @@ class _InCareWidgetState extends State<InCareWidget> {
 
   /// Same fallback logic as the other widgets
   DateTime? _resolveNextTransfer(Map<String, dynamic> row) {
-    final raw = row['next_transfer'];
+    final raw = row['strain_next_transfer'];
     if (raw is DateTime) return raw;
     if (raw is String && raw.trim().isNotEmpty) {
       final parsed = DateTime.tryParse(raw);
       if (parsed != null) return parsed;
     }
-    final lastRaw = row['last_transfer'];
-    final daysRaw = row['time_days'];
+    final lastRaw = row['strain_last_transfer'];
+    final daysRaw = row['strain_periodicity'];
     DateTime? last;
     if (lastRaw is DateTime) {
       last = lastRaw;
@@ -111,9 +111,9 @@ class _InCareWidgetState extends State<InCareWidget> {
           const Divider(height: 1, indent: 12, endIndent: 12),
       itemBuilder: (context, i) {
         final strain  = _strains[i];
-        final code    = strain['code']?.toString() ?? '—';
-        final name    = strain['scientific_name']?.toString() ?? '';
-        final medium  = strain['medium']?.toString() ?? '';
+        final code    = strain['strain_code']?.toString() ?? '—';
+        final name    = strain['strain_scientific_name']?.toString() ?? '';
+        final medium  = strain['strain_medium']?.toString() ?? '';
         final next    = _resolveNextTransfer(strain);
         final now     = DateTime.now();
 
@@ -182,10 +182,10 @@ class _InCareWidgetState extends State<InCareWidget> {
               tooltip: 'Open strain',
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              onPressed: () => _openDetail(strain['id']),
+              onPressed: () => _openDetail(strain['strain_id']),
             ),
           ]),
-          onTap: () => _openDetail(strain['id']),
+          onTap: () => _openDetail(strain['strain_id']),
         );
       },
     );

@@ -29,15 +29,15 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
   }
 
   DateTime? _resolveNextTransfer(Map<String, dynamic> row) {
-    final raw = row['next_transfer'];
+    final raw = row['strain_next_transfer'];
     if (raw is DateTime) return raw;
     if (raw is String && raw.trim().isNotEmpty) {
       final parsed = DateTime.tryParse(raw);
       if (parsed != null) return parsed;
     }
 
-    final lastRaw = row['last_transfer'];
-    final daysRaw = row['time_days'];
+    final lastRaw = row['strain_last_transfer'];
+    final daysRaw = row['strain_periodicity'];
 
     DateTime? last;
     if (lastRaw is DateTime) {
@@ -70,13 +70,13 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
     try {
       final data = await Supabase.instance.client
           .from('strains')
-          .select('time_days, next_transfer, last_transfer')
-          .neq('status', 'DEAD');
+          .select('strain_periodicity, strain_next_transfer, strain_last_transfer')
+          .neq('strain_status', 'DEAD');
 
       final Map<int, DateTime> byTimeDays = {};
 
       for (final row in data) {
-        final daysRaw = row['time_days'];
+        final daysRaw = row['strain_periodicity'];
 
         int? timeDays;
         if (daysRaw is int) {
@@ -103,7 +103,7 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
 
       setState(() {
         _nextTransfers = sortedEntries
-            .map((e) => {'time_days': e.key, 'next_transfer': e.value})
+            .map((e) => {'strain_periodicity': e.key, 'strain_next_transfer': e.value})
             .toList();
         _loading = false;
       });
@@ -134,8 +134,8 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
       itemCount: _nextTransfers.length,
       itemBuilder: (context, index) {
         final item     = _nextTransfers[index];
-        final timeDays = item['time_days'] as int;
-        final nextDate = item['next_transfer'] as DateTime;
+        final timeDays = item['strain_periodicity'] as int;
+        final nextDate = item['strain_next_transfer'] as DateTime;
         final now      = DateTime.now();
         final daysLeft = nextDate.difference(now).inDays;
 

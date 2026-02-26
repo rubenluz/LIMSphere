@@ -32,11 +32,11 @@ class _StrainsByMediumWidgetState extends State<StrainsByMediumWidget> {
   Future<void> _loadMediumData() async {
     try {
       final supabase = Supabase.instance.client;
-      final data = await supabase.from('strains').select('medium');
+      final data = await supabase.from('strains').select('strain_medium');
 
       final Map<String, int> counts = {};
       for (var row in data) {
-        final medium = row['medium'] as String?;
+        final medium = row['strain_medium'] as String?;
         if (medium != null && medium.isNotEmpty) {
           counts[medium] = (counts[medium] ?? 0) + 1;
         }

@@ -382,8 +382,8 @@ class _DashboardPageState extends State<DashboardPage> {
   // ── Header ─────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(bool isMobile) {
-    final name = widget.userInfo['username'] ?? '';
-    final role = widget.userInfo['role'] ?? '';
+    final name = widget.userInfo['user_username'] ?? '';
+    final role = widget.userInfo['user_role'] ?? '';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(
         'Welcome back${name.isNotEmpty ? ", ${name.split('@').first}" : ''}!',
