@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../strains/strains_page.dart';
+import 'strains_page.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design tokens

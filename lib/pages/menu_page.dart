@@ -1,7 +1,12 @@
+import 'package:blue_open_lims/pages/lab_chat_page.dart';
+import 'package:blue_open_lims/pages/zebrafish/fish_lines_page.dart';
+import 'package:blue_open_lims/pages/zebrafish/fish_stocks_page.dart';
+import 'package:blue_open_lims/pages/zebrafish/fish_tanks_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'samples/samples_page.dart';
-import 'strains/strains_page.dart';
+import 'culture_collection/samples_page.dart';
+import 'culture_collection/strains_page.dart';
+import 'user_settings_dialog.dart';
 import 'dashboard_page.dart';
 
 const _roleOrder = ['viewer', 'technician', 'researcher', 'admin', 'superadmin'];
@@ -17,7 +22,7 @@ const Map<String, String?> _moduleRequiredRole = {
   'dashboard':        'technician',
   'chat':             'technician',
   'strains':          null,
-  'samples':          null,
+  'samples':          'technician',
   'requests':         'technician',
   'sops_inventory':   'technician',
   'fish_stock':       null,
@@ -70,7 +75,7 @@ class _MenuPageState extends State<MenuPage> {
   bool _loadingUser = true;
   bool _collapsed = false;
 
-  final Set<String> _expandedGroups = {'Inventory', 'Fish Facility', 'Resources', 'Admin'};
+  final Set<String> _expandedGroups = {'Culture Collection', 'Fish Facility', 'Resources', 'Admin'};
 
   late final List<_NavItem> _topItems = [
     _NavItem(
@@ -89,13 +94,13 @@ class _MenuPageState extends State<MenuPage> {
       label: 'Chat',
       icon: Icons.forum_outlined,
       accent: const Color(0xFF22D3EE),
-      comingSoon: true,
+      builder: (_) => const LabChatPage(),
     ),
   ];
 
   late final List<_NavGroup> _groups = [
     _NavGroup(
-      label: 'Inventory',
+      label: 'Culture Collection',
       icon: Icons.inventory_2_outlined,
       children: [
         _NavItem(
@@ -120,9 +125,9 @@ class _MenuPageState extends State<MenuPage> {
       label: 'Fish Facility',
       icon: Icons.water_outlined,
       children: [
-        _NavItem(id: 'fish_stock',   label: 'Stock',            icon: Icons.set_meal_outlined,           accent: const Color(0xFF0EA5E9), comingSoon: true),
-        _NavItem(id: 'fish_tankmap', label: 'Tank Map',         icon: Icons.grid_view_outlined,          accent: const Color(0xFF38BDF8), comingSoon: true),
-        _NavItem(id: 'fish_lines',   label: 'Fish Lines',       icon: Icons.science_outlined,            accent: const Color(0xFF7DD3FC), comingSoon: true),
+        _NavItem(id: 'fish_stock',   label: 'Stock',            icon: Icons.set_meal_outlined,           accent: const Color(0xFF0EA5E9), builder: (_) => const FishStocksPage()),
+        _NavItem(id: 'fish_tankmap', label: 'Tank Map',         icon: Icons.grid_view_outlined,          accent: const Color(0xFF38BDF8), builder: (_) => const FishTanksPage()),
+        _NavItem(id: 'fish_lines',   label: 'Fish Lines',       icon: Icons.science_outlined,            accent: const Color(0xFF7DD3FC), builder: (_) => const FishLinesPage()),
         _NavItem(id: 'sops_fish',    label: 'SOPs / Protocols', icon: Icons.menu_book_outlined,          accent: const Color(0xFF06B6D4), comingSoon: true),
       ],
     ),
@@ -155,7 +160,7 @@ class _MenuPageState extends State<MenuPage> {
     try {
       final email = Supabase.instance.client.auth.currentSession?.user.email ?? '';
       final rows = await Supabase.instance.client
-          .from('users').select().eq('user_username', email).limit(1);
+          .from('users').select().eq('user_email', email).limit(1);
       if (rows.isNotEmpty) {
         setState(() {
           _userInfo = Map<String, dynamic>.from(rows[0]);
@@ -202,12 +207,12 @@ class _MenuPageState extends State<MenuPage> {
     try {
       final admins = await Supabase.instance.client
           .from('users')
-          .select('user_full_name, user_email')
+          .select('user_name, user_email, user_role')
           .inFilter('user_role', ['admin', 'superadmin'])
           .eq('user_status', 'active')
           .limit(1);
       if (admins.isNotEmpty) {
-        adminName  = admins[0]['user_full_name']?.toString() ?? adminName;
+        adminName  = admins[0]['user_name']?.toString() ?? adminName;
         adminEmail = admins[0]['user_email']?.toString()     ?? '';
       }
     } catch (_) {}
@@ -241,6 +246,33 @@ class _MenuPageState extends State<MenuPage> {
         ]),
       ),
     );
+  }
+
+  Future<void> _showEditUserDialog() async {
+    final result = await showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (ctx) => UserSettingsDialog(userInfo: _userInfo),
+    );
+
+    if (result == null) return; // cancelled
+
+    // merge and persist returned updates
+    final updates = Map<String, dynamic>.from(result);
+    updates['user_updated_at'] = DateTime.now().toUtc().toIso8601String();
+
+    try {
+      if (_userInfo['user_id'] != null) {
+        await Supabase.instance.client.from('users').update(updates).eq('user_id', _userInfo['user_id']);
+      } else {
+        await Supabase.instance.client.from('users').update(updates).eq('user_email', _userInfo['user_email']);
+      }
+      await _loadUserInfo();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
+    }
   }
 
   // ── Content ────────────────────────────────────────────────────────────────
@@ -286,9 +318,7 @@ class _MenuPageState extends State<MenuPage> {
     final bool collapsed = !isDrawer && _collapsed;
     final double w = collapsed ? 64.0 : 240.0;
     final userRole = _userInfo['user_role']?.toString() ?? '';
-    final userName = _userInfo['user_full_name']?.toString()
-        ?? _userInfo['user_username']?.toString()
-        ?? '';
+    final userName = _userInfo['user_name']?.toString() ?? '';
     final pendingCount = _pendingUsers.length;
 
     return AnimatedContainer(
@@ -436,26 +466,33 @@ class _MenuPageState extends State<MenuPage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
                 child: Row(children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor: const Color(0xFF6366F1).withOpacity(0.3),
-                    child: Text(
-                      userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: _showEditUserDialog,
+                    child: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: const Color(0xFF6366F1).withOpacity(0.3),
+                      child: Text(
+                        userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(userName, style: const TextStyle(color: Colors.white,
-                          fontSize: 12, fontWeight: FontWeight.w600),
-                          overflow: TextOverflow.ellipsis),
-                      Text(userRole, style: const TextStyle(
-                          color: Colors.white38, fontSize: 10),
-                          overflow: TextOverflow.ellipsis),
-                    ],
+                  Expanded(child: InkWell(
+                    onTap: _showEditUserDialog,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(userName, style: const TextStyle(color: Colors.white,
+                            fontSize: 12, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis),
+                        Text(userRole, style: const TextStyle(
+                            color: Colors.white38, fontSize: 10),
+                            overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
                   )),
                   if (pendingCount > 0)
                     Tooltip(
@@ -482,12 +519,16 @@ class _MenuPageState extends State<MenuPage> {
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Tooltip(
                   message: '$userName ($userRole)',
-                  child: CircleAvatar(
-                    radius: 14,
-                    backgroundColor: const Color(0xFF6366F1).withOpacity(0.3),
-                    child: Text(
-                      userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: _showEditUserDialog,
+                    child: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: const Color(0xFF6366F1).withOpacity(0.3),
+                      child: Text(
+                        userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
                     ),
                   ),
                 ),

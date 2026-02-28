@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'widgets/next_transfer_widget.dart';
-import 'widgets/strains_by_origin_widget.dart';
-import 'widgets/strains_by_medium_widget.dart';
-import 'widgets/transfer_status_widget.dart';
-import 'widgets/incare_widget.dart';
+import 'dashboard_widgets/next_transfer_widget.dart';
+import 'dashboard_widgets/strains_by_origin_widget.dart';
+import 'dashboard_widgets/strains_by_medium_widget.dart';
+import 'dashboard_widgets/transfer_status_widget.dart';
+import 'dashboard_widgets/incare_widget.dart';
 
 // All available widgets — add new ones here and they appear in the picker.
 const _availableWidgets = [

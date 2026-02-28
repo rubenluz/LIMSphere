@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,106 +8,18 @@ import 'package:open_filex/open_filex.dart';
 import 'dart:io';
 import 'sample_detail_page.dart';
 import '../excel_import_page.dart';
+import 'samples_columns.dart';
+import 'samples_design_tokens.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design tokens  (mirrors strains_page _DS)
-// ─────────────────────────────────────────────────────────────────────────────
-class _DS {
-  static const double headerH = 46.0;
-  static const double rowH    = 38.0;
-  static const double checkW  = 44.0;
-  static const double openW   = 40.0;
+// Design tokens and column definitions are now in separate files
+// - samples_design_tokens.dart (SamplesDS, preference keys, platform check)
+// - samples_columns.dart (SampleColDef, column definitions)
 
-  static const Color headerBg     = Color(0xFF1E293B);
-  static const Color headerText   = Color(0xFFCBD5E1);
-  static const Color headerBorder = Color(0xFF334155);
 
-  static const Color rowEven    = Color(0xFFFFFFFF);
-  static const Color rowOdd     = Color(0xFFF8FAFC);
-  static const Color selectedBg = Color(0xFFDBEAFE);
-  static const Color cellBorder = Color(0xFFE2E8F0);
+// Column definitions are now in samples_columns.dart
 
-  static const TextStyle headerStyle = TextStyle(
-    fontSize: 11, fontWeight: FontWeight.w700, color: headerText, letterSpacing: 0.4,
-  );
-  static const TextStyle cellStyle = TextStyle(fontSize: 12, color: Color(0xFF334155));
-  static const TextStyle readOnlyStyle = TextStyle(fontSize: 12, color: Color(0xFFAEB8C2));
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Column definition — keys match DB column names (sample_* prefix)
-// ─────────────────────────────────────────────────────────────────────────────
-class SampleColDef {
-  final String key;
-  final String label;
-  final double defaultWidth;
-  final bool readOnly;
-  const SampleColDef(this.key, this.label, {double width = 130, this.readOnly = false})
-      : defaultWidth = width;
-}
-
-const List<SampleColDef> _allColumns = [
-  // Identifiers
-  SampleColDef('sample_code',         'Code',                    width: 60,  readOnly: true),
-  SampleColDef('sample_rebeca',       'REBECA',                width: 120),
-  SampleColDef('sample_ccpi',         'CCPI',                  width: 110),
-  SampleColDef('sample_permit',       'Permit',                width: 120),
-  SampleColDef('sample_other_code',   'Other Code',            width: 120),
-  // Collection event
-  SampleColDef('sample_date',         'Date',                  width: 110),
-  SampleColDef('sample_collector',    'Collector',             width: 130),
-  SampleColDef('sample_responsible',  'Responsible',           width: 140),
-  // Geography
-  SampleColDef('sample_country',      'Country',               width: 120),
-  SampleColDef('sample_archipelago',  'Archipelago',           width: 130),
-  SampleColDef('sample_island',       'Island',                width: 120),
-  SampleColDef('sample_region',       'Region',                width: 120),
-  SampleColDef('sample_municipality', 'Municipality',          width: 140),
-  SampleColDef('sample_parish',       'Parish',                width: 120),
-  SampleColDef('sample_local',        'Local',                 width: 150),
-  SampleColDef('sample_gps',          'GPS',                   width: 180),
-  SampleColDef('sample_latitude',     'Latitude',              width: 100),
-  SampleColDef('sample_longitude',    'Longitude',             width: 110),
-  SampleColDef('sample_altitude_m',   'Altitude (m)',          width: 110),
-  // Habitat
-  SampleColDef('sample_habitat_type', 'Habitat Type',          width: 130),
-  SampleColDef('sample_habitat_1',    'Habitat 1',             width: 130),
-  SampleColDef('sample_habitat_2',    'Habitat 2',             width: 130),
-  SampleColDef('sample_habitat_3',    'Habitat 3',             width: 130),
-  SampleColDef('sample_substrate',    'Substrate',             width: 120),
-  SampleColDef('sample_method',       'Method',                width: 130),
-  // Physical-chemical
-  SampleColDef('sample_temperature',  '°C',                    width: 70),
-  SampleColDef('sample_ph',           'pH',                    width: 70),
-  SampleColDef('sample_conductivity', 'µS/cm',                 width: 100),
-  SampleColDef('sample_oxygen',       'O₂ (mg/L)',             width: 100),
-  SampleColDef('sample_salinity',     'Salinity',              width: 100),
-  SampleColDef('sample_radiation',    'Solar Radiation',       width: 130),
-  SampleColDef('sample_turbidity',    'Turbidity (NTU)',       width: 130),
-  SampleColDef('sample_depth_m',      'Depth (m)',             width: 100),
-  // Biological context
-  SampleColDef('sample_bloom',        'Bloom',                 width: 120),
-  SampleColDef('sample_associated_organisms', 'Associated Organisms', width: 170),
-  // Logistics
-  SampleColDef('sample_photos',       'Photos',                width: 100),
-  SampleColDef('sample_preservation', 'Preservation',          width: 130),
-  SampleColDef('sample_transport_time_h', 'Transport (h)',     width: 120),
-  // Admin
-  SampleColDef('sample_project',      'Project',               width: 130),
-  SampleColDef('sample_observations', 'Observations',          width: 200),
-];
-
-const _kSortKeys  = 'samples_sort_keys';
-const _kSortDirs  = 'samples_sort_dirs';
-const _kColWidths = 'samples_col_widths';
-const _kColOrder  = 'samples_col_order';
-const double _kMinColWidth = 40.0;
-
-bool _isDesktop(BuildContext context) {
-  if (kIsWeb) return true;
-  try { if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true; } catch (_) {}
-  return MediaQuery.of(context).size.width >= 720;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
@@ -159,12 +70,12 @@ class _SamplesPageState extends State<SamplesPage> {
   // ── Derived ────────────────────────────────────────────────────────────────
   List<SampleColDef> get _visibleCols {
     final ordered = _colOrder == null
-        ? List<SampleColDef>.from(_allColumns)
+        ? List<SampleColDef>.from(sampleAllColumns)
         : [
             ..._colOrder!
-                .map((k) { try { return _allColumns.firstWhere((c) => c.key == k); } catch (_) { return null; } })
+                .map((k) { try { return sampleAllColumns.firstWhere((c) => c.key == k); } catch (_) { return null; } })
                 .whereType<SampleColDef>(),
-            ..._allColumns.where((c) => !_colOrder!.contains(c.key)),
+            ...sampleAllColumns.where((c) => !_colOrder!.contains(c.key)),
           ];
     return ordered.where((col) {
       if (_hiddenCols.contains(col.key))   return false;
@@ -206,11 +117,11 @@ class _SamplesPageState extends State<SamplesPage> {
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      final keysStr = prefs.getString(_kSortKeys);
+      final keysStr = prefs.getString(samplePrefSortKeys);
       if (keysStr != null && keysStr.isNotEmpty) {
         _sortKeys = keysStr.split(',').where((s) => s.isNotEmpty).toList();
       }
-      final dirsStr = prefs.getString(_kSortDirs);
+      final dirsStr = prefs.getString(samplePrefSortDirs);
       if (dirsStr != null && dirsStr.isNotEmpty) {
         for (final part in dirsStr.split('|')) {
           final kv = part.split(':');
@@ -218,12 +129,12 @@ class _SamplesPageState extends State<SamplesPage> {
         }
       }
       for (final k in prefs.getKeys()) {
-        if (k.startsWith('$_kColWidths.')) {
+        if (k.startsWith('$samplePrefColWidths.')) {
           final w = prefs.getDouble(k);
-          if (w != null) _colWidths[k.substring('$_kColWidths.'.length)] = w;
+          if (w != null) _colWidths[k.substring('$samplePrefColWidths.'.length)] = w;
         }
       }
-      final saved = prefs.getString(_kColOrder);
+      final saved = prefs.getString(samplePrefColOrder);
       if (saved != null && saved.isNotEmpty) {
         _colOrder = saved.split(',').where((s) => s.isNotEmpty).toList();
       }
@@ -233,21 +144,21 @@ class _SamplesPageState extends State<SamplesPage> {
   Future<void> _saveSortPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     if (_sortKeys.isEmpty) {
-      await prefs.remove(_kSortKeys);
-      await prefs.remove(_kSortDirs);
+      await prefs.remove(samplePrefSortKeys);
+      await prefs.remove(samplePrefSortDirs);
     } else {
-      await prefs.setString(_kSortKeys, _sortKeys.join(','));
+      await prefs.setString(samplePrefSortKeys, _sortKeys.join(','));
       final dirsStr = _sortKeys.map((k) => '$k:${_sortDirs[k] == true ? "asc" : "desc"}').join('|');
-      await prefs.setString(_kSortDirs, dirsStr);
+      await prefs.setString(samplePrefSortDirs, dirsStr);
     }
   }
 
   Future<void> _saveColWidth(String key, double w) async =>
-      (await SharedPreferences.getInstance()).setDouble('$_kColWidths.$key', w);
+      (await SharedPreferences.getInstance()).setDouble('$samplePrefColWidths.$key', w);
 
   Future<void> _resetColWidths() async {
     final prefs = await SharedPreferences.getInstance();
-    for (final k in prefs.getKeys().where((k) => k.startsWith('$_kColWidths.')).toList()) {
+    for (final k in prefs.getKeys().where((k) => k.startsWith('$samplePrefColWidths.')).toList()) {
       await prefs.remove(k);
     }
     setState(() => _colWidths.clear());
@@ -255,16 +166,16 @@ class _SamplesPageState extends State<SamplesPage> {
 
   Future<void> _saveColOrder() async {
     if (_colOrder == null) return;
-    (await SharedPreferences.getInstance()).setString(_kColOrder, _colOrder!.join(','));
+    (await SharedPreferences.getInstance()).setString(samplePrefColOrder, _colOrder!.join(','));
   }
 
   Future<void> _resetColOrder() async {
-    await (await SharedPreferences.getInstance()).remove(_kColOrder);
+    await (await SharedPreferences.getInstance()).remove(samplePrefColOrder);
     setState(() => _colOrder = null);
   }
 
   void _reorderCol(String colKey, int toVisibleIndex) {
-    final all = _colOrder ?? _allColumns.map((c) => c.key).toList();
+    final all = _colOrder ?? sampleAllColumns.map((c) => c.key).toList();
     final mutable = List<String>.from(all)..remove(colKey);
     final visible = _visibleCols;
     String? anchorKey;
@@ -302,7 +213,7 @@ class _SamplesPageState extends State<SamplesPage> {
   }
 
   void _detectEmptyCols() {
-    _emptyColKeys = _allColumns
+    _emptyColKeys = sampleAllColumns
         .where((col) => !_rows.any((r) {
               final v = r[col.key];
               return v != null && v.toString().isNotEmpty;
@@ -540,7 +451,7 @@ class _SamplesPageState extends State<SamplesPage> {
   // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final desktop = _isDesktop(context);
+    final desktop = isSampleDesktop(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       resizeToAvoidBottomInset: false,
@@ -559,7 +470,7 @@ class _SamplesPageState extends State<SamplesPage> {
               onPressed: _addRow,
               icon: const Icon(Icons.add),
               label: const Text('New Sample'),
-              backgroundColor: _DS.headerBg,
+              backgroundColor: SamplesDS.headerBg,
               foregroundColor: Colors.white,
             ),
     );
@@ -588,7 +499,7 @@ class _SamplesPageState extends State<SamplesPage> {
     }
 
     return AppBar(
-      backgroundColor: _DS.headerBg,
+      backgroundColor: SamplesDS.headerBg,
       foregroundColor: Colors.white,
       elevation: 0,
       title: const Row(children: [
@@ -774,7 +685,7 @@ class _SamplesPageState extends State<SamplesPage> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             child: Wrap(
               spacing: 6, runSpacing: 6,
-              children: _allColumns.map((col) {
+              children: sampleAllColumns.map((col) {
                 final hidden = _hiddenCols.contains(col.key);
                 final empty  = _emptyColKeys.contains(col.key);
                 return FilterChip(
@@ -808,13 +719,13 @@ class _SamplesPageState extends State<SamplesPage> {
           onPressed: _addRow,
           icon: const Icon(Icons.add),
           label: const Text('Add First Sample'),
-          style: FilledButton.styleFrom(backgroundColor: _DS.headerBg),
+          style: FilledButton.styleFrom(backgroundColor: SamplesDS.headerBg),
         ),
       ]));
     }
 
     final cols = _visibleCols;
-    final totalWidth = (_selectionMode ? _DS.checkW : 0.0) + _DS.openW +
+    final totalWidth = (_selectionMode ? SamplesDS.checkW : 0.0) + SamplesDS.openW +
         cols.fold(0.0, (s, c) => s + _colWidth(c));
 
     return Padding(
@@ -847,7 +758,7 @@ class _SamplesPageState extends State<SamplesPage> {
                       child: ListView.builder(
                         controller: _vScroll,
                         itemCount: _filtered.length,
-                        itemExtent: _DS.rowH,
+                        itemExtent: SamplesDS.rowH,
                         itemBuilder: (ctx, i) => _buildDataRow(_filtered[i], i, cols),
                       ),
                     ),
@@ -877,18 +788,18 @@ class _SamplesPageState extends State<SamplesPage> {
   Widget _buildHeaderRow(List<SampleColDef> cols) {
     final allRowsSel = _filtered.isNotEmpty && _selectedRowIds.length == _filtered.length;
     return Container(
-      height: _DS.headerH,
+      height: SamplesDS.headerH,
       decoration: const BoxDecoration(
-          color: _DS.headerBg, border: Border(bottom: BorderSide(color: _DS.headerBorder))),
+          color: SamplesDS.headerBg, border: Border(bottom: BorderSide(color: SamplesDS.headerBorder))),
       child: Row(children: [
         if (_selectionMode)
-          SizedBox(width: _DS.checkW, child: Center(child: Checkbox(
+          SizedBox(width: SamplesDS.checkW, child: Center(child: Checkbox(
             value: allRowsSel ? true : (_selectedRowIds.isEmpty ? false : null),
             tristate: true, onChanged: (_) => _selectAllRows(),
-            activeColor: Colors.white, checkColor: _DS.headerBg,
+            activeColor: Colors.white, checkColor: SamplesDS.headerBg,
             side: const BorderSide(color: Colors.white38, width: 1.5),
           ))),
-        SizedBox(width: _DS.openW,
+        SizedBox(width: SamplesDS.openW,
             child: const Center(child: Icon(Icons.launch_rounded, size: 13, color: Colors.white30))),
         ...List.generate(cols.length, (i) {
           final col      = cols[i];
@@ -896,7 +807,7 @@ class _SamplesPageState extends State<SamplesPage> {
           final showDrop = _dropTargetIndex == i;
           final isColSel = _selectionMode && _selectedColKeys.contains(col.key);
           return Row(mainAxisSize: MainAxisSize.min, children: [
-            if (showDrop) Container(width: 2, height: _DS.headerH, color: const Color(0xFF60A5FA)),
+            if (showDrop) Container(width: 2, height: SamplesDS.headerH, color: const Color(0xFF60A5FA)),
             Opacity(
               opacity: isDrag ? 0.35 : 1.0,
               child: _DraggableHeader(
@@ -923,7 +834,7 @@ class _SamplesPageState extends State<SamplesPage> {
               ),
             ),
             if (i == cols.length - 1 && _dropTargetIndex == cols.length)
-              Container(width: 2, height: _DS.headerH, color: const Color(0xFF60A5FA)),
+              Container(width: 2, height: SamplesDS.headerH, color: const Color(0xFF60A5FA)),
           ]);
         }),
       ]),
@@ -938,15 +849,15 @@ class _SamplesPageState extends State<SamplesPage> {
     if (isColSelected) bgColor = const Color(0xFF1E40AF);
 
     return SizedBox(
-      width: width, height: _DS.headerH,
+      width: width, height: SamplesDS.headerH,
       child: Stack(clipBehavior: Clip.none, children: [
         MouseRegion(
           cursor: SystemMouseCursors.click,
           child: Container(
-            width: width, height: _DS.headerH,
+            width: width, height: SamplesDS.headerH,
             decoration: BoxDecoration(
               color: bgColor,
-              border: const Border(right: BorderSide(color: _DS.headerBorder)),
+              border: const Border(right: BorderSide(color: SamplesDS.headerBorder)),
             ),
             padding: const EdgeInsets.only(left: 8, right: 14),
             child: Row(children: [
@@ -954,9 +865,9 @@ class _SamplesPageState extends State<SamplesPage> {
                 Padding(padding: const EdgeInsets.only(right: 5),
                     child: Icon(Icons.check_box_rounded, size: 11, color: Colors.white.withOpacity(0.85))),
               Expanded(child: Text(col.label,
-                  style: _DS.headerStyle.copyWith(
+                  style: SamplesDS.headerStyle.copyWith(
                     color: isColSelected ? Colors.white :
-                           col.readOnly  ? Colors.white38 : _DS.headerText,
+                           col.readOnly  ? Colors.white38 : SamplesDS.headerText,
                   ),
                   overflow: TextOverflow.ellipsis)),
               if (!_selectionMode && isSorted)
@@ -978,7 +889,7 @@ class _SamplesPageState extends State<SamplesPage> {
         if (!_selectionMode)
           Positioned(right: -4, top: 0, bottom: 0, width: 8,
             child: _ColResizeHandle(
-              onDrag:    (d) => setState(() { _colWidths[col.key] = (_colWidth(col) + d).clamp(_kMinColWidth, 600.0); }),
+              onDrag:    (d) => setState(() { _colWidths[col.key] = (_colWidth(col) + d).clamp(sampleMinColWidth, 600.0); }),
               onDragEnd: ()  => _saveColWidth(col.key, _colWidth(col)),
             )),
       ]),
@@ -988,13 +899,13 @@ class _SamplesPageState extends State<SamplesPage> {
   // ── Data row ──────────────────────────────────────────────────────────────
   Widget _buildDataRow(Map<String, dynamic> row, int index, List<SampleColDef> cols) {
     final isSelected = _selectedRowIds.contains(row['sample_code']);
-    final Color rowBg   = isSelected ? _DS.selectedBg : index.isEven ? _DS.rowEven : _DS.rowOdd;
-    final Color cellBase = isSelected ? _DS.selectedBg : index.isEven ? _DS.rowEven : _DS.rowOdd;
+    final Color rowBg   = isSelected ? SamplesDS.selectedBg : index.isEven ? SamplesDS.rowEven : SamplesDS.rowOdd;
+    final Color cellBase = isSelected ? SamplesDS.selectedBg : index.isEven ? SamplesDS.rowEven : SamplesDS.rowOdd;
 
     return GestureDetector(
       onTap: _selectionMode ? () => _toggleRowSelection(row['sample_code']) : null,
       child: Container(
-        height: _DS.rowH,
+        height: SamplesDS.rowH,
         decoration: BoxDecoration(
           color: rowBg,
           border: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 0.5)),
@@ -1002,7 +913,7 @@ class _SamplesPageState extends State<SamplesPage> {
         child: Row(children: [
           if (_selectionMode)
             Container(
-              width: _DS.checkW, height: _DS.rowH, color: cellBase,
+              width: SamplesDS.checkW, height: SamplesDS.rowH, color: cellBase,
               child: Center(child: Checkbox(
                 value: isSelected,
                 onChanged: (_) => _toggleRowSelection(row['sample_code']),
@@ -1012,7 +923,7 @@ class _SamplesPageState extends State<SamplesPage> {
             ),
           // Open button
           Container(
-            width: _DS.openW, height: _DS.rowH, color: cellBase,
+            width: SamplesDS.openW, height: SamplesDS.rowH, color: cellBase,
             child: Center(child: IconButton(
               icon: Icon(Icons.launch_rounded, size: 14,
                   color: _selectionMode ? Colors.grey.shade400 : const Color(0xFF94A3B8)),
@@ -1042,10 +953,10 @@ class _SamplesPageState extends State<SamplesPage> {
         });
       },
       child: Container(
-        width: width, height: _DS.rowH,
+        width: width, height: SamplesDS.rowH,
         decoration: BoxDecoration(
           color: cellBase,
-          border: const Border(right: BorderSide(color: _DS.cellBorder)),
+          border: const Border(right: BorderSide(color: SamplesDS.cellBorder)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: isEditing
@@ -1067,7 +978,7 @@ class _SamplesPageState extends State<SamplesPage> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   row[col.key]?.toString() ?? '',
-                  style: isReadOnly ? _DS.readOnlyStyle : _DS.cellStyle,
+                  style: isReadOnly ? SamplesDS.readOnlyStyle : SamplesDS.cellStyle,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

@@ -1,5 +1,4 @@
 import 'package:blue_open_lims/functions/printing_strains.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -11,223 +10,16 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'dart:io';
+import 'strains_columns.dart';
+import 'strains_design_tokens.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Design tokens
-// ─────────────────────────────────────────────────────────────────────────────
-class _DS {
-  static const double headerH = 46.0;
-  static const double rowH    = 38.0;
-  static const double checkW  = 44.0;
-  static const double openW   = 40.0;
+// Design tokens and column definitions are now in separate files
+// - strains_design_tokens.dart (StrainsDS, status options, preferences, urgency enum, platform check)
+// - strains_columns.dart (StrainColDef, column definitions)
 
-  static const Color headerBg     = Color(0xFF1E293B);
-  static const Color headerText   = Color(0xFFCBD5E1);
-  static const Color headerBorder = Color(0xFF334155);
 
-  static const Color rowEven    = Color(0xFFFFFFFF);
-  static const Color rowOdd     = Color(0xFFF8FAFC);
-  static const Color selectedBg = Color(0xFFDBEAFE);
+// Column definitions are now in strains_columns.dart
 
-  static const Color overdueRowBg = Color(0xFFFFF1F2);
-  static const Color soonRowBg    = Color(0xFFFFFBEB);
-
-  static const Color cellBorder  = Color(0xFFE2E8F0);
-  static const Color blockedBg   = Color(0xFFFFF1F2);
-  static const Color blockedText = Color(0xFFEF4444);
-
-  static const Color aliveColor  = Color(0xFF16A34A);
-  static const Color deadColor   = Color(0xFFDC2626);
-  static const Color incareColor = Color(0xFFD97706);
-
-  static const TextStyle headerStyle = TextStyle(
-    fontSize: 11, fontWeight: FontWeight.w700, color: headerText, letterSpacing: 0.4,
-  );
-  static const TextStyle cellStyle = TextStyle(fontSize: 12, color: Color(0xFF334155));
-  static const TextStyle readOnlyStyle = TextStyle(fontSize: 12, color: Color(0xFFAEB8C2));
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Column definition
-// Keys now match the actual DB column names (strain_* and s_* for sample mirrors)
-// ─────────────────────────────────────────────────────────────────────────────
-class StrainColDef {
-  final String key;
-  final String label;
-  final double defaultWidth;
-  final bool readOnly;
-  final Set<String>? onlyFor;
-
-  const StrainColDef(this.key, this.label,
-      {double width = 130, this.readOnly = false, this.onlyFor})
-      : defaultWidth = width;
-}
-
-const List<StrainColDef> _allColumns = [
-  // Identity & status
-  StrainColDef('strain_code',               'Code',                   width: 100, readOnly: true),
-  StrainColDef('strain_status',             'Status',                 width: 100),
-  StrainColDef('strain_origin',             'Origin',                 width: 60,  readOnly: true),
-  StrainColDef('strain_toxins',             'Toxins',                 width: 100),
-  StrainColDef('strain_situation',          'Situation',              width: 110),
-  StrainColDef('strain_last_checked',       'Last Checked',           width: 120),
-  StrainColDef('strain_public',             'Public',                 width: 60),
-  StrainColDef('strain_private_collection', 'Private Collection',     width: 160),
-  StrainColDef('strain_type_strain',        'Type Strain',            width: 110),
-  StrainColDef('strain_biosafety_level',    'Biosafety Level',        width: 120),
-  StrainColDef('strain_other_codes',        'Other Codes',            width: 130),
-  // Taxonomy
-  StrainColDef('strain_empire',             'Empire',                 width: 100),
-  StrainColDef('strain_kingdom',            'Kingdom',                width: 110),
-  StrainColDef('strain_phylum',             'Phylum',                 width: 110),
-  StrainColDef('strain_class',              'Class',                  width: 110),
-  StrainColDef('strain_order',              'Order',                  width: 110),
-  StrainColDef('strain_family',             'Family',                 width: 120),
-  StrainColDef('strain_genus',              'Genus',                  width: 120),
-  StrainColDef('strain_species',            'Species',                width: 140),
-  StrainColDef('strain_subspecies',         'Subspecies',             width: 130),
-  StrainColDef('strain_variety',            'Variety',                width: 110),
-  StrainColDef('strain_scientific_name',    'Scientific Name',        width: 180),
-  StrainColDef('strain_authority',          'Authority',              width: 140),
-  StrainColDef('strain_other_names',        'Other Names / Old ID',   width: 170),
-  StrainColDef('strain_taxonomist',         'Taxonomist',             width: 130),
-  StrainColDef('strain_identification_method', 'ID Method',           width: 130),
-  StrainColDef('strain_identification_date',   'ID Date',             width: 120),
-  // Morphology
-  StrainColDef('strain_morphology',         'Morphology',             width: 120),
-  StrainColDef('strain_cell_shape',         'Cell Shape',             width: 110),
-  StrainColDef('strain_cell_size_um',       'Cell Size (µm)',         width: 120),
-  StrainColDef('strain_motility',           'Motility',               width: 100),
-  StrainColDef('strain_pigments',           'Pigments',               width: 110),
-  StrainColDef('strain_colonial_morphology','Colonial Morphology',    width: 160),
-  // Photos
-  StrainColDef('strain_photo',              'Photo',                  width: 100),
-  StrainColDef('strain_public_photo',       'Public Photo',           width: 120),
-  StrainColDef('strain_microscopy_photo',   'Microscopy Photo',       width: 150),
-  // Herbarium
-  StrainColDef('strain_herbarium_code',     'Herbarium Code',         width: 130),
-  StrainColDef('strain_herbarium_name',     'Herbarium Name',         width: 150),
-  StrainColDef('strain_herbarium_status',   'Herbarium Status',       width: 140),
-  StrainColDef('strain_herbarium_date',     'Herbarium Date',         width: 130),
-  StrainColDef('strain_herbarium_method',   'Herbarium Method',       width: 140),
-  StrainColDef('strain_herbarium_notes',    'Herbarium Notes',        width: 160),
-  // Culture maintenance
-  StrainColDef('strain_last_transfer',      'Last Transfer',          width: 120),
-  StrainColDef('strain_periodicity',        'Cycle (Days)',           width: 100),
-  StrainColDef('strain_next_transfer',      'Next Transfer',          width: 120, readOnly: true),
-  StrainColDef('strain_medium',             'Medium',                 width: 110),
-  StrainColDef('strain_medium_salinity',    'Medium Salinity',        width: 130),
-  StrainColDef('strain_light_cycle',        'Light Cycle',            width: 110),
-  StrainColDef('strain_light_intensity_umol', 'Light (µmol)',         width: 110),
-  StrainColDef('strain_temperature_c',      'Incubation °C',          width: 110),
-  StrainColDef('strain_co2_pct',            'CO₂ (%)',                width: 90),
-  StrainColDef('strain_aeration',           'Aeration',               width: 100),
-  StrainColDef('strain_culture_vessel',     'Culture Vessel',         width: 130),
-  StrainColDef('strain_room',               'Room',                   width: 100),
-  // Cryopreservation
-  StrainColDef('strain_cryo_date',          'Cryo Date',              width: 110),
-  StrainColDef('strain_cryo_method',        'Cryo Method',            width: 120),
-  StrainColDef('strain_cryo_location',      'Cryo Location',          width: 130),
-  StrainColDef('strain_cryo_vials',         'Cryo Vials',             width: 100),
-  StrainColDef('strain_cryo_responsible',   'Cryo Responsible',       width: 150),
-  // Isolation
-  StrainColDef('strain_isolation_responsible', 'Isolation Responsible', width: 170),
-  StrainColDef('strain_isolation_date',     'Isolation Date',         width: 120),
-  StrainColDef('strain_isolation_method',   'Isolation Method',       width: 140),
-  StrainColDef('strain_deposit_date',       'Deposit Date',           width: 120),
-  // Molecular — prokaryotes
-  StrainColDef('strain_seq_16s_bp',         '16S (bp)',               width: 90),
-  StrainColDef('strain_its',                'ITS',                    width: 80),
-  StrainColDef('strain_its_bands',          'ITS Bands',              width: 160),
-  StrainColDef('strain_cloned_gel',         'Cloned/GelExtraction',   width: 170),
-  StrainColDef('strain_genbank_16s_its',    'GenBank (16S+ITS)',      width: 160),
-  StrainColDef('strain_genbank_status',     'GenBank Status',         width: 130),
-  StrainColDef('strain_genome_pct',         'Genome (%)',             width: 100),
-  StrainColDef('strain_genome_cont',        'Genome (Cont.)',         width: 130),
-  StrainColDef('strain_genome_16s',         'Genome (16S)',           width: 120),
-  StrainColDef('strain_gca_accession',      'GCA Accession',          width: 130),
-  // Molecular — eukaryotes
-  StrainColDef('strain_seq_18s_bp',         '18S (bp)',               width: 90),
-  StrainColDef('strain_genbank_18s',        'GenBank (18S)',          width: 130),
-  StrainColDef('strain_its2_bp',            'ITS2 (bp)',              width: 90),
-  StrainColDef('strain_genbank_its2',       'GenBank (ITS2)',         width: 130),
-  StrainColDef('strain_rbcl_bp',            'rbcL (bp)',              width: 90),
-  StrainColDef('strain_genbank_rbcl',       'GenBank (rbcL)',         width: 130),
-  StrainColDef('strain_tufa_bp',            'tufA (bp)',              width: 90),
-  StrainColDef('strain_genbank_tufa',       'GenBank (tufA)',         width: 130),
-  StrainColDef('strain_cox1_bp',            'COX1 (bp)',              width: 90),
-  StrainColDef('strain_genbank_cox1',       'GenBank (COX1)',         width: 130),
-  // Bioactivity & references
-  StrainColDef('strain_bioactivity',        'Bioactivity',            width: 130),
-  StrainColDef('strain_metabolites',        'Metabolites',            width: 130),
-  StrainColDef('strain_industrial_use',     'Industrial Use',         width: 130),
-  StrainColDef('strain_growth_rate',        'Growth Rate',            width: 120),
-  StrainColDef('strain_publications',       'Publications',           width: 150),
-  StrainColDef('strain_external_links',     'External Links',         width: 150),
-  StrainColDef('strain_notes',              'Notes',                  width: 180),
-  StrainColDef('strain_qrcode',             'QR Code',                width: 100),
-  // Sample mirror fields (read-only, joined from samples table)
-  StrainColDef('s_rebeca',        'Sample REBECA',       width: 130, readOnly: true),
-  StrainColDef('s_ccpi',          'Sample CCPI',         width: 110, readOnly: true),
-  StrainColDef('s_date',          'Sample Date',         width: 110, readOnly: true),
-  StrainColDef('s_country',       'Country',             width: 120, readOnly: true),
-  StrainColDef('s_archipelago',   'Archipelago',         width: 130, readOnly: true),
-  StrainColDef('s_island',        'Island',              width: 110, readOnly: true),
-  StrainColDef('s_municipality',  'Municipality',        width: 140, readOnly: true),
-  StrainColDef('s_local',         'Local',               width: 140, readOnly: true),
-  StrainColDef('s_habitat_type',  'Habitat Type',        width: 120, readOnly: true),
-  StrainColDef('s_habitat_1',     'Habitat 1',           width: 120, readOnly: true),
-  StrainColDef('s_habitat_2',     'Habitat 2',           width: 120, readOnly: true),
-  StrainColDef('s_habitat_3',     'Habitat 3',           width: 120, readOnly: true),
-  StrainColDef('s_method',        'Method',              width: 120, readOnly: true),
-  StrainColDef('s_gps',           'GPS',                 width: 160, readOnly: true),
-  StrainColDef('s_temperature',   '°C',                  width: 70,  readOnly: true),
-  StrainColDef('s_ph',            'pH',                  width: 70,  readOnly: true),
-  StrainColDef('s_conductivity',  'µS/cm',               width: 90,  readOnly: true),
-  StrainColDef('s_oxygen',        'O₂ (mg/L)',           width: 90,  readOnly: true),
-  StrainColDef('s_salinity',      'Salinity',            width: 100, readOnly: true),
-  StrainColDef('s_radiation',     'Solar Radiation',     width: 130, readOnly: true),
-  StrainColDef('s_responsible',   'Sampling Responsible',width: 160, readOnly: true),
-  StrainColDef('s_observations',  'Sample Observations', width: 180, readOnly: true),
-];
-
-const _statusOptions = ['ALIVE', 'INCARE', 'DEAD'];
-
-enum _TU { overdue, soon, ok, unknown }
-
-_TU _urgency(Map<String, dynamic> row) {
-  final v = row['strain_next_transfer']?.toString();
-  if (v == null || v.isEmpty) return _TU.unknown;
-  try {
-    final d = DateTime.parse(v).difference(DateTime.now()).inDays;
-    if (d < 0) return _TU.overdue;
-    if (d <= 7) return _TU.soon;
-    return _TU.ok;
-  } catch (_) {
-    return _TU.unknown;
-  }
-}
-
-class _ActiveFilter {
-  final String column;
-  final String label;
-  String value;
-  _ActiveFilter(this.column, this.label, this.value);
-}
-
-const _kSortKeys  = 'strains_sort_keys';
-const _kSortDirs  = 'strains_sort_dirs';
-const _kColWidths = 'strains_col_widths';
-const _kColOrder  = 'strains_col_order';
-const double _kMinColWidth = 40.0;
-
-bool _isDesktopPlatform(BuildContext context) {
-  if (kIsWeb) return true;
-  try {
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
-  } catch (_) {}
-  return MediaQuery.of(context).size.width >= 720;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
@@ -262,7 +54,7 @@ class _StrainsPageState extends State<StrainsPage> {
   final _searchController = TextEditingController();
   bool _showFilters    = false;
   bool _showColManager = false;
-  final List<_ActiveFilter> _activeFilters = [];
+  final List<ActiveFilter> _activeFilters = [];
   List<int> _periodicityOptions = [];
   int?      _selectedPeriodicity;
 
@@ -285,18 +77,18 @@ class _StrainsPageState extends State<StrainsPage> {
   // ── Derived ────────────────────────────────────────────────────────────────
   List<StrainColDef> get _visibleCols {
     final ordered = _colOrder == null
-        ? List<StrainColDef>.from(_allColumns)
+        ? List<StrainColDef>.from(strainAllColumns)
         : [
             ..._colOrder!
                 .map((k) {
                   try {
-                    return _allColumns.firstWhere((c) => c.key == k);
+                    return strainAllColumns.firstWhere((c) => c.key == k);
                   } catch (_) {
                     return null;
                   }
                 })
                 .whereType<StrainColDef>(),
-            ..._allColumns.where((c) => !_colOrder!.contains(c.key)),
+            ...strainAllColumns.where((c) => !_colOrder!.contains(c.key)),
           ];
     return ordered.where((col) {
       if (_hiddenCols.contains(col.key))   return false;
@@ -342,11 +134,11 @@ class _StrainsPageState extends State<StrainsPage> {
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      final keysStr = prefs.getString(_kSortKeys);
+      final keysStr = prefs.getString(strainPrefSortKeys);
       if (keysStr != null && keysStr.isNotEmpty) {
         _sortKeys = keysStr.split(',').where((s) => s.isNotEmpty).toList();
       }
-      final dirsStr = prefs.getString(_kSortDirs);
+      final dirsStr = prefs.getString(strainPrefSortDirs);
       if (dirsStr != null && dirsStr.isNotEmpty) {
         for (final part in dirsStr.split('|')) {
           final kv = part.split(':');
@@ -354,12 +146,12 @@ class _StrainsPageState extends State<StrainsPage> {
         }
       }
       for (final k in prefs.getKeys()) {
-        if (k.startsWith('$_kColWidths.')) {
+        if (k.startsWith('$strainPrefColWidths.')) {
           final w = prefs.getDouble(k);
-          if (w != null) _colWidths[k.substring('$_kColWidths.'.length)] = w;
+          if (w != null) _colWidths[k.substring('$strainPrefColWidths.'.length)] = w;
         }
       }
-      final saved = prefs.getString(_kColOrder);
+      final saved = prefs.getString(strainPrefColOrder);
       if (saved != null && saved.isNotEmpty) {
         _colOrder = saved.split(',').where((s) => s.isNotEmpty).toList();
       }
@@ -369,26 +161,26 @@ class _StrainsPageState extends State<StrainsPage> {
   Future<void> _saveSortPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     if (_sortKeys.isEmpty) {
-      await prefs.remove(_kSortKeys);
-      await prefs.remove(_kSortDirs);
+      await prefs.remove(strainPrefSortKeys);
+      await prefs.remove(strainPrefSortDirs);
     } else {
-      await prefs.setString(_kSortKeys, _sortKeys.join(','));
+      await prefs.setString(strainPrefSortKeys, _sortKeys.join(','));
       final dirsStr = _sortKeys
           .map((k) => '$k:${_sortDirs[k] == true ? "asc" : "desc"}')
           .join('|');
-      await prefs.setString(_kSortDirs, dirsStr);
+      await prefs.setString(strainPrefSortDirs, dirsStr);
     }
   }
 
   Future<void> _saveColWidth(String colKey, double width) async =>
       (await SharedPreferences.getInstance())
-          .setDouble('$_kColWidths.$colKey', width);
+          .setDouble('$strainPrefColWidths.$colKey', width);
 
   Future<void> _resetColWidths() async {
     final prefs = await SharedPreferences.getInstance();
     for (final k in prefs
         .getKeys()
-        .where((k) => k.startsWith('$_kColWidths.'))
+        .where((k) => k.startsWith('$strainPrefColWidths.'))
         .toList()) {
       await prefs.remove(k);
     }
@@ -398,16 +190,16 @@ class _StrainsPageState extends State<StrainsPage> {
   Future<void> _saveColOrder() async {
     if (_colOrder == null) return;
     await (await SharedPreferences.getInstance())
-        .setString(_kColOrder, _colOrder!.join(','));
+        .setString(strainPrefColOrder, _colOrder!.join(','));
   }
 
   Future<void> _resetColOrder() async {
-    await (await SharedPreferences.getInstance()).remove(_kColOrder);
+    await (await SharedPreferences.getInstance()).remove(strainPrefColOrder);
     setState(() => _colOrder = null);
   }
 
   void _reorderCol(String colKey, int toVisibleIndex) {
-    final all = _colOrder ?? _allColumns.map((c) => c.key).toList();
+    final all = _colOrder ?? strainAllColumns.map((c) => c.key).toList();
     final mutable = List<String>.from(all)..remove(colKey);
     final visible = _visibleCols;
     String? anchorKey;
@@ -509,7 +301,7 @@ class _StrainsPageState extends State<StrainsPage> {
   }
 
   void _detectEmptyCols() {
-    _emptyColKeys = _allColumns
+    _emptyColKeys = strainAllColumns
         .where((col) => !_rows.any((r) {
               final v = r[col.key];
               return v != null && v.toString().isNotEmpty;
@@ -647,7 +439,7 @@ class _StrainsPageState extends State<StrainsPage> {
       context: context,
       position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 1, pos.dy + 1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      items: _statusOptions
+      items: strainStatusOptions
           .map((s) => PopupMenuItem<String>(
                 value: s,
                 child: Row(children: [
@@ -780,9 +572,9 @@ class _StrainsPageState extends State<StrainsPage> {
   }
 
   Color _statusColor(String? s) {
-    if (s == 'ALIVE')  return _DS.aliveColor;
-    if (s == 'DEAD')   return _DS.deadColor;
-    if (s == 'INCARE') return _DS.incareColor;
+    if (s == 'ALIVE')  return StrainsDS.aliveColor;
+    if (s == 'DEAD')   return StrainsDS.deadColor;
+    if (s == 'INCARE') return StrainsDS.incareColor;
     return Colors.grey;
   }
 
@@ -1018,7 +810,7 @@ class _StrainsPageState extends State<StrainsPage> {
   // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final desktop = _isDesktopPlatform(context);
+    final desktop = isDesktopPlatform(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       resizeToAvoidBottomInset: false,
@@ -1063,7 +855,7 @@ class _StrainsPageState extends State<StrainsPage> {
     }
 
     return AppBar(
-      backgroundColor: _DS.headerBg,
+      backgroundColor: StrainsDS.headerBg,
       foregroundColor: Colors.white,
       elevation: 0,
       title: Row(children: [
@@ -1363,7 +1155,7 @@ class _StrainsPageState extends State<StrainsPage> {
     );
   }
 
-  void _editFilterValue(_ActiveFilter f) async {
+  void _editFilterValue(ActiveFilter f) async {
     final ctrl = TextEditingController(text: f.value);
     await showDialog<void>(
         context: context,
@@ -1402,7 +1194,7 @@ class _StrainsPageState extends State<StrainsPage> {
   // ── Filter panel ──────────────────────────────────────────────────────────
   Widget _buildFilterPanel() {
     final filterableCols =
-        _allColumns.where((c) => !c.readOnly).toList();
+        strainAllColumns.where((c) => !c.readOnly).toList();
     String? pickedColKey;
     return StatefulBuilder(
         builder: (ctx, setPanel) => Container(
@@ -1486,14 +1278,14 @@ class _StrainsPageState extends State<StrainsPage> {
                           onPressed: pickedColKey == null
                               ? null
                               : () {
-                                  final col = _allColumns.firstWhere(
+                                  final col = strainAllColumns.firstWhere(
                                       (c) => c.key == pickedColKey);
                                   if (_activeFilters.any(
                                       (f) =>
                                           f.column == pickedColKey)) {
                                     return;
                                   }
-                                  final filter = _ActiveFilter(
+                                  final filter = ActiveFilter(
                                       col.key, col.label, '');
                                   setState(
                                       () => _activeFilters.add(filter));
@@ -1559,12 +1351,7 @@ class _StrainsPageState extends State<StrainsPage> {
   // ── Column manager ────────────────────────────────────────────────────────
   Widget _buildColumnManager() {
   // Build a full ordered list of all columns with their current visibility and width
-  final orderedKeys = _colOrder ?? _allColumns.map((c) => c.key).toList();
-  // Ensure all columns are represented (in case new ones were added)
-  final allKeys = [
-    ...orderedKeys,
-    ..._allColumns.map((c) => c.key).where((k) => !orderedKeys.contains(k)),
-  ];
+  final orderedKeys = _colOrder ?? strainAllColumns.map((c) => c.key).toList();
 
   return Container(
     constraints: const BoxConstraints(maxHeight: 420),
@@ -1631,10 +1418,10 @@ class _StrainsPageState extends State<StrainsPage> {
           child: StatefulBuilder(
             builder: (ctx, setPanel) {
               // Rebuild ordered list from current state
-              final orderedKeys2 = _colOrder ?? _allColumns.map((c) => c.key).toList();
+              final orderedKeys2 = _colOrder ?? strainAllColumns.map((c) => c.key).toList();
               final displayKeys = [
                 ...orderedKeys2,
-                ..._allColumns.map((c) => c.key).where((k) => !orderedKeys2.contains(k)),
+                ...strainAllColumns.map((c) => c.key).where((k) => !orderedKeys2.contains(k)),
               ];
 
               return ListView.separated(
@@ -1644,10 +1431,10 @@ class _StrainsPageState extends State<StrainsPage> {
                 itemBuilder: (ctx, i) {
                   final key = displayKeys[i];
                   StrainColDef? colDef;
-                  try { colDef = _allColumns.firstWhere((c) => c.key == key); } catch (_) { return const SizedBox.shrink(); }
+                  try { colDef = strainAllColumns.firstWhere((c) => c.key == key); } catch (_) { return const SizedBox.shrink(); }
 
                   final isHidden = _hiddenCols.contains(key) || _emptyColKeys.contains(key);
-                  final currentWidth = _colWidths[key] ?? colDef.defaultWidth;
+                  final currentWidth = _colWidths[key] ?? colDef!.defaultWidth;
                   final position = i + 1; // 1-based
 
                   return Container(
@@ -1675,13 +1462,13 @@ class _StrainsPageState extends State<StrainsPage> {
                       // Column label
                       Expanded(
                         child: Row(children: [
-                          if (colDef.readOnly)
+                          if (colDef!.readOnly)
                             Padding(
                               padding: const EdgeInsets.only(right: 4),
                               child: Icon(Icons.lock_outline_rounded, size: 10, color: Colors.grey.shade400),
                             ),
                           Flexible(
-                            child: Text(colDef.label,
+                            child: Text(colDef!.label,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isHidden ? Colors.grey.shade400 : const Color(0xFF334155),
@@ -1769,13 +1556,13 @@ class _StrainsPageState extends State<StrainsPage> {
             icon: const Icon(Icons.add),
             label: const Text('Add First Strain'),
             style:
-                FilledButton.styleFrom(backgroundColor: _DS.headerBg)),
+                FilledButton.styleFrom(backgroundColor: StrainsDS.headerBg)),
       ]));
     }
 
     final cols = _visibleCols;
-    final totalWidth = (_selectionMode ? _DS.checkW : 0.0) +
-        _DS.openW +
+    final totalWidth = (_selectionMode ? StrainsDS.checkW : 0.0) +
+        StrainsDS.openW +
         cols.fold(0.0, (s, c) => s + _colWidth(c));
 
     return Padding(
@@ -1815,7 +1602,7 @@ class _StrainsPageState extends State<StrainsPage> {
                       child: ListView.builder(
                         controller: _vScroll,
                         itemCount: _filtered.length,
-                        itemExtent: _DS.rowH,
+                        itemExtent: StrainsDS.rowH,
                         itemBuilder: (ctx, i) {
                           final row = _filtered[i];
                           return _buildDataRow(row, i, cols,
@@ -1854,15 +1641,15 @@ class _StrainsPageState extends State<StrainsPage> {
         _filtered.isNotEmpty &&
         _selectedRowIds.length == _filtered.length;
     return Container(
-      height: _DS.headerH,
+      height: StrainsDS.headerH,
       decoration: const BoxDecoration(
-          color: _DS.headerBg,
+          color: StrainsDS.headerBg,
           border: Border(
-              bottom: BorderSide(color: _DS.headerBorder))),
+              bottom: BorderSide(color: StrainsDS.headerBorder))),
       child: Row(children: [
         if (_selectionMode)
           SizedBox(
-              width: _DS.checkW,
+              width: StrainsDS.checkW,
               child: Center(
                   child: Checkbox(
                 value: allRowsSel
@@ -1871,12 +1658,12 @@ class _StrainsPageState extends State<StrainsPage> {
                 tristate: true,
                 onChanged: (_) => _selectAllRows(),
                 activeColor: Colors.white,
-                checkColor: _DS.headerBg,
+                checkColor: StrainsDS.headerBg,
                 side: const BorderSide(
                     color: Colors.white38, width: 1.5),
               ))),
         SizedBox(
-            width: _DS.openW,
+            width: StrainsDS.openW,
             child: Center(
                 child: Icon(Icons.launch_rounded,
                     size: 13, color: Colors.white30))),
@@ -1890,7 +1677,7 @@ class _StrainsPageState extends State<StrainsPage> {
             if (showDrop)
               Container(
                   width: 2,
-                  height: _DS.headerH,
+                  height: StrainsDS.headerH,
                   color: const Color(0xFF60A5FA)),
             Opacity(
               opacity: isDrag ? 0.35 : 1.0,
@@ -1940,7 +1727,7 @@ class _StrainsPageState extends State<StrainsPage> {
                 _dropTargetIndex == cols.length)
               Container(
                   width: 2,
-                  height: _DS.headerH,
+                  height: StrainsDS.headerH,
                   color: const Color(0xFF60A5FA)),
           ]);
         }),
@@ -1963,17 +1750,17 @@ class _StrainsPageState extends State<StrainsPage> {
 
     return SizedBox(
       width: width,
-      height: _DS.headerH,
+      height: StrainsDS.headerH,
       child: Stack(clipBehavior: Clip.none, children: [
         MouseRegion(
           cursor: SystemMouseCursors.click,
           child: Container(
             width: width,
-            height: _DS.headerH,
+            height: StrainsDS.headerH,
             decoration: BoxDecoration(
               color: bgColor,
               border: const Border(
-                  right: BorderSide(color: _DS.headerBorder)),
+                  right: BorderSide(color: StrainsDS.headerBorder)),
             ),
             padding: const EdgeInsets.only(left: 8, right: 14),
             child: Row(children: [
@@ -1985,14 +1772,14 @@ class _StrainsPageState extends State<StrainsPage> {
                         color: Colors.white.withOpacity(0.85))),
               Expanded(
                   child: Text(col.label,
-                      style: _DS.headerStyle.copyWith(
+                      style: StrainsDS.headerStyle.copyWith(
                         color: blocked
                             ? Colors.white24
                             : isColSelected
                                 ? Colors.white
                                 : col.readOnly
                                     ? Colors.white38
-                                    : _DS.headerText,
+                                    : StrainsDS.headerText,
                       ),
                       overflow: TextOverflow.ellipsis)),
               if (!_selectionMode)
@@ -2036,7 +1823,7 @@ class _StrainsPageState extends State<StrainsPage> {
               child: _ColResizeHandle(
                 onDrag: (d) => setState(() {
                   _colWidths[col.key] =
-                      (_colWidth(col) + d).clamp(_kMinColWidth, 600.0);
+                      (_colWidth(col) + d).clamp(strainMinColWidth, 600.0);
                 }),
                 onDragEnd: () =>
                     _saveColWidth(col.key, _colWidth(col)),
@@ -2049,28 +1836,28 @@ class _StrainsPageState extends State<StrainsPage> {
   Widget _buildDataRow(Map<String, dynamic> row, int index,
       List<StrainColDef> cols,
       {bool highlight = false}) {
-    final urgency = _urgency(row);
+    final urgency = calculateStrainUrgency(row);
     final isSelected = _selectedRowIds.contains(row['strain_id']);
 
     Color rowBg;
-    if (isSelected)                  rowBg = _DS.selectedBg;
-    else if (highlight)              rowBg = const Color(0xFFDEF1FF);
-    else if (urgency == _TU.overdue) rowBg = _DS.overdueRowBg;
-    else if (urgency == _TU.soon)    rowBg = _DS.soonRowBg;
-    else if (index.isEven)           rowBg = _DS.rowEven;
-    else                             rowBg = _DS.rowOdd;
+    if (isSelected)                           rowBg = StrainsDS.selectedBg;
+    else if (highlight)                       rowBg = const Color(0xFFDEF1FF);
+    else if (urgency == StrainTransferUrgency.overdue) rowBg = StrainsDS.overdueRowBg;
+    else if (urgency == StrainTransferUrgency.soon)    rowBg = StrainsDS.soonRowBg;
+    else if (index.isEven)                   rowBg = StrainsDS.rowEven;
+    else                                     rowBg = StrainsDS.rowOdd;
 
     final Color cellBase = isSelected
-        ? _DS.selectedBg
+        ? StrainsDS.selectedBg
         : index.isEven
-            ? _DS.rowEven
-            : _DS.rowOdd;
+            ? StrainsDS.rowEven
+            : StrainsDS.rowOdd;
 
     return GestureDetector(
       onTap:
           _selectionMode ? () => _toggleRowSelection(row['strain_id']) : null,
       child: Container(
-        height: _DS.rowH,
+        height: StrainsDS.rowH,
         decoration: BoxDecoration(
           color: rowBg,
           border: const Border(
@@ -2080,8 +1867,8 @@ class _StrainsPageState extends State<StrainsPage> {
         child: Row(children: [
           if (_selectionMode)
             Container(
-              width: _DS.checkW,
-              height: _DS.rowH,
+              width: StrainsDS.checkW,
+              height: StrainsDS.rowH,
               color: cellBase,
               child: Center(
                   child: Checkbox(
@@ -2093,8 +1880,8 @@ class _StrainsPageState extends State<StrainsPage> {
               )),
             ),
           Container(
-            width: _DS.openW,
-            height: _DS.rowH,
+            width: StrainsDS.openW,
+            height: StrainsDS.rowH,
             color: cellBase,
             child: Center(
                 child: IconButton(
@@ -2131,7 +1918,7 @@ class _StrainsPageState extends State<StrainsPage> {
     final isComputed = col.key == 'strain_next_transfer' &&
         row['_next_transfer_computed'] == true;
 
-    Color cellBg = blocked ? _DS.blockedBg : cellBase;
+    Color cellBg = blocked ? StrainsDS.blockedBg : cellBase;
 
     return GestureDetector(
       onDoubleTap:
@@ -2170,11 +1957,11 @@ class _StrainsPageState extends State<StrainsPage> {
                 },
       child: Container(
         width: width,
-        height: _DS.rowH,
+        height: StrainsDS.rowH,
         decoration: BoxDecoration(
             color: cellBg,
             border: const Border(
-                right: BorderSide(color: _DS.cellBorder))),
+                right: BorderSide(color: StrainsDS.cellBorder))),
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: isEditing
             ? Center(
@@ -2220,17 +2007,17 @@ class _StrainsPageState extends State<StrainsPage> {
                               ? '—'
                               : (row[col.key]?.toString() ?? ''),
                           style: blocked
-                              ? _DS.cellStyle.copyWith(
-                                  color: _DS.blockedText
+                              ? StrainsDS.cellStyle.copyWith(
+                                  color: StrainsDS.blockedText
                                       .withOpacity(0.4))
                               : isReadOnly
-                                  ? _DS.readOnlyStyle
+                                  ? StrainsDS.readOnlyStyle
                                   : isComputed
-                                      ? _DS.cellStyle.copyWith(
+                                      ? StrainsDS.cellStyle.copyWith(
                                           color:
                                               const Color(0xFF3B82F6),
                                           fontStyle: FontStyle.italic)
-                                      : _DS.cellStyle,
+                                      : StrainsDS.cellStyle,
                           overflow: TextOverflow.ellipsis,
                         )),
                       ]),
@@ -2248,9 +2035,9 @@ class _StatusCell extends StatelessWidget {
   const _StatusCell({this.status});
 
   Color get _color {
-    if (status == 'ALIVE')  return _DS.aliveColor;
-    if (status == 'DEAD')   return _DS.deadColor;
-    if (status == 'INCARE') return _DS.incareColor;
+    if (status == 'ALIVE')  return StrainsDS.aliveColor;
+    if (status == 'DEAD')   return StrainsDS.deadColor;
+    if (status == 'INCARE') return StrainsDS.incareColor;
     return Colors.grey;
   }
 
@@ -2304,12 +2091,12 @@ class _ToolbarChip extends StatelessWidget {
             horizontal: compact ? 8 : 10, vertical: compact ? 4 : 6),
         decoration: BoxDecoration(
           color: selected
-              ? _DS.headerBg
+              ? StrainsDS.headerBg
               : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
               color: selected
-                  ? _DS.headerBg
+                  ? StrainsDS.headerBg
                   : const Color(0xFFCBD5E1)),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [

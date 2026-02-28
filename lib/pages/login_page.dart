@@ -73,7 +73,7 @@ class _LoginPageState extends State<LoginPage> {
       final userRows = await Supabase.instance.client
           .from('users')
           .select()
-          .eq('user_username', email)
+          .eq('user_email', email)
           .limit(1);
 
       if ((userRows as List).isEmpty) throw Exception('User record not found.');
@@ -166,7 +166,7 @@ class _LoginPageState extends State<LoginPage> {
                             color: Theme.of(context).colorScheme.primary),
                         const SizedBox(height: 16),
                         const Text(
-                          'Culture Collection Manager',
+                          'BlueOpenLIMS',
                           style: TextStyle(
                               fontSize: 20, fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,

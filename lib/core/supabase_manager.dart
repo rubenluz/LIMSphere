@@ -110,15 +110,35 @@ class SupabaseManager {
       return false;
     }
   }
+// ── Tanks ─────────────────────────────────────────────────────────────────
+  Future<List<ZebrafishTank>> fetchTanks({String? rack}) async {
+    var q = _client?.from('zebrafish_facility').select();
+    if (rack != null) q = q?.eq('zebra_rack', rack) as dynamic;
+    final rows = await q?.order('zebra_tank_id') as List<dynamic>;
+    return rows.map((r) => ZebrafishTank.fromMap(r as Map<String, dynamic>)).toList();
+  }
 
-  static Future<bool> _checkTablesDirectly(List<String> tables) async {
-    try {
-      for (final table in tables) {
-        await client.from(table).select('*').limit(1);
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
+  Future<void> upsertTank(ZebrafishTank tank) async {
+    await _client?.from('zebrafish_facility').upsert(tank.toMap());
+  }
+
+  Future<void> deleteTank(String tankId) async {
+    await _client?.from('zebrafish_facility').delete().eq('zebra_tank_id', tankId);
+  }
+
+  // ── Fish Lines ────────────────────────────────────────────────────────────
+  Future<List<FishLine>> fetchLines() async {
+    final rows = await _client?.from('fishlines').select().order('fishline_name') as List<dynamic>;
+    return rows.map((r) => FishLine.fromMap(r as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> upsertLine(FishLine line) async {
+    final data = line.toMap();
+    data['fishline_updated_at'] = DateTime.now().toIso8601String();
+    await _client?.from('fishlines').upsert(data);
+  }
+
+  Future<void> deleteLine(int lineId) async {
+    await _client?.from('fishlines').delete().eq('fishline_id', lineId);
   }
 }

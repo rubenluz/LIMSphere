@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io' show Platform;
-import '../strains/strain_detail_page.dart'; // adjust import path as needed
+import '../culture_collection/strain_detail_page.dart'; // adjust import path as needed
 
 class InCareWidget extends StatefulWidget {
   const InCareWidget({super.key});
