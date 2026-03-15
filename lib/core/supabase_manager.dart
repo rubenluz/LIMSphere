@@ -1,10 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
-import '../models/connection_model.dart';
+import '../pages/database_connection/database_connection_model.dart';
 import 'local_storage.dart';
 
 class SupabaseManager {
   static SupabaseClient? _client;
   static String? _currentUrl;
+  static String? currentName;
 
   static SupabaseClient get client {
     if (_client == null) throw Exception('Supabase not initialized');
@@ -12,6 +13,17 @@ class SupabaseManager {
   }
 
   static bool get isInitialized => _client != null;
+
+  /// Extracts the Supabase project reference ID from the URL.
+  /// e.g. https://abcdefgh.supabase.co → 'abcdefgh'
+  static String? get projectRef {
+    if (_currentUrl == null) return null;
+    try {
+      return Uri.parse(_currentUrl!).host.split('.').first;
+    } catch (_) {
+      return null;
+    }
+  }
 
   static bool get hasActiveSession {
     if (!isInitialized) return false;
@@ -21,6 +33,7 @@ class SupabaseManager {
   /// MAIN INITIALIZATION (used when user selects a connection)
   static Future<void> initialize(ConnectionModel conn) async {
     await _init(conn.url, conn.anonKey);
+    currentName = conn.name;
     await LocalStorage.saveLastConnection(conn);
   }
 
@@ -30,6 +43,7 @@ class SupabaseManager {
     if (conn == null) return false;
     try {
       await _init(conn.url, conn.anonKey);
+      currentName = conn.name;
       return true;
     } catch (_) {
       return false;
@@ -76,6 +90,7 @@ class SupabaseManager {
     } catch (_) {}
     _client = null;
     _currentUrl = null;
+    currentName = null;
     await LocalStorage.clearLastConnection();
   }
 
@@ -109,36 +124,5 @@ class SupabaseManager {
     } catch (_) {
       return false;
     }
-  }
-// ── Tanks ─────────────────────────────────────────────────────────────────
-  Future<List<ZebrafishTank>> fetchTanks({String? rack}) async {
-    var q = _client?.from('zebrafish_facility').select();
-    if (rack != null) q = q?.eq('zebra_rack', rack) as dynamic;
-    final rows = await q?.order('zebra_tank_id') as List<dynamic>;
-    return rows.map((r) => ZebrafishTank.fromMap(r as Map<String, dynamic>)).toList();
-  }
-
-  Future<void> upsertTank(ZebrafishTank tank) async {
-    await _client?.from('zebrafish_facility').upsert(tank.toMap());
-  }
-
-  Future<void> deleteTank(String tankId) async {
-    await _client?.from('zebrafish_facility').delete().eq('zebra_tank_id', tankId);
-  }
-
-  // ── Fish Lines ────────────────────────────────────────────────────────────
-  Future<List<FishLine>> fetchLines() async {
-    final rows = await _client?.from('fishlines').select().order('fishline_name') as List<dynamic>;
-    return rows.map((r) => FishLine.fromMap(r as Map<String, dynamic>)).toList();
-  }
-
-  Future<void> upsertLine(FishLine line) async {
-    final data = line.toMap();
-    data['fishline_updated_at'] = DateTime.now().toIso8601String();
-    await _client?.from('fishlines').upsert(data);
-  }
-
-  Future<void> deleteLine(int lineId) async {
-    await _client?.from('fishlines').delete().eq('fishline_id', lineId);
   }
 }

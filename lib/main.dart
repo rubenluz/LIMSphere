@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import 'core/local_storage.dart';
 import 'core/supabase_manager.dart';
-import 'pages/connections_page.dart';
-import 'pages/add_connection_page.dart';
-import 'pages/menu_page.dart';
-import 'pages/database_check_page.dart';
-import 'pages/setup_page.dart';
-import 'pages/set_admin_login_page.dart';
-import 'pages/login_page.dart';
+import 'pages/database_connection/connections_page.dart';
+import 'pages/database_connection/add_connection_page.dart';
+import 'pages/menu/menu_page.dart';
+import 'pages/database_connection/database_check_page.dart';
+import 'pages/database_connection/setup_page.dart';
+import 'pages/login/set_admin_login_page.dart';
+import 'pages/login/login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,6 +77,18 @@ class _StartupPageState extends State<StartupPage> {
       final sessionValid = await LocalStorage.hasValidSession();
 
       if (sessionValid && SupabaseManager.hasActiveSession) {
+        // Update last login for the restored session (non-critical)
+        try {
+          final email =
+              Supabase.instance.client.auth.currentSession?.user.email;
+          if (email != null) {
+            await Supabase.instance.client
+                .from('users')
+                .update({'user_last_login': DateTime.now().toIso8601String()})
+                .eq('user_email', email);
+          }
+        } catch (_) {}
+
         // Skip login entirely → go straight to dashboard
         if (mounted) Navigator.pushReplacementNamed(context, '/menu');
         return;

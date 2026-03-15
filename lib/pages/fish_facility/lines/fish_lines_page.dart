@@ -1,0 +1,962 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'fish_lines_connection_model.dart';
+import '/core/fish_db_schema.dart';
+import '../shared_widgets.dart';
+import 'fish_lines_detail_page.dart';
+import '/theme/theme.dart';
+import '/theme/grid_widgets.dart';
+
+
+
+class FishLinesPage extends StatefulWidget {
+  const FishLinesPage({super.key});
+
+  @override
+  State<FishLinesPage> createState() => _FishLinesPageState();
+}
+
+class _FishLinesPageState extends State<FishLinesPage> {
+  List<FishLine> _lines = [];
+  List<FishLine> _filtered = [];
+  final _searchCtrl = TextEditingController();
+  bool _loading = true;
+  String? _loadError;
+  String? _filterType;
+  String? _filterStatus;
+  String? _filterReporter;
+  String _sortKey = 'fishlineName';
+  bool _sortAsc = true;
+  Map<String, dynamic>? _editingCell;
+  final _editController = TextEditingController();
+
+  final _vertCtrl  = ScrollController();
+  final _horizCtrl = ScrollController();
+  final _hOffset   = ValueNotifier<double>(0);
+  final _vOffset   = ValueNotifier<double>(0);
+
+  static const _cols = [
+    ('fishlineName',         'Name',        180.0, false),
+    ('fishlineDateBirth',    'DOB',         100.0, false),
+    ('ageDays',              'Days',         70.0,  false),
+    ('ageMonths',            'Mo.',          58.0,  false),
+    ('stockMales',           '♂',            50.0,  false),
+    ('stockFemales',         '♀',            50.0,  false),
+    ('stockJuveniles',       'Juv',          50.0,  false),
+    ('stockTotal',           'Total',        65.0,  false),
+    ('fishlineType',         'Type',        100.0, false),
+    ('fishlineOriginLab',    'Origin Lab',  150.0, false),
+    ('fishlineAlias',        'Alias',       110.0, false),
+    ('fishlineStatus',       'Status',      110.0, false),
+    ('fishlineZygosity',     'Zygosity',    110.0, false),
+    ('fishlineGeneration',   'Gen.',         60.0, false),
+    ('fishlineAffectedGene', 'Gene',         90.0, true),
+    ('fishlineReporter',     'Reporter',     80.0, false),
+    ('fishlineTargetTissue', 'Tissue',      120.0, false),
+    ('fishlineSource',       'Source',      100.0, false),
+    ('fishlineZfinId',       'ZFIN ID',     130.0, true),
+    ('fishlineCryopreserved','Cryo',         60.0, false),
+    ('fishlineSpfStatus',    'SPF',          80.0, false),
+    ('fishlineNotes',        'Notes',       150.0, false),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLines();
+    _searchCtrl.addListener(_applyFilters);
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _editController.dispose();
+    _vertCtrl.dispose();
+    _horizCtrl.dispose();
+    _hOffset.dispose();
+    _vOffset.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadLines() async {
+    try {
+      setState(() { _loading = true; _loadError = null; });
+      final rows = (await Supabase.instance.client
+          .from('fish_lines')
+          .select()
+          .order('fish_line_name') as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      _lines = rows.map(FishLine.fromMap).toList();
+
+      // Aggregate fish counts from fish_stocks by line FK.
+      final stockRows = (await Supabase.instance.client
+          .from('fish_stocks')
+          .select('fish_stocks_line_id, fish_stocks_males, fish_stocks_females, fish_stocks_juveniles')
+          .not('fish_stocks_line_id', 'is', null) as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      final countsById = <int, (int, int, int, int)>{};
+      for (final r in stockRows) {
+        final id = r['fish_stocks_line_id'] as int;
+        final m = (r['fish_stocks_males']     as int?) ?? 0;
+        final f = (r['fish_stocks_females']   as int?) ?? 0;
+        final j = (r['fish_stocks_juveniles'] as int?) ?? 0;
+        final prev = countsById[id] ?? (0, 0, 0, 0);
+        countsById[id] = (prev.$1 + m, prev.$2 + f, prev.$3 + j, prev.$4 + m + f + j);
+      }
+      for (final line in _lines) {
+        final c = line.fishlineId != null ? countsById[line.fishlineId] : null;
+        if (c != null) {
+          line.stockMales     = c.$1;
+          line.stockFemales   = c.$2;
+          line.stockJuveniles = c.$3;
+          line.stockTotal     = c.$4;
+        }
+      }
+
+      _applyFilters();
+      if (mounted) { setState(() => _loading = false); }
+    } catch (e) {
+      if (mounted) { setState(() { _loading = false; _loadError = e.toString(); }); }
+    }
+  }
+
+  void _applyFilters() {
+    var d = _lines.toList();
+    final q = _searchCtrl.text.toLowerCase();
+    if (q.isNotEmpty) {
+      d = d.where((r) =>
+        r.fishlineName.toLowerCase().contains(q) ||
+        (r.fishlineAlias?.toLowerCase().contains(q) ?? false) ||
+        (r.fishlineAffectedGene?.toLowerCase().contains(q) ?? false) ||
+        (r.fishlineOriginLab?.toLowerCase().contains(q) ?? false) ||
+        (r.fishlineZfinId?.toLowerCase().contains(q) ?? false)
+      ).toList();
+    }
+    if (_filterType != null) d = d.where((r) => r.fishlineType == _filterType).toList();
+    if (_filterStatus != null) d = d.where((r) => r.fishlineStatus == _filterStatus).toList();
+    if (_filterReporter != null) d = d.where((r) => r.fishlineReporter == _filterReporter).toList();
+
+    d.sort((a, b) {
+      dynamic av, bv;
+      switch (_sortKey) {
+        case 'fishlineName':       av = a.fishlineName; bv = b.fishlineName; break;
+        case 'fishlineAlias':      av = a.fishlineAlias ?? ''; bv = b.fishlineAlias ?? ''; break;
+        case 'fishlineType':       av = a.fishlineType ?? ''; bv = b.fishlineType ?? ''; break;
+        case 'fishlineStatus':     av = a.fishlineStatus ?? ''; bv = b.fishlineStatus ?? ''; break;
+        case 'fishlineZygosity':   av = a.fishlineZygosity ?? ''; bv = b.fishlineZygosity ?? ''; break;
+        case 'fishlineGeneration': av = a.fishlineGeneration ?? ''; bv = b.fishlineGeneration ?? ''; break;
+        case 'fishlineAffectedGene': av = a.fishlineAffectedGene ?? ''; bv = b.fishlineAffectedGene ?? ''; break;
+        case 'fishlineOriginLab':  av = a.fishlineOriginLab ?? ''; bv = b.fishlineOriginLab ?? ''; break;
+        case 'fishlineDateBirth':
+        case 'ageDays':
+        case 'ageMonths':
+          av = a.fishlineDateBirth ?? DateTime(0); bv = b.fishlineDateBirth ?? DateTime(0); break;
+        case 'stockMales':     av = a.stockMales;     bv = b.stockMales;     break;
+        case 'stockFemales':   av = a.stockFemales;   bv = b.stockFemales;   break;
+        case 'stockJuveniles': av = a.stockJuveniles; bv = b.stockJuveniles; break;
+        case 'stockTotal':     av = a.stockTotal;     bv = b.stockTotal;     break;
+        default: av = a.fishlineName; bv = b.fishlineName;
+      }
+      final c = av.toString().compareTo(bv.toString());
+      return _sortAsc ? c : -c;
+    });
+
+    setState(() => _filtered = d);
+  }
+
+  void _sort(String key) {
+    setState(() {
+      if (_sortKey == key) _sortAsc = !_sortAsc;
+      else { _sortKey = key; _sortAsc = true; }
+    });
+    _applyFilters();
+  }
+
+  void _openDetail(FishLine line) {
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => FishLineDetailPage(
+        fishLine: line,
+        onSaved: _loadLines,
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reporters = _lines.where((l) => l.fishlineReporter != null)
+        .map((l) => l.fishlineReporter!).toSet().toList()..sort();
+    final tableWidth = _cols.fold(0.0, (s, c) => s + c.$3) + 36;
+
+    return Column(
+      children: [
+        // ── Toolbar ──────────────────────────────────────────────────────
+        Container(
+          color: AppDS.bg,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Row(children: [
+            AppSearchBar(controller: _searchCtrl, hint: 'Search lines…',
+              onClear: _applyFilters),
+            const SizedBox(width: 10),
+            AppFilterChip(label: 'Type', value: _filterType,
+              options: const ['WT', 'transgenic', 'mutant', 'CRISPR', 'KO'],
+              onChanged: (v) { setState(() => _filterType = v); _applyFilters(); }),
+            const SizedBox(width: 8),
+            AppFilterChip(label: 'Status', value: _filterStatus,
+              options: const ['active', 'archived', 'cryopreserved', 'lost'],
+              onChanged: (v) { setState(() => _filterStatus = v); _applyFilters(); }),
+            const SizedBox(width: 8),
+            AppFilterChip(label: 'Reporter', value: _filterReporter,
+              options: reporters,
+              onChanged: (v) { setState(() => _filterReporter = v); _applyFilters(); }),
+            const Spacer(),
+            Text('${_filtered.length} of ${_lines.length}',
+              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppDS.textMuted)),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add, size: 14),
+              label: const Text('New Line'),
+              onPressed: _showAddLineDialog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppDS.accent,
+                foregroundColor: AppDS.bg,
+              ),
+            ),
+          ]),
+        ),
+        const Divider(height: 1, color: AppDS.border),
+        // ── Table ────────────────────────────────────────────────────────
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _loadError != null
+                  ? Center(child: Text(
+                      'Failed to load lines: $_loadError',
+                      style: GoogleFonts.spaceGrotesk(color: AppDS.red, fontSize: 13)))
+                  : Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(children: [
+              Expanded(
+                child: Row(children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppDS.tableBorder),
+                        boxShadow: const [BoxShadow(color: AppDS.shadow, blurRadius: 4, offset: Offset(0, 2))],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: (n) {
+                            if (n is ScrollUpdateNotification) {
+                              if (n.metrics.axis == Axis.horizontal) {
+                                _hOffset.value = _horizCtrl.hasClients ? _horizCtrl.offset : 0.0;
+                              } else if (n.metrics.axis == Axis.vertical) {
+                                _vOffset.value = _vertCtrl.hasClients ? _vertCtrl.offset : 0.0;
+                              }
+                            }
+                            return false;
+                          },
+                          child: SingleChildScrollView(
+                            controller: _horizCtrl,
+                            scrollDirection: Axis.horizontal,
+                            child: SizedBox(
+                              width: tableWidth,
+                              child: Column(children: [
+                                // Sticky header
+                                Container(
+                                  height: AppDS.tableHeaderH,
+                                  color: AppDS.surface,
+                                  child: Row(children: [
+                                    const SizedBox(width: 36),
+                                    ..._cols.map((c) => SizedBox(
+                                      width: c.$3,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                                        child: SortHeader(
+                                          label: c.$2, columnKey: c.$1,
+                                          sortKey: _sortKey, sortAsc: _sortAsc, onSort: _sort),
+                                      ),
+                                    )),
+                                  ]),
+                                ),
+                                Container(height: 1, color: AppDS.border),
+                                // Rows
+                                Expanded(
+                                  child: ListView.builder(
+                                    controller: _vertCtrl,
+                                    itemCount: _filtered.length,
+                                    itemExtent: AppDS.tableRowH,
+                                    itemBuilder: (_, i) => _buildRow(_filtered[i], i),
+                                  ),
+                                ),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  AppVerticalThumb(
+                    contentLength: _filtered.length * AppDS.tableRowH,
+                    topPadding: AppDS.tableHeaderH,
+                    offset: _vOffset,
+                    onScrollTo: (y) {
+                      final max = _vertCtrl.hasClients ? _vertCtrl.position.maxScrollExtent : 0.0;
+                      final clamped = y.clamp(0.0, max);
+                      _vertCtrl.jumpTo(clamped);
+                      _vOffset.value = clamped;
+                    },
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 4),
+              AppHorizontalThumb(
+                contentWidth: tableWidth,
+                offset: _hOffset,
+                onScrollTo: (x) {
+                  final max = _horizCtrl.hasClients ? _horizCtrl.position.maxScrollExtent : 0.0;
+                  final clamped = x.clamp(0.0, max);
+                  _horizCtrl.jumpTo(clamped);
+                  _hOffset.value = clamped;
+                },
+              ),
+              const SizedBox(height: 8),
+            ]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRow(FishLine line, int rowIndex) {
+    final rowBg = rowIndex.isEven ? AppDS.tableRowEven : AppDS.tableRowOdd;
+    return Container(
+      decoration: BoxDecoration(
+        color: rowBg,
+        border: const Border(bottom: BorderSide(color: AppDS.tableBorder, width: 1)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 36,
+            child: AppIconButton(
+              icon: Icons.open_in_new, tooltip: 'Open detail page',
+              color: AppDS.textMuted,
+              onPressed: () => _openDetail(line)),
+          ),
+          _nameCell(line, 180),
+          _dateCell(line, 100),
+          _ageCell(line, 70, inMonths: false),
+          _ageCell(line, 58, inMonths: true),
+          _stockCountCell(line.stockMales,     50, AppDS.accent),
+          _stockCountCell(line.stockFemales,   50, AppDS.pink),
+          _stockCountCell(line.stockJuveniles, 50, AppDS.orange),
+          _stockCountCell(line.stockTotal,     65, AppDS.tableText, bold: true),
+          _typeCell(line, 100),
+          _textCell(line, 'fishlineOriginLab', 150),
+          _textCell(line, 'fishlineAlias', 110),
+          _statusCell(line, 110),
+          _menuCell(line, 'fishlineZygosity', 110,
+              const ['homozygous', 'heterozygous', 'unknown']),
+          _menuCell(line, 'fishlineGeneration', 60,
+              const ['F1', 'F2', 'F3', 'F4', 'F5']),
+          _textCell(line, 'fishlineAffectedGene', 90, mono: true),
+          _textCell(line, 'fishlineReporter', 80),
+          _textCell(line, 'fishlineTargetTissue', 120),
+          _menuCell(line, 'fishlineSource', 100,
+              const ['ZIRC', 'EZRC', 'collaborator', 'in-house', 'other']),
+          _textCell(line, 'fishlineZfinId', 130, mono: true),
+          _cryoCell(line, 60),
+          _textCell(line, 'fishlineSpfStatus', 80),
+          _textCell(line, 'fishlineNotes', 150),
+        ],
+      ),
+    );
+  }
+
+  // ── Edit helpers ────────────────────────────────────────────────────────────
+
+  static const _editDeco = InputDecoration(
+    isDense: true,
+    contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+    filled: true, fillColor: Colors.white,
+    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(4)),
+        borderSide: BorderSide(color: AppDS.accent, width: 1.5)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(4)),
+        borderSide: BorderSide(color: AppDS.accent, width: 1.5)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(4)),
+        borderSide: BorderSide(color: AppDS.accent, width: 1.5)),
+  );
+
+  String? _fieldVal(FishLine l, String key) {
+    switch (key) {
+      case 'fishlineName':         return l.fishlineName;
+      case 'fishlineAlias':        return l.fishlineAlias;
+      case 'fishlineType':         return l.fishlineType;
+      case 'fishlineStatus':       return l.fishlineStatus;
+      case 'fishlineZygosity':     return l.fishlineZygosity;
+      case 'fishlineGeneration':   return l.fishlineGeneration;
+      case 'fishlineAffectedGene': return l.fishlineAffectedGene;
+      case 'fishlineReporter':     return l.fishlineReporter;
+      case 'fishlineTargetTissue': return l.fishlineTargetTissue;
+      case 'fishlineOriginLab':    return l.fishlineOriginLab;
+      case 'fishlineZfinId':       return l.fishlineZfinId;
+      case 'fishlineSpfStatus':    return l.fishlineSpfStatus;
+      case 'fishlineSource':       return l.fishlineSource;
+      case 'fishlineNotes':        return l.fishlineNotes;
+      default: return null;
+    }
+  }
+
+  String _dbCol(String key) {
+    switch (key) {
+      case 'fishlineName':         return FishSch.lineName;
+      case 'fishlineAlias':        return FishSch.lineAlias;
+      case 'fishlineType':         return FishSch.lineType;
+      case 'fishlineStatus':       return FishSch.lineStatus;
+      case 'fishlineZygosity':     return FishSch.lineZygosity;
+      case 'fishlineGeneration':   return FishSch.lineGeneration;
+      case 'fishlineAffectedGene': return FishSch.lineAffectedGene;
+      case 'fishlineReporter':     return FishSch.lineReporter;
+      case 'fishlineTargetTissue': return FishSch.lineTargetTissue;
+      case 'fishlineOriginLab':    return FishSch.lineOriginLab;
+      case 'fishlineZfinId':       return FishSch.lineZfinId;
+      case 'fishlineSpfStatus':    return FishSch.lineSpfStatus;
+      case 'fishlineSource':       return FishSch.lineSource;
+      case 'fishlineNotes':        return FishSch.lineNotes;
+      case 'fishlineDateBirth':    return FishSch.lineDateBirth;
+      default: return key;
+    }
+  }
+
+  void _applyLocal(FishLine l, String key, String? s) {
+    switch (key) {
+      case 'fishlineName':         if (s != null) l.fishlineName = s; break;
+      case 'fishlineAlias':        l.fishlineAlias = s; break;
+      case 'fishlineType':         l.fishlineType = s; break;
+      case 'fishlineStatus':       l.fishlineStatus = s; break;
+      case 'fishlineZygosity':     l.fishlineZygosity = s; break;
+      case 'fishlineGeneration':   l.fishlineGeneration = s; break;
+      case 'fishlineAffectedGene': l.fishlineAffectedGene = s; break;
+      case 'fishlineReporter':     l.fishlineReporter = s; break;
+      case 'fishlineTargetTissue': l.fishlineTargetTissue = s; break;
+      case 'fishlineOriginLab':    l.fishlineOriginLab = s; break;
+      case 'fishlineZfinId':       l.fishlineZfinId = s; break;
+      case 'fishlineSpfStatus':    l.fishlineSpfStatus = s; break;
+      case 'fishlineSource':       l.fishlineSource = s; break;
+      case 'fishlineNotes':        l.fishlineNotes = s; break;
+    }
+  }
+
+  Future<void> _commitEdit(FishLine l, String key, String value) async {
+    if (l.fishlineId == null) return;
+    final s = value.isEmpty ? null : value;
+    setState(() { _applyLocal(l, key, s); _editingCell = null; });
+    try {
+      await Supabase.instance.client
+          .from(FishSch.linesTable)
+          .update({_dbCol(key): s})
+          .eq(FishSch.lineId, l.fishlineId!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e'), backgroundColor: AppDS.red));
+      }
+    }
+  }
+
+  Future<void> _commitDate(FishLine l, DateTime date) async {
+    if (l.fishlineId == null) return;
+    final iso = '${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
+    setState(() { l.fishlineDateBirth = date; _editingCell = null; });
+    try {
+      await Supabase.instance.client
+          .from(FishSch.linesTable)
+          .update({FishSch.lineDateBirth: iso})
+          .eq(FishSch.lineId, l.fishlineId!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e'), backgroundColor: AppDS.red));
+      }
+    }
+  }
+
+  Future<void> _toggleCryo(FishLine l) async {
+    if (l.fishlineId == null) return;
+    final newVal = !l.fishlineCryopreserved;
+    setState(() => l.fishlineCryopreserved = newVal);
+    try {
+      await Supabase.instance.client
+          .from(FishSch.linesTable)
+          .update({FishSch.lineCryopreserved: newVal})
+          .eq(FishSch.lineId, l.fishlineId!);
+    } catch (e) {
+      if (mounted) {
+        setState(() => l.fishlineCryopreserved = !newVal);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e'), backgroundColor: AppDS.red));
+      }
+    }
+  }
+
+  Future<void> _showMenuPicker(
+      FishLine l, String key, List<String> options, Offset pos) async {
+    final current = _fieldVal(l, key);
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 1, pos.dy + 1),
+      color: AppDS.surface2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: AppDS.border)),
+      items: options.map((o) => PopupMenuItem<String>(
+        value: o,
+        child: Row(children: [
+          Text(o, style: GoogleFonts.spaceGrotesk(
+            fontSize: 13, color: AppDS.textPrimary,
+            fontWeight: current == o ? FontWeight.w700 : FontWeight.normal)),
+          if (current == o) ...[
+            const Spacer(),
+            const Icon(Icons.check, size: 14, color: AppDS.accent)],
+        ]),
+      )).toList(),
+    );
+    if (result != null && result != current) await _commitEdit(l, key, result);
+  }
+
+  Future<void> _showDatePickerDialog(FishLine l) async {
+    DateTime? selected;
+    final current = l.fishlineDateBirth;
+    final result = await showDialog<DateTime>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDs) => AlertDialog(
+          backgroundColor: AppDS.surface2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: AppDS.border2)),
+          title: Text('Date of Birth',
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 15, fontWeight: FontWeight.w700, color: AppDS.textPrimary)),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox(
+              width: 300,
+              child: Theme(
+                data: ThemeData.light(),
+                child: CalendarDatePicker(
+                  initialDate: current ?? DateTime.now(),
+                  firstDate: DateTime(1990),
+                  lastDate: DateTime.now(),
+                  onDateChanged: (d) => setDs(() => selected = d),
+                ),
+              ),
+            ),
+            if (selected != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppDS.accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppDS.accent.withValues(alpha: 0.4))),
+                child: Text(
+                  '${selected!.year}-${selected!.month.toString().padLeft(2,"0")}-${selected!.day.toString().padLeft(2,"0")}',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontWeight: FontWeight.w600, color: AppDS.accent, fontSize: 13)),
+              ),
+            ],
+          ]),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppDS.accent, foregroundColor: AppDS.bg),
+              onPressed: selected != null ? () => Navigator.pop(ctx, selected) : null,
+              child: const Text('Set Date')),
+          ],
+        ),
+      ),
+    );
+    if (result != null && mounted) await _commitDate(l, result);
+  }
+
+  // ── Cell widgets ────────────────────────────────────────────────────────────
+
+  Widget _nameCell(FishLine l, double w) {
+    final isEditing = _editingCell?['id'] == l.fishlineId &&
+        _editingCell?['key'] == 'fishlineName';
+    return GestureDetector(
+      onDoubleTap: () => setState(() {
+        _editingCell = {'id': l.fishlineId, 'key': 'fishlineName'};
+        _editController.text = l.fishlineName;
+      }),
+      child: SizedBox(
+        width: w,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: isEditing
+              ? TextField(
+                  controller: _editController, autofocus: true,
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 12.5, fontWeight: FontWeight.w600,
+                    color: AppDS.tableText),
+                  decoration: _editDeco,
+                  onSubmitted: (v) => _commitEdit(l, 'fishlineName', v),
+                  onTapOutside: (_) =>
+                      _commitEdit(l, 'fishlineName', _editController.text),
+                )
+              : Text(l.fishlineName,
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 12.5, fontWeight: FontWeight.w600,
+                    color: AppDS.tableText),
+                  overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    );
+  }
+
+  Widget _textCell(FishLine l, String key, double w, {bool mono = false}) {
+    final isEditing =
+        _editingCell?['id'] == l.fishlineId && _editingCell?['key'] == key;
+    final val = _fieldVal(l, key);
+    return GestureDetector(
+      onDoubleTap: () => setState(() {
+        _editingCell = {'id': l.fishlineId, 'key': key};
+        _editController.text = val ?? '';
+      }),
+      child: SizedBox(
+        width: w,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: isEditing
+              ? TextField(
+                  controller: _editController, autofocus: true,
+                  style: mono
+                      ? GoogleFonts.jetBrainsMono(
+                          fontSize: 11.5, color: AppDS.tableText)
+                      : GoogleFonts.spaceGrotesk(
+                          fontSize: 12, color: AppDS.tableText),
+                  decoration: _editDeco,
+                  onSubmitted: (v) => _commitEdit(l, key, v),
+                  onTapOutside: (_) =>
+                      _commitEdit(l, key, _editController.text),
+                )
+              : Text(
+                  val ?? '—',
+                  style: (mono
+                      ? GoogleFonts.jetBrainsMono(fontSize: 11.5)
+                      : GoogleFonts.spaceGrotesk(fontSize: 12))
+                      .copyWith(
+                          color: val == null
+                              ? AppDS.tableTextMute
+                              : AppDS.tableText),
+                  overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    );
+  }
+
+  Widget _menuCell(
+      FishLine l, String key, double w, List<String> options) {
+    final val = _fieldVal(l, key);
+    return GestureDetector(
+      onDoubleTapDown: (d) {
+        _showMenuPicker(l, key, options, d.globalPosition);
+      },
+      child: SizedBox(
+        width: w,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Text(val ?? '—',
+            style: GoogleFonts.spaceGrotesk(fontSize: 12,
+                color: val == null ? AppDS.tableTextMute : AppDS.tableText),
+            overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    );
+  }
+
+  Widget _typeCell(FishLine l, double w) {
+    return GestureDetector(
+      onDoubleTapDown: (d) => _showMenuPicker(l, 'fishlineType',
+          const ['WT', 'transgenic', 'mutant', 'CRISPR', 'KO', 'KI'],
+          d.globalPosition),
+      child: SizedBox(
+        width: w,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: StatusBadge(
+              label: l.fishlineType,
+              overrideStatus: l.fishlineType?.toLowerCase()),
+        ),
+      ),
+    );
+  }
+
+  Widget _statusCell(FishLine l, double w) {
+    return GestureDetector(
+      onDoubleTapDown: (d) => _showMenuPicker(l, 'fishlineStatus',
+          const ['active', 'archived', 'cryopreserved', 'lost'],
+          d.globalPosition),
+      child: SizedBox(
+        width: w,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: StatusBadge(label: l.fishlineStatus),
+        ),
+      ),
+    );
+  }
+
+  Widget _dateCell(FishLine l, double w) {
+    return GestureDetector(
+      onDoubleTap: () => _showDatePickerDialog(l),
+      child: SizedBox(
+        width: w,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Text(
+            l.fishlineDateBirth?.toIso8601String().split('T')[0] ?? '—',
+            style: GoogleFonts.jetBrainsMono(fontSize: 11,
+                color: l.fishlineDateBirth == null
+                    ? AppDS.tableTextMute
+                    : AppDS.tableText)),
+        ),
+      ),
+    );
+  }
+
+  Widget _stockCountCell(int count, double w, Color color, {bool bold = false}) =>
+    SizedBox(
+      width: w,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Text(
+          count > 0 ? '$count' : '—',
+          style: GoogleFonts.jetBrainsMono(
+            fontSize: 11,
+            fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+            color: count > 0 ? color : AppDS.tableTextMute),
+        ),
+      ),
+    );
+
+  Widget _ageCell(FishLine l, double w, {required bool inMonths}) {
+    final days = l.fishlineDateBirth != null
+        ? DateTime.now().difference(l.fishlineDateBirth!).inDays
+        : null;
+    final val = days == null
+        ? '—'
+        : inMonths ? (days ~/ 30).toString() : days.toString();
+    return SizedBox(
+      width: w,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Text(val,
+          style: GoogleFonts.jetBrainsMono(fontSize: 11,
+              color: days == null ? AppDS.tableTextMute : AppDS.tableText)),
+      ),
+    );
+  }
+
+  Widget _cryoCell(FishLine l, double w) => GestureDetector(
+    onTap: () => _toggleCryo(l),
+    child: SizedBox(
+      width: w,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Icon(
+          l.fishlineCryopreserved ? Icons.ac_unit : Icons.remove,
+          size: 14,
+          color: l.fishlineCryopreserved ? AppDS.accent : AppDS.textMuted),
+      ),
+    ),
+  );
+
+  void _showAddLineDialog() {
+    showDialog(context: context, builder: (_) => _AddLineDialog(
+      onAdd: (line) => setState(() { _lines.add(line); _applyFilters(); }),
+    ));
+  }
+}
+
+// ─── ADD LINE DIALOG ─────────────────────────────────────────────────────────
+class _AddLineDialog extends StatefulWidget {
+  final ValueChanged<FishLine> onAdd;
+  const _AddLineDialog({required this.onAdd});
+
+  @override
+  State<_AddLineDialog> createState() => _AddLineDialogState();
+}
+
+class _AddLineDialogState extends State<_AddLineDialog> {
+  final _nameCtrl  = TextEditingController();
+  final _aliasCtrl = TextEditingController();
+  final _geneCtrl  = TextEditingController();
+  final _labCtrl   = TextEditingController();
+  String _type     = 'transgenic';
+  String _status   = 'active';
+  String _zygosity = 'heterozygous';
+  bool   _saving   = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _aliasCtrl.dispose();
+    _geneCtrl.dispose();
+    _labCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Line name is required.');
+      return;
+    }
+    setState(() { _saving = true; _error = null; });
+    try {
+      final resp = await Supabase.instance.client
+          .from('fish_lines')
+          .insert({
+            FishSch.lineName:         name,
+            FishSch.lineAlias:        _aliasCtrl.text.isEmpty ? null : _aliasCtrl.text.trim(),
+            FishSch.lineType:         _type,
+            FishSch.lineStatus:       _status,
+            FishSch.lineZygosity:     _zygosity,
+            FishSch.lineAffectedGene: _geneCtrl.text.isEmpty ? null : _geneCtrl.text.trim(),
+            FishSch.lineOriginLab:    _labCtrl.text.isEmpty  ? null : _labCtrl.text.trim(),
+          })
+          .select()
+          .single();
+      widget.onAdd(FishLine.fromMap(resp));
+      if (mounted) { Navigator.pop(context); }
+    } catch (e) {
+      setState(() { _saving = false; _error = e.toString(); });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppDS.surface2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppDS.border2)),
+      title: Text('New Fish Line',
+        style: GoogleFonts.spaceGrotesk(
+          fontSize: 16, fontWeight: FontWeight.w700, color: AppDS.textPrimary)),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_error != null) ...[
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppDS.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppDS.red.withValues(alpha: 0.4)),
+                ),
+                child: Text(_error!,
+                  style: GoogleFonts.spaceGrotesk(color: AppDS.red, fontSize: 12)),
+              ),
+              const SizedBox(height: 8),
+            ],
+            _f('Line Name (e.g. Tg(mpx:GFP)uwm1)', _nameCtrl),
+            const SizedBox(height: 8),
+            _f('Alias', _aliasCtrl),
+            const SizedBox(height: 8),
+            _f('Affected Gene', _geneCtrl),
+            const SizedBox(height: 8),
+            _f('Origin Lab', _labCtrl),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: _dd('Type', _type,
+                ['WT', 'transgenic', 'mutant', 'CRISPR', 'KO', 'KI'],
+                (v) => setState(() => _type = v ?? _type))),
+              const SizedBox(width: 8),
+              Expanded(child: _dd('Status', _status,
+                ['active', 'archived', 'cryopreserved', 'lost'],
+                (v) => setState(() => _status = v ?? _status))),
+            ]),
+            const SizedBox(height: 8),
+            _dd('Zygosity', _zygosity,
+              ['homozygous', 'heterozygous', 'unknown'],
+              (v) => setState(() => _zygosity = v ?? _zygosity)),
+          ],
+        ),
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppDS.accent, foregroundColor: AppDS.bg),
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Add Line'),
+        ),
+      ],
+    );
+  }
+
+  Widget _f(String label, TextEditingController ctrl) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: GoogleFonts.spaceGrotesk(
+        fontSize: 11, color: AppDS.textMuted, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 3),
+      TextField(controller: ctrl,
+        style: GoogleFonts.spaceGrotesk(color: AppDS.textPrimary, fontSize: 13),
+        decoration: InputDecoration(
+          isDense: true,
+          filled: true, fillColor: AppDS.surface3,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: AppDS.border)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+        )),
+    ],
+  );
+
+  Widget _dd(String label, String value, List<String> opts, ValueChanged<String?> cb) =>
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.spaceGrotesk(
+          fontSize: 11, color: AppDS.textMuted, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 3),
+        DropdownButtonFormField<String>(
+          initialValue: opts.contains(value) ? value : opts.first,
+          dropdownColor: AppDS.surface2,
+          style: GoogleFonts.spaceGrotesk(color: AppDS.textPrimary, fontSize: 13),
+          items: opts.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+          onChanged: cb,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true, fillColor: AppDS.surface3,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: const BorderSide(color: AppDS.border)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+          )),
+      ],
+    );
+}

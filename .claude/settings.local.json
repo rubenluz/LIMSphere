@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze lib/pages/culture_collection/strains/strains_page.dart lib/pages/lab_chat/lab_chat_page.dart)",
+      "Bash(grep -v \"//.*Color\")"
+    ]
+  }
+}

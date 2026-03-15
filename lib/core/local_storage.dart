@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/connection_model.dart';
+import '../pages/database_connection/database_connection_model.dart';
 
 class LocalStorage {
   static const _connectionsKey = 'connections';
@@ -84,4 +84,5 @@ class LocalStorage {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_rememberDurationKey) ?? 0;
   }
+
 }
