@@ -1,0 +1,1985 @@
+﻿import 'dart:io';
+import '/core/data_cache.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'tanks_connection_model.dart';
+import '../shared_widgets.dart';
+import '../stocks/stocks_detail_page.dart';
+import '/theme/theme.dart';
+import '../add_stock_dialog.dart';
+
+
+// ─── ZebTec rack geometry ─────────────────────────────────────────────────────
+//
+//  Row A  : 15 positions × 1.1 L   (top shelf)
+//  Rows B-E: 10 positions × 2.4 L  (main rack)
+//
+//  Proportionality rule (same total row width for ALL rows):
+//    15 × cellW_1.1  ==  10 × cellW_2.4
+//    => cellW_1.1 = availableW / 15
+//    => cellW_2.4 = availableW / 10
+//    => 4.8 L slot = 2 × cellW_2.4   (merges 2 adjacent 2.4 L positions)
+//
+//  We use a LayoutBuilder to compute availableW at runtime so the rack
+//  always fills the full container width regardless of window size.
+
+const _rowLabels  = ['A', 'B', 'C', 'D', 'E'];
+const _rowACount  = 15;    // 1.1 L
+const _rowBECount = 10;    // 2.4 L
+const _labelW     = 44.0;  // row-label column width
+const _gap        = 3.0;   // inner padding per cell (each side)
+const _rowHTop    = 60.0;  // row A cell height
+const _rowHMain   = 82.0;  // rows B-E cell height
+
+// ─── Tank state helpers ───────────────────────────────────────────────────────
+bool _isOccupied(ZebrafishTank t) =>
+    t.zebraStatus != null && t.zebraStatus != 'empty' && t.zebraStatus != 'retired';
+
+bool _hasFish(ZebrafishTank t) =>
+    ((t.zebraMales ?? 0) + (t.zebraFemales ?? 0) + (t.zebraJuveniles ?? 0)) > 0;
+
+bool _isSentinel(ZebrafishTank t) => t.zebraTankType == 'sentinel';
+
+// ─── Default rack ─────────────────────────────────────────────────────────────
+List<ZebrafishTank> _buildDefaultRack(String rack) {
+  final out = <ZebrafishTank>[];
+  for (int r = 0; r < _rowLabels.length; r++) {
+    final row   = _rowLabels[r];
+    final isTop = r == 0;
+    final cols  = isTop ? _rowACount : _rowBECount;
+    for (int c = 1; c <= cols; c++) {
+      out.add(ZebrafishTank(
+        zebraTankId:       '$rack-$row$c',
+        zebraRack:         rack,
+        zebraRow:          row,
+        zebraColumn:       '$c',
+        zebraVolumeL:      isTop ? 1.5 : 3.5,
+        zebraTankType:     'holding',
+        zebraStatus:       'empty',
+        zebraHealthStatus: 'healthy',
+        isEightLiter:      false,
+        isTopRow:          isTop,
+        rackRowIndex:      r,
+        rackColIndex:      c,
+      ));
+    }
+  }
+  return out;
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+class FishTanksPage extends StatefulWidget {
+  const FishTanksPage({super.key});
+
+  @override
+  State<FishTanksPage> createState() => _FishTanksPageState();
+}
+
+class _FishTanksPageState extends State<FishTanksPage> {
+  String  _selectedRack = 'R1';
+  final   _showLabels   = true;
+  bool    _loading      = true;
+  String? _error;
+
+  final Map<String, List<ZebrafishTank>> _racks = {
+    'R1': _buildDefaultRack('R1'),
+  };
+
+  ZebrafishTank? _menuTank;
+  Offset         _menuOffset = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromSupabase();
+  }
+
+  String? _canonicalTankId(Map<String, dynamic> row) {
+    final raw = (row['fish_stocks_tank_id']?.toString() ?? '').trim().toUpperCase();
+    final rack = (row['fish_stocks_rack']?.toString() ?? '').trim().toUpperCase();
+    final r = (row['fish_stocks_row']?.toString() ?? '').trim().toUpperCase();
+    final c = (row['fish_stocks_column']?.toString() ?? '').trim();
+
+    if (raw.isNotEmpty) {
+      if (raw.contains('-')) return raw;
+      if (RegExp(r'^[A-E]\d{1,2}$').hasMatch(raw)) {
+        return '${rack.isNotEmpty ? rack : 'R1'}-$raw';
+      }
+    }
+
+    if (r.isNotEmpty && c.isNotEmpty) {
+      return '${rack.isNotEmpty ? rack : 'R1'}-$r$c';
+    }
+    return null;
+  }
+
+  // ── Supabase ──────────────────────────────────────────────────────────────
+  void _applyStockRows(List<dynamic> rows) {
+    for (final row in rows) {
+      final rackId = (row as Map)['fish_stocks_rack']?.toString().toUpperCase();
+      if (rackId != null && rackId.isNotEmpty && !_racks.containsKey(rackId)) {
+        _racks[rackId] = _buildDefaultRack(rackId);
+      }
+    }
+    for (final row in rows) {
+      final data = Map<String, dynamic>.from(row as Map);
+      final id = _canonicalTankId(data);
+      if (id == null) continue;
+      for (final list in _racks.values) {
+        final idx = list.indexWhere((t) => t.zebraTankId == id);
+        if (idx >= 0) { list[idx] = _fromRow(data, list[idx]); break; }
+      }
+    }
+  }
+
+  Future<void> _loadFromSupabase() async {
+    final cached = await DataCache.read('fish_stocks_tanks');
+    if (cached != null && mounted) {
+      _racks.clear();
+      _racks['R1'] = _buildDefaultRack('R1');
+      _applyStockRows(cached);
+      setState(() => _loading = false);
+    } else {
+      setState(() => _loading = true);
+    }
+    try {
+      final rows = await Supabase.instance.client
+          .from('fish_stocks')
+          .select('*, fish_lines!fish_stocks_line_id(fish_line_name)')
+          .order('fish_stocks_rack')
+          .order('fish_stocks_row')
+          .order('fish_stocks_column') as List<dynamic>;
+      await DataCache.write('fish_stocks_tanks', rows);
+      if (!mounted) return;
+      _racks.clear();
+      _racks['R1'] = _buildDefaultRack('R1');
+      _applyStockRows(rows);
+      setState(() => _loading = false);
+    } catch (e) {
+      if (cached == null && mounted) setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  ZebrafishTank _fromRow(Map<String, dynamic> r, ZebrafishTank def) {
+    final volL = (r['fish_stocks_volume_l'] as num?)?.toDouble();
+    // A-row merges at 2.2 L; B-E rows merge at 4.8 L
+    final is8  = def.isTopRow
+        ? (volL != null && volL >= 2.4)
+        : (volL != null && volL >= 8.0);
+    final lineData  = r['fish_lines'] as Map<String, dynamic>?;
+    final liveName  = lineData?['fish_line_name']?.toString();
+    return def.copyWith(
+      zebraVolumeL:      volL,
+      isEightLiter:      is8,
+      zebraLine:         liveName ?? r['fish_stocks_line'],
+      zebraLineId:       r['fish_stocks_line_id'] as int?,
+      zebraMales:        r['fish_stocks_males'],
+      zebraFemales:      r['fish_stocks_females'],
+      zebraJuveniles:    r['fish_stocks_juveniles'],
+      zebraResponsible:  r['fish_stocks_responsible'],
+      zebraStatus:       r['fish_stocks_status'] ?? 'empty',
+      zebraHealthStatus: r['fish_stocks_health_status'] ?? 'healthy',
+      zebraTankType:     (r['fish_stocks_sentinel_status'] == 'sentinel')
+          ? 'sentinel'
+          : (r['fish_stocks_tank_type'] ?? 'holding'),
+      zebraFoodType:     r['fish_stocks_food_type'],
+      zebraFoodSource:   r['fish_stocks_food_source'],
+      zebraFoodAmount:   (r['fish_stocks_food_amount'] as num?)?.toDouble(),
+      zebraFeedingSchedule: r['fish_stocks_feeding_schedule'],
+      zebraExperimentId: r['fish_stocks_experiment_id'],
+      zebraNotes:        r['fish_stocks_notes'],
+      zebraTemperatureC: (r['fish_stocks_temperature_c'] as num?)?.toDouble(),
+      zebraPh:           (r['fish_stocks_ph'] as num?)?.toDouble(),
+    );
+  }
+
+  Future<void> _deleteStock(ZebrafishTank tank) async {
+    try {
+      await Supabase.instance.client
+          .from('fish_stocks')
+          .delete()
+          .eq('fish_stocks_tank_id', tank.zebraTankId);
+      final empty = tank.copyWith(
+        zebraStatus: 'empty', zebraLine: null,
+        zebraMales: 0, zebraFemales: 0, zebraJuveniles: 0,
+        zebraTankType: 'holding', isEightLiter: false,
+        zebraVolumeL: tank.isTopRow ? 1.1 : 3.5,
+      );
+      if (mounted) setState(() => _patch(empty));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Delete error: $e'),
+          backgroundColor: AppDS.red.withValues(alpha: 0.9),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
+  Future<void> _persist(ZebrafishTank t) async {
+    try {
+      final isSentinel = t.zebraTankType == 'sentinel';
+      final persistedTankType = isSentinel ? 'holding' : (t.zebraTankType ?? 'holding');
+      final payload = {
+        'fish_stocks_tank_id':     t.zebraTankId,
+        'fish_stocks_rack':        t.zebraRack,
+        'fish_stocks_row':         t.zebraRow,
+        'fish_stocks_column':      t.zebraColumn,
+        'fish_stocks_volume_l':    t.zebraVolumeL,
+        'fish_stocks_line':        t.zebraLine,
+        'fish_stocks_line_id':     t.zebraLineId,
+        'fish_stocks_males':       t.zebraMales ?? 0,
+        'fish_stocks_females':     t.zebraFemales ?? 0,
+        'fish_stocks_juveniles':   t.zebraJuveniles ?? 0,
+        'fish_stocks_responsible': t.zebraResponsible,
+        'fish_stocks_status':      t.zebraStatus ?? 'empty',
+        'fish_stocks_health_status': t.zebraHealthStatus ?? 'healthy',
+        'fish_stocks_tank_type':   persistedTankType,
+        'fish_stocks_sentinel_status': isSentinel ? 'sentinel' : 'none',
+        'fish_stocks_food_type':       t.zebraFoodType,
+        'fish_stocks_food_source':     t.zebraFoodSource,
+        'fish_stocks_food_amount':     t.zebraFoodAmount,
+        'fish_stocks_feeding_schedule': t.zebraFeedingSchedule,
+        'fish_stocks_experiment_id':   t.zebraExperimentId,
+        'fish_stocks_notes':       t.zebraNotes,
+      };
+      if (t.zebraId != null) {
+        await Supabase.instance.client
+            .from('fish_stocks')
+            .update(payload)
+            .eq('fish_stocks_id', t.zebraId!);
+      } else {
+        await Supabase.instance.client
+            .from('fish_stocks')
+            .upsert(payload, onConflict: 'fish_stocks_tank_id');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Save error: $e'),
+          backgroundColor: AppDS.red.withValues(alpha: 0.9),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
+  // ── Rack helpers ──────────────────────────────────────────────────────────
+  List<ZebrafishTank> get _rackTanks => _racks[_selectedRack] ?? [];
+
+  void _patch(ZebrafishTank updated) {
+    for (final list in _racks.values) {
+      final idx = list.indexWhere((t) => t.zebraTankId == updated.zebraTankId);
+      if (idx >= 0) { list[idx] = updated; return; }
+    }
+  }
+
+  Map<int, List<ZebrafishTank>> get _byRow {
+    final m = <int, List<ZebrafishTank>>{};
+    for (final t in _rackTanks) {
+      m.putIfAbsent(t.rackRowIndex, () => []).add(t);
+    }
+    for (final k in m.keys) {
+      m[k]!.sort((a, b) => a.rackColIndex.compareTo(b.rackColIndex));
+    }
+    return m;
+  }
+
+  Future<void> _exportCsv() async {
+    final allTanks = _racks.entries
+        .expand((e) => e.value.map((t) => (rack: e.key, tank: t)))
+        .toList();
+    final buf = StringBuffer();
+    buf.writeln('Rack,Tank ID,Type,Row,Column,Volume (L),Line,Males,Females,Juveniles,Responsible,Status,Health,Last Cleaning,Food Type,Feeding Schedule,Experiment,Notes');
+    for (final entry in allTanks) {
+      final t = entry.tank;
+      String esc(String? v) => '"${(v ?? '').replaceAll('"', '""')}"';
+      buf.writeln([
+        esc(entry.rack),
+        esc(t.zebraTankId),
+        esc(t.zebraTankType),
+        esc(t.zebraRow),
+        esc(t.zebraColumn),
+        t.zebraVolumeL ?? '',
+        esc(t.zebraLine),
+        t.zebraMales ?? 0,
+        t.zebraFemales ?? 0,
+        t.zebraJuveniles ?? 0,
+        esc(t.zebraResponsible),
+        esc(t.zebraStatus),
+        esc(t.zebraHealthStatus),
+        t.zebraLastTankCleaning != null ? t.zebraLastTankCleaning!.toIso8601String().substring(0, 10) : '',
+        esc(t.zebraFoodType),
+        esc(t.zebraFeedingSchedule),
+        esc(t.zebraExperimentId),
+        esc(t.zebraNotes),
+      ].join(','));
+    }
+    try {
+      final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/tanks_${DateTime.now().millisecondsSinceEpoch}.csv');
+      await file.writeAsString(buf.toString());
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    final tanks     = _rackTanks;
+    final occupied  = tanks.where(_isOccupied).length;
+    final empties   = tanks.where((t) => t.zebraStatus == 'empty').length;
+    final sentinels = tanks.where(_isSentinel).length;
+
+    return GestureDetector(
+      onTap: () => setState(() => _menuTank = null),
+      child: Stack(children: [
+        Column(children: [
+          // ── Toolbar ──────────────────────────────────────────────────
+          Container(
+            color: context.appBg,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(children: [
+              // Rack selector: dropdown if >1 rack, plain label if only one
+              if (_racks.length > 1) ...[
+                Text('Rack:', style: GoogleFonts.spaceGrotesk(
+                  fontSize: 12, color: context.appTextSecondary)),
+                const SizedBox(width: 8),
+                DropdownButton<String>(
+                  value: _selectedRack,
+                  dropdownColor: context.appSurface2,
+                  underline: const SizedBox(),
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 13, fontWeight: FontWeight.w700,
+                    color: AppDS.accent),
+                  items: (_racks.keys.toList()..sort())
+                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                    .toList(),
+                  onChanged: (v) { if (v != null) setState(() => _selectedRack = v); },
+                ),
+              ] else
+                Text(_selectedRack, style: GoogleFonts.jetBrainsMono(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: AppDS.accent)),
+              const SizedBox(width: 16),
+              _chip('${tanks.length} tanks',  context.appTextMuted),
+              const SizedBox(width: 6),
+              _chip('$occupied occupied',     AppDS.green),
+              const SizedBox(width: 6),
+              _chip('$empties empty',         context.appTextSecondary),
+              if (sentinels > 0) ...[
+                const SizedBox(width: 6),
+                _chip('$sentinels sentinel',  AppDS.pink),
+              ],
+              const Spacer(),
+              Tooltip(
+                message: 'Export CSV',
+                child: IconButton(
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  color: AppDS.textSecondary,
+                  onPressed: _exportCsv,
+                ),
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<String>(
+                tooltip: 'Rack options',
+                offset: const Offset(0, 36),
+                color: context.appSurface2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(color: context.appBorder2)),
+                onSelected: (v) {
+                  if (v == 'add') _showAddRackDialog();
+                  if (v == 'delete') _showDeleteRackDialog();
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'add',
+                    child: Row(children: [
+                      const Icon(Icons.add, size: 16, color: AppDS.accent),
+                      const SizedBox(width: 8),
+                      Text('Add Rack', style: GoogleFonts.spaceGrotesk(
+                        fontSize: 13, color: context.appTextPrimary)),
+                    ])),
+                  PopupMenuItem(
+                    value: 'delete',
+                    enabled: _racks.length > 1,
+                    child: Row(children: [
+                      Icon(Icons.delete_outline, size: 16,
+                        color: _racks.length > 1 ? AppDS.red : context.appTextMuted),
+                      const SizedBox(width: 8),
+                      Text('Delete $_selectedRack',
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 13,
+                          color: _racks.length > 1 ? AppDS.red : context.appTextMuted)),
+                    ])),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppDS.accent),
+                    borderRadius: BorderRadius.circular(6)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.settings_outlined, size: 14, color: AppDS.accent),
+                    const SizedBox(width: 6),
+                    Text('Racks', style: GoogleFonts.spaceGrotesk(
+                      fontSize: 13, color: AppDS.accent)),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down, size: 16, color: AppDS.accent),
+                  ]),
+                ),
+              ),
+            ]),
+          ),
+          Container(height: 1, color: context.appBorder),
+
+          // ── Body ─────────────────────────────────────────────────────
+          if (_loading)
+            const Expanded(child: Center(
+              child: CircularProgressIndicator()))
+          else if (_error != null)
+            Expanded(child: Center(child: Text('Error: $_error',
+              style: GoogleFonts.spaceGrotesk(color: AppDS.red, fontSize: 13))))
+          else
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    LayoutBuilder(builder: (ctx, box) {
+                      final avail = box.maxWidth - _labelW - 8;
+                      return _buildRack(avail);
+                    }),
+                    const SizedBox(height: 12),
+                    _buildLegend(),
+                    const SizedBox(height: 20),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: _buildStocksWidget()),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildFishByLineWidget()),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildFoodAmountWidget()),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ]),
+        if (_menuTank != null) _buildContextMenu(),
+      ]),
+    );
+  }
+
+  // ── Rack grid ─────────────────────────────────────────────────────────────
+  Widget _buildRack(double availW) {
+    final rows       = _byRow;
+    final sortedKeys = rows.keys.toList()..sort();
+
+    // cellW for each row type — total row always == availW
+    final cellW15 = availW / _rowACount;   // row A
+    final cellW35 = availW / _rowBECount;  // rows B-E
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.isDark ? AppDS.surface2 : const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.appBorder2, width: 1.5),
+        boxShadow: [BoxShadow(
+          color: Colors.black.withValues(alpha:0.35),
+          blurRadius: 18, offset: const Offset(0, 5))]),
+      child: Column(
+        children: sortedKeys.map((rowIdx) {
+          final isTop   = rowIdx == 0;
+          final cellW   = isTop ? cellW15 : cellW35;
+          final rowH    = isTop ? _rowHTop : _rowHMain;
+          final padding = isTop ? 12.0 : 4.0;
+          return Padding(
+            padding: EdgeInsets.only(bottom: padding),
+            child: _buildRow(rowIdx, rows[rowIdx]!, isTop, cellW, rowH),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildRow(
+    int rowIdx, List<ZebrafishTank> tanks,
+    bool isTop, double cellW, double rowH) {
+
+    final label = _rowLabels[rowIdx];
+
+    return SizedBox(
+      height: rowH,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Row label
+          SizedBox(
+            width: _labelW,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isTop) ...[
+                  Text('TOP', style: GoogleFonts.jetBrainsMono(
+                    fontSize: 9, color: AppDS.accent,
+                    fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                ],
+                Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    color: context.appSurface3,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: context.appBorder)),
+                  child: Center(child: Text(label,
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 12, fontWeight: FontWeight.w700,
+                      color: context.appTextPrimary))),
+                ),
+                if (!isTop) ...[
+                  const SizedBox(height: 3),
+                  Text('3.5L', style: GoogleFonts.jetBrainsMono(
+                    fontSize: 8, color: context.appTextMuted)),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Tank cells — Expanded fills remaining width = availW exactly
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: () {
+                // A merged (8L / 3.0L) tank absorbs the slot to its right,
+                // so we skip that right neighbour to keep total flex = row count.
+                final widgets = <Widget>[];
+                bool skipNext = false;
+                for (final t in tanks) {
+                  if (skipNext) { skipNext = false; continue; }
+                  widgets.add(Expanded(
+                    flex: t.isEightLiter ? 2 : 1,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: _gap),
+                      child: _tankCell(t, isTop),
+                    ),
+                  ));
+                  if (t.isEightLiter) skipNext = true;
+                }
+                return widgets;
+              }(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Single tank cell ──────────────────────────────────────────────────────
+  Widget _tankCell(ZebrafishTank tank, bool isTop) {
+    final occupied = _isOccupied(tank);
+    final hasFish  = _hasFish(tank);
+    final isSent   = _isSentinel(tank);
+
+    // Colors — light rack background, vivid fills for contrast
+    final Color bg, border;
+    if (isSent) {
+      bg     = AppDS.pink.withValues(alpha:0.22);
+      border = AppDS.pink.withValues(alpha:0.80);
+    } else {
+      switch (tank.zebraStatus) {
+        case 'quarantine':
+          bg = AppDS.yellow.withValues(alpha:0.22); border = AppDS.yellow.withValues(alpha:0.75); break;
+        case 'retired':
+          bg = AppDS.red.withValues(alpha:0.12);    border = AppDS.red.withValues(alpha:0.55);    break;
+        case 'active':
+          if (hasFish) {
+            bg = AppDS.green.withValues(alpha:0.30); border = AppDS.green.withValues(alpha:0.65);
+          } else {
+            bg = AppDS.accent.withValues(alpha:0.12); border = AppDS.accent.withValues(alpha:0.40);
+          }
+          break;
+        default: // empty
+          bg = (context.isDark ? AppDS.surface3 : Colors.white).withValues(alpha:0.80); border = const Color(0xFFBDD4E8);
+      }
+    }
+
+    // Text colors: dark on light rack background
+    const kTextLine   = Color(0xFF0F172A);  // occupied line name
+    const kTextNum    = Color(0xFF334155);  // fish counts
+    const kTextCol    = Color(0xFF64748B);  // column number
+    const kTextColEmp = Color(0xFFB0CADA); // column on empty
+
+    // Health dot
+    final Color healthDot = switch (tank.zebraHealthStatus) {
+      'sick'        => AppDS.red,
+      'treatment'   => AppDS.orange,
+      'observation' => AppDS.yellow,
+      _             => AppDS.green,
+    };
+
+    return GestureDetector(
+      onTapUp:          (d) => _showMenu(tank, d.globalPosition),
+      onSecondaryTapUp: (d) => _showMenu(tank, d.globalPosition),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Tooltip(
+          message: _tooltip(tank),
+          preferBelow: false,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(
+                color: border,
+                width: (occupied || isSent) ? 1.5 : 1)),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Stack(clipBehavior: Clip.hardEdge, children: [
+                // Main text content
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tank.zebraColumn ?? '',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 9.5,
+                        color: occupied ? kTextCol : kTextColEmp),
+                      overflow: TextOverflow.clip),
+                    if (isTop && _showLabels && occupied && tank.zebraLine != null) ...[
+                      const SizedBox(height: 1),
+                      Text(tank.zebraLine!,
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 8.5, fontWeight: FontWeight.w700,
+                          color: isSent ? AppDS.pink : kTextLine),
+                        overflow: TextOverflow.ellipsis, maxLines: 1),
+                    ],
+                    if (!isTop && _showLabels && occupied) ...[
+                      const SizedBox(height: 1),
+                      if (tank.zebraLine != null)
+                        Text(tank.zebraLine!,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 10.0, fontWeight: FontWeight.w700,
+                            color: isSent ? AppDS.pink : kTextLine),
+                          overflow: TextOverflow.ellipsis, maxLines: 1),
+                      const SizedBox(height: 1),
+                      if (hasFish)
+                        Text(
+                          '♂${tank.zebraMales ?? 0} ♀${tank.zebraFemales ?? 0}'
+                          '${(tank.zebraJuveniles ?? 0) > 0 ? ' J${tank.zebraJuveniles}' : ''}',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 9.0, color: kTextNum),
+                          overflow: TextOverflow.clip)
+                      else
+                        Text('no fish',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 9.0, color: AppDS.accent,
+                            fontStyle: FontStyle.italic)),
+                      if (tank.zebraFoodType?.isNotEmpty == true)
+                        Text(tank.zebraFoodType!,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 8.0, color: AppDS.yellow),
+                          overflow: TextOverflow.ellipsis, maxLines: 1),
+                      if (tank.zebraResponsible?.isNotEmpty == true)
+                        Text(tank.zebraResponsible!,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 8.5, color: kTextCol),
+                          overflow: TextOverflow.ellipsis, maxLines: 1),
+                    ],
+                  ],
+                ),
+                // Volume badge (non-top only)
+                if (!isTop)
+                  Positioned(top: 0, right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 3, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: context.isDark ? AppDS.surface3 : const Color(0xFFDDE9F5),
+                        borderRadius: BorderRadius.circular(3)),
+                      child: Text(tank.volumeLabel,
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 8.5, color: context.appTextSecondary)))),
+                // Health dot
+                if (occupied)
+                  Positioned(bottom: 1, right: 2,
+                    child: Container(width: 5, height: 5,
+                      decoration: BoxDecoration(
+                        color: healthDot, shape: BoxShape.circle))),
+                // merge badge (2.4L for top row, 8L for main rows)
+                if (tank.isEightLiter)
+                  Positioned(bottom: 1, left: 3,
+                    child: Text(tank.isTopRow ? '2.4L' : '8L',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 7, color: AppDS.accent,
+                        fontWeight: FontWeight.w700))),
+                // Sentinel pink dot top-left
+                if (isSent)
+                  Positioned(top: 0, left: 0,
+                    child: Container(width: 5, height: 5,
+                      decoration: const BoxDecoration(
+                        color: AppDS.pink,
+                        shape: BoxShape.circle))),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _tooltip(ZebrafishTank t) => [
+    '${t.zebraTankId}  ·  ${t.volumeLabel}',
+    if (_isSentinel(t))  '★ Sentinel tank',
+    'Status: ${t.zebraStatus ?? "empty"}',
+    if (t.zebraLine != null) 'Line: ${t.zebraLine}',
+    if (_hasFish(t))
+      '♂${t.zebraMales ?? 0}  ♀${t.zebraFemales ?? 0}'
+      '${(t.zebraJuveniles ?? 0) > 0 ? "  J${t.zebraJuveniles}" : ""}',
+    if (_isOccupied(t) && !_hasFish(t)) 'Active — no fish',
+  ].join('\n');
+
+  // ── Context menu ──────────────────────────────────────────────────────────
+  void _showMenu(ZebrafishTank tank, Offset globalPos) {
+    final box = context.findRenderObject() as RenderBox?;
+    final local = box != null ? box.globalToLocal(globalPos) : globalPos;
+    setState(() { _menuTank = tank; _menuOffset = local; });
+  }
+
+  Widget _buildContextMenu() {
+    final tank    = _menuTank!;
+    final box     = context.findRenderObject() as RenderBox?;
+    final sz      = box?.size ?? MediaQuery.of(context).size;
+    double l = _menuOffset.dx, t = _menuOffset.dy;
+    const mw = 226.0, mh = 360.0;
+    if (l + mw > sz.width)  l = sz.width  - mw - 8;
+    if (t + mh > sz.height) t = sz.height - mh - 8;
+    if (l < 4) l = 4;
+    if (t < 4) t = 4;
+
+    final isSent = _isSentinel(tank);
+    final isOcc  = _isOccupied(tank);
+
+    return Positioned(
+      left: l, top: t,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: mw,
+          decoration: BoxDecoration(
+            color: context.appSurface2,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: context.appBorder2),
+            boxShadow: [BoxShadow(
+              color: Colors.black.withValues(alpha:0.55),
+              blurRadius: 22, offset: const Offset(0, 5))]),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: context.appBorder))),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Text(tank.zebraTankId,
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 12, fontWeight: FontWeight.w700,
+                        color: AppDS.accent)),
+                    const SizedBox(width: 6),
+                    StatusBadge(label: tank.zebraStatus),
+                    if (isSent) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppDS.pink.withValues(alpha:0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppDS.pink.withValues(alpha:0.4))),
+                        child: Text('SENTINEL',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 8, fontWeight: FontWeight.w700,
+                            color: AppDS.pink))),
+                    ],
+                  ]),
+                  if (tank.zebraLine != null) ...[
+                    const SizedBox(height: 2),
+                    Text(tank.zebraLine!,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 11, color: context.appTextSecondary)),
+                  ],
+                  Text(tank.volumeLabel,
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 9, color: context.appTextMuted)),
+                ],
+              ),
+            ),
+
+            _mi(Icons.info_outline,  'View Details', context.appTextPrimary, () {
+              setState(() => _menuTank = null);
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => TankDetailPage(tank: tank, availableRacks: _racks.keys.toList()..sort())));
+            }),
+            if (!isOcc)
+              _mi(Icons.add_circle_outline, 'Add Stock', AppDS.accent, () {
+                setState(() => _menuTank = null);
+                _showAddStockDialog(tank);
+              }),
+            if (isOcc)
+              _mi(Icons.copy_outlined, 'Duplicate Stock', AppDS.purple, () {
+                setState(() => _menuTank = null);
+                _showDuplicateStockDialog(tank);
+              }),
+            if (isOcc || (tank.zebraLine?.isNotEmpty ?? false))
+              _mi(Icons.edit_outlined, 'Edit Tank', context.appTextPrimary, () {
+                setState(() => _menuTank = null);
+                _showEditDialog(tank);
+              }),
+
+            // Mark active (no fish) vs clear
+            if (!isOcc)
+              _mi(Icons.check_circle_outline, 'Mark Active (no fish)',
+                AppDS.accent, () {
+                  final u = tank.copyWith(zebraStatus: 'active');
+                  setState(() { _patch(u); _menuTank = null; });
+                  _persist(u);
+                })
+            else
+              _mi(Icons.remove_circle_outline, 'Clear Tank',
+                AppDS.orange, () async {
+                  setState(() => _menuTank = null);
+                  final ok = await showConfirmDialog(context,
+                    title: 'Clear Tank',
+                    message: 'Remove all data from ${tank.zebraTankId}?',
+                    confirmLabel: 'Clear',
+                    confirmColor: AppDS.orange);
+                  if (ok && mounted) {
+                    final u = tank.copyWith(
+                      zebraStatus: 'empty',
+                      zebraLine: null,
+                      zebraMales: 0,  zebraFemales: 0, zebraJuveniles: 0,
+                      zebraTankType: 'holding');
+                    setState(() => _patch(u));
+                    _persist(u);
+                  }
+                }),
+
+            // Toggle sentinel
+            _mi(
+              isSent ? Icons.star_outline : Icons.star,
+              isSent ? 'Remove Sentinel' : 'Mark as Sentinel',
+              AppDS.pink,
+              () {
+                final u = tank.copyWith(
+                  zebraTankType: isSent ? 'holding' : 'sentinel',
+                  zebraStatus:   isSent ? tank.zebraStatus : 'active');
+                setState(() { _patch(u); _menuTank = null; });
+                _persist(u);
+              }),
+
+            // merge toggle — last column cannot merge (no right neighbour)
+            if (tank.isEightLiter ||
+                (tank.isTopRow
+                    ? tank.rackColIndex < _rowACount
+                    : tank.rackColIndex < _rowBECount))
+            _mi(Icons.swap_horiz,
+              tank.isEightLiter
+                ? (tank.isTopRow ? 'Revert to 2 × 1.1 L' : 'Revert to 2 × 3.5 L')
+                : (tank.isTopRow ? 'Convert to 2.4 L'    : 'Convert to 8.0 L'),
+              AppDS.accent, () {
+                final next  = !tank.isEightLiter;
+                final volL  = next
+                    ? (tank.isTopRow ? 2.4 : 8.0)
+                    : (tank.isTopRow ? 1.5 : 3.5);
+                final u = tank.copyWith(isEightLiter: next, zebraVolumeL: volL);
+                setState(() { _patch(u); _menuTank = null; });
+                _persist(u);
+              }),
+
+            Divider(height: 1, color: context.appBorder),
+            _mi(Icons.refresh, 'Reset to Empty', AppDS.red, () async {
+              setState(() => _menuTank = null);
+              final ok = await showConfirmDialog(context,
+                title: 'Reset Tank',
+                message: 'Permanently clear ${tank.zebraTankId}?\nThis will delete the stock record from the database.',
+                confirmLabel: 'Reset');
+              if (ok && mounted) {
+                await _deleteStock(tank);
+              }
+            }),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _mi(IconData icon, String label, Color color, VoidCallback fn) =>
+    InkWell(
+      onTap: fn,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        child: Row(children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 10),
+          Text(label, style: GoogleFonts.spaceGrotesk(
+            fontSize: 12.5, color: color)),
+        ]),
+      ),
+    );
+
+  // ── Edit dialog ───────────────────────────────────────────────────────────
+  void _showEditDialog(ZebrafishTank tank) {
+    showDialog(context: context, builder: (_) => _EditTankDialog(
+      tank: tank,
+      // exclude the tank being edited so its current slot isn't shown as occupied
+      occupiedTankIds: _occupiedTankIds.difference({tank.zebraTankId}),
+      availableRacks: _racks.keys.toList()..sort(),
+      onSave: (u) {
+        setState(() {
+          // if position changed, clear the old slot first
+          if (u.zebraTankId != tank.zebraTankId) {
+            _patch(tank.copyWith(
+              zebraStatus: 'empty', zebraLine: null,
+              zebraMales: 0, zebraFemales: 0, zebraJuveniles: 0,
+            ));
+          }
+          _patch(u);
+        });
+        _persist(u);
+      },
+    ));
+  }
+
+  Set<String> get _occupiedTankIds =>
+      _racks.values.expand((l) => l).where(_isOccupied).map((t) => t.zebraTankId).toSet();
+
+  void _showAddStockDialog(ZebrafishTank tank) {
+    showDialog(
+      context: context,
+      builder: (_) => AddStockDialog(
+        occupiedTankIds: _occupiedTankIds,
+        availableRacks: _racks.keys.toList()..sort(),
+        onAdd: (_) => _loadFromSupabase(),
+        prefill: FishStockPrefill(
+          rack: tank.zebraRack ?? 'R1',
+          row:  tank.zebraRow  ?? 'B',
+          col:  int.tryParse(tank.zebraColumn ?? '1') ?? 1,
+        ),
+      ),
+    );
+  }
+
+  /// Returns (rack, row, col) of the closest available tank to [source],
+  /// searching outward same-row first, then other rows, then other racks.
+  (String, String, int)? _closestAvailable(ZebrafishTank source) {
+    final occupied = _occupiedTankIds;
+    final srcRack = source.zebraRack ?? 'R1';
+    final srcRow  = source.zebraRow  ?? 'B';
+    final srcCol  = int.tryParse(source.zebraColumn ?? '1') ?? 1;
+
+    bool free(String rack, String row, int col) =>
+        !occupied.contains('$rack-$row$col');
+
+    // Same rack+row, outward from source column
+    final maxColSameRow = srcRow == 'A' ? _rowACount : _rowBECount;
+    for (int d = 1; d <= maxColSameRow; d++) {
+      for (final c in [srcCol + d, srcCol - d]) {
+        if (c >= 1 && c <= maxColSameRow && free(srcRack, srcRow, c)) {
+          return (srcRack, srcRow, c);
+        }
+      }
+    }
+    // Same rack, other rows
+    for (final row in _rowLabels) {
+      if (row == srcRow) continue;
+      final maxC = row == 'A' ? _rowACount : _rowBECount;
+      for (int c = 1; c <= maxC; c++) {
+        if (free(srcRack, row, c)) return (srcRack, row, c);
+      }
+    }
+    // Other racks
+    for (final rack in _racks.keys) {
+      if (rack == srcRack) continue;
+      for (final row in _rowLabels) {
+        final maxC = row == 'A' ? _rowACount : _rowBECount;
+        for (int c = 1; c <= maxC; c++) {
+          if (free(rack, row, c)) return (rack, row, c);
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<void> _showDuplicateStockDialog(ZebrafishTank tank) async {
+    Map<String, dynamic>? rawRow;
+    try {
+      rawRow = await Supabase.instance.client
+          .from('fish_stocks')
+          .select()
+          .eq('fish_stocks_tank_id', tank.zebraTankId)
+          .maybeSingle();
+    } catch (_) {}
+    if (!mounted) return;
+    final closest = _closestAvailable(tank);
+    showDialog(
+      context: context,
+      builder: (_) => AddStockDialog(
+        occupiedTankIds: _occupiedTankIds,
+        availableRacks: _racks.keys.toList()..sort(),
+        onAdd: (_) => _loadFromSupabase(),
+        prefill: FishStockPrefill(
+          line:            tank.zebraLine,
+          responsible:     tank.zebraResponsible,
+          experiment:      tank.zebraExperimentId,
+          notes:           tank.zebraNotes,
+          status:          tank.zebraStatus,
+          health:          tank.zebraHealthStatus,
+          males:           tank.zebraMales     ?? 0,
+          females:         tank.zebraFemales   ?? 0,
+          juveniles:       tank.zebraJuveniles ?? 0,
+          foodType:        tank.zebraFoodType,
+          foodSource:      tank.zebraFoodSource,
+          foodAmount:      tank.zebraFoodAmount,
+          feedingSchedule: tank.zebraFeedingSchedule,
+          rack:            closest?.$1,
+          row:             closest?.$2,
+          col:             closest?.$3,
+          rawRow:          rawRow,
+        ),
+      ),
+    );
+  }
+
+  Widget _chip(String label, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha:0.09),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withValues(alpha:0.22))),
+    child: Text(label, style: GoogleFonts.spaceGrotesk(
+      fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+  );
+
+  // ── Legend ────────────────────────────────────────────────────────────────
+  Widget _buildLegend() {
+    return Wrap(spacing: 16, runSpacing: 8, children: [
+      Text('Tank:', style: GoogleFonts.spaceGrotesk(
+        fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700)),
+      _li('Active + fish',   AppDS.green),
+      _li('Active, no fish', AppDS.accent),
+      _li('Sentinel',        AppDS.pink),
+      _li('Quarantine',      AppDS.yellow),
+      _li('Empty',           context.appTextMuted),
+      _li('Retired',         AppDS.red),
+      const SizedBox(width: 4),
+      Text('Health:', style: GoogleFonts.spaceGrotesk(
+        fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700)),
+      _li('Healthy',     AppDS.green,  dot: true),
+      _li('Observation', AppDS.yellow, dot: true),
+      _li('Treatment',   AppDS.orange, dot: true),
+      _li('Sick',        AppDS.red,    dot: true),
+    ]);
+  }
+
+  Widget _li(String label, Color color, {bool dot = false}) =>
+    Row(mainAxisSize: MainAxisSize.min, children: [
+      dot
+          ? Container(width: 7, height: 7,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle))
+          : Container(width: 13, height: 13,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha:0.15),
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: color.withValues(alpha:0.45)))),
+      const SizedBox(width: 4),
+      Text(label, style: GoogleFonts.spaceGrotesk(
+        fontSize: 11, color: context.appTextSecondary)),
+    ]);
+
+  // ── Add Rack dialog ───────────────────────────────────────────────────────
+  void _showAddRackDialog() {
+    final ctrl = TextEditingController();
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      backgroundColor: context.appSurface2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: context.appBorder2)),
+      title: Text('Add Rack', style: GoogleFonts.spaceGrotesk(
+        fontSize: 16, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
+      content: SizedBox(width: 280,
+        child: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: GoogleFonts.jetBrainsMono(color: context.appTextPrimary),
+          decoration: InputDecoration(
+            labelText: 'Rack name (e.g. R2)',
+            labelStyle: GoogleFonts.spaceGrotesk(color: context.appTextSecondary),
+            filled: true, fillColor: context.appSurface3,
+            border: OutlineInputBorder(borderSide: BorderSide(color: context.appBorder)),
+            focusedBorder: OutlineInputBorder(
+              borderSide: const BorderSide(color: AppDS.accent, width: 1.5))),
+        )),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.spaceGrotesk(color: context.appTextSecondary))),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppDS.accent, foregroundColor: AppDS.bg),
+          onPressed: () {
+            final name = ctrl.text.trim().toUpperCase();
+            if (name.isNotEmpty && !_racks.containsKey(name)) {
+              final defaultTanks = _buildDefaultRack(name);
+              setState(() {
+                _racks[name] = defaultTanks;
+                _selectedRack = name;
+              });
+              for (final t in defaultTanks) { _persist(t); }
+            }
+            Navigator.pop(ctx);
+          },
+          child: const Text('Add')),
+      ],
+    ));
+  }
+
+  // ── Delete Rack dialog ────────────────────────────────────────────────────
+  void _showDeleteRackDialog() {
+    if (_racks.length <= 1) return;
+    final rackId    = _selectedRack;
+    final tankCount = (_racks[rackId] ?? []).length;
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      backgroundColor: context.appSurface2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: context.appBorder2)),
+      title: Text('Delete Rack $rackId?', style: GoogleFonts.spaceGrotesk(
+        fontSize: 16, fontWeight: FontWeight.w700, color: AppDS.red)),
+      content: Text(
+        'This will permanently remove all $tankCount tank records for rack $rackId from the database.',
+        style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextSecondary)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: Text('Cancel', style: GoogleFonts.spaceGrotesk(color: context.appTextSecondary))),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppDS.red, foregroundColor: Colors.white),
+          onPressed: () async {
+            Navigator.pop(ctx);
+            try {
+              await Supabase.instance.client
+                  .from('fish_stocks')
+                  .delete()
+                  .eq('fish_stocks_rack', rackId);
+            } catch (_) {}
+            final remaining = _racks.keys.where((k) => k != rackId).toList()..sort();
+            setState(() {
+              _racks.remove(rackId);
+              _selectedRack = remaining.first;
+            });
+          },
+          child: const Text('Delete')),
+      ],
+    ));
+  }
+
+  // ── Info widgets ──────────────────────────────────────────────────────────
+  Widget _infoCard(String title, IconData icon, List<Widget> rows) =>
+    Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.appBorder2)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, size: 14, color: AppDS.accent),
+          const SizedBox(width: 6),
+          Text(title, style: GoogleFonts.spaceGrotesk(
+            fontSize: 13, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
+        ]),
+        const SizedBox(height: 10),
+        Divider(height: 1, color: context.appBorder),
+        const SizedBox(height: 8),
+        ...rows,
+      ]),
+    );
+
+  /// Natural sort for IDs like "R1-A2" vs "R1-A10" — compares column as int.
+  static int _compareTankId(String a, String b) {
+    final re = RegExp(r'^([^-]+)-([A-Za-z]+)(\d+)$');
+    final ma = re.firstMatch(a);
+    final mb = re.firstMatch(b);
+    if (ma == null || mb == null) return a.compareTo(b);
+    final rack = ma.group(1)!.compareTo(mb.group(1)!);
+    if (rack != 0) return rack;
+    final row = ma.group(2)!.compareTo(mb.group(2)!);
+    if (row != 0) return row;
+    return int.parse(ma.group(3)!).compareTo(int.parse(mb.group(3)!));
+  }
+
+  Widget _buildStocksWidget() {
+    final stockTanks = _rackTanks.where(_hasFish).toList()
+      ..sort((a, b) => _compareTankId(a.zebraTankId, b.zebraTankId));
+
+    final header = Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(children: [
+        SizedBox(width: 56, child: Text('Tank', style: GoogleFonts.spaceGrotesk(
+          fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
+        Expanded(child: Text('Line', style: GoogleFonts.spaceGrotesk(
+          fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
+        SizedBox(width: 28, child: Text('♂', textAlign: TextAlign.center,
+          style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
+        SizedBox(width: 28, child: Text('♀', textAlign: TextAlign.center,
+          style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
+        SizedBox(width: 32, child: Text('Juv', textAlign: TextAlign.center,
+          style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
+        SizedBox(width: 36, child: Text('Total', textAlign: TextAlign.right,
+          style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
+      ]),
+    );
+
+    final rows = stockTanks.isEmpty
+      ? [Text('No active stocks in this rack.',
+          style: GoogleFonts.spaceGrotesk(fontSize: 12, color: context.appTextMuted))]
+      : stockTanks.map((t) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(children: [
+            SizedBox(width: 56, child: Text(t.zebraTankId.split('-').last,
+              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppDS.accent))),
+            Expanded(child: Text(t.zebraLine ?? '—',
+              style: GoogleFonts.spaceGrotesk(fontSize: 11, color: context.appTextPrimary),
+              overflow: TextOverflow.ellipsis)),
+            SizedBox(width: 28, child: Text('${t.zebraMales ?? 0}', textAlign: TextAlign.center,
+              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: context.appTextSecondary))),
+            SizedBox(width: 28, child: Text('${t.zebraFemales ?? 0}', textAlign: TextAlign.center,
+              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: context.appTextSecondary))),
+            SizedBox(width: 32, child: Text('${t.zebraJuveniles ?? 0}', textAlign: TextAlign.center,
+              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: context.appTextSecondary))),
+            SizedBox(width: 36, child: Text('${t.totalFish}', textAlign: TextAlign.right,
+              style: GoogleFonts.jetBrainsMono(fontSize: 11,
+                fontWeight: FontWeight.w700, color: AppDS.green))),
+          ]),
+        )).toList();
+
+    return _infoCard('Stocks', Icons.water, [header, ...rows]);
+  }
+
+  Widget _buildFishByLineWidget() {
+    // (males, females, juveniles, total) per line name
+    final byLine = <String, (int, int, int, int)>{};
+    for (final t in _rackTanks.where(_hasFish)) {
+      final name = t.zebraLine?.trim().isNotEmpty == true ? t.zebraLine! : 'Unknown';
+      final m = t.zebraMales     ?? 0;
+      final f = t.zebraFemales   ?? 0;
+      final j = t.zebraJuveniles ?? 0;
+      final p = byLine[name] ?? (0, 0, 0, 0);
+      byLine[name] = (p.$1 + m, p.$2 + f, p.$3 + j, p.$4 + m + f + j);
+    }
+    final sorted = byLine.entries.toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+
+    if (sorted.isEmpty) {
+      return _infoCard('Fish by Line', Icons.biotech_outlined, [
+        Text('No fish in this rack.', style: GoogleFonts.spaceGrotesk(
+            fontSize: 12, color: context.appTextMuted)),
+      ]);
+    }
+
+    const colM = 36.0;
+    const colF = 36.0;
+    const colJ = 36.0;
+    const colT = 44.0;
+
+    colHdr(String label, Color color) => SizedBox(
+      width: label == 'Total' ? colT : colM,
+      child: Text(label,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.spaceGrotesk(
+          fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+    );
+
+    cell(int v, double w, Color color, {bool bold = false}) => SizedBox(
+      width: w,
+      child: Text(v > 0 ? '$v' : '—',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.jetBrainsMono(
+          fontSize: 11,
+          fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+          color: v > 0 ? color : context.appTextMuted)),
+    );
+
+    final header = Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(children: [
+        const Expanded(child: SizedBox()),
+        colHdr('♂',     AppDS.accent),
+        colHdr('♀',     AppDS.pink),
+        colHdr('Juv',   context.appTextMuted),
+        colHdr('Total', context.appTextSecondary),
+      ]),
+    );
+
+    final dataRows = sorted.map((e) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(children: [
+        Expanded(child: Text(e.key,
+          style: GoogleFonts.spaceGrotesk(fontSize: 12, color: context.appTextPrimary),
+          overflow: TextOverflow.ellipsis)),
+        cell(e.value.$1, colM, AppDS.accent),
+        cell(e.value.$2, colF, AppDS.pink),
+        cell(e.value.$3, colJ, context.appTextMuted),
+        cell(e.value.$4, colT, context.appTextPrimary, bold: true),
+      ]),
+    )).toList();
+
+    return _infoCard('Fish by Line', Icons.biotech_outlined, [header, ...dataRows]);
+  }
+
+  static bool _isGemma(String ft) => ft.startsWith('GEMMA');
+
+  Widget _buildFoodAmountWidget() {
+    // Use stored food_amount per tank when available.
+    // Fallback: GEMMA types → 0.02 g/fish/day formula.
+    final amounts  = <String, double>{};
+    final fishCount = <String, int>{};
+    for (final t in _rackTanks.where(_hasFish)) {
+      final ft   = t.zebraFoodType?.trim().isNotEmpty == true
+          ? t.zebraFoodType! : 'Not set';
+      final fish = t.totalFish;
+      fishCount[ft] = (fishCount[ft] ?? 0) + fish;
+      if (t.zebraFoodAmount != null) {
+        // Explicit amount (even 0) — blocks GEMMA fallback.
+        amounts[ft] = (amounts[ft] ?? 0) + t.zebraFoodAmount!;
+      } else if (_isGemma(ft)) {
+        // Amount not set → use GEMMA formula.
+        amounts[ft] = (amounts[ft] ?? 0) + fish * 0.02;
+      }
+    }
+
+    final rows = fishCount.isEmpty
+      ? [Text('No fish in this rack.', style: GoogleFonts.spaceGrotesk(
+          fontSize: 12, color: context.appTextMuted))]
+      : (fishCount.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
+          .map((e) {
+            final hasAmount = amounts.containsKey(e.key);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(e.key, style: GoogleFonts.spaceGrotesk(
+                      fontSize: 12, color: context.appTextPrimary)),
+                    Text('${e.value} fish total', style: GoogleFonts.jetBrainsMono(
+                      fontSize: 10, color: context.appTextMuted)),
+                  ])),
+                hasAmount
+                  ? Text('${amounts[e.key]!.toStringAsFixed(2)} g/day',
+                      style: GoogleFonts.jetBrainsMono(fontSize: 12,
+                        fontWeight: FontWeight.w700, color: AppDS.accent))
+                  : Text('—', style: GoogleFonts.jetBrainsMono(
+                      fontSize: 12, color: context.appTextMuted)),
+              ]),
+            );
+          }).toList();
+
+    final total   = amounts.values.fold(0.0, (a, b) => a + b);
+    final summary = total > 0
+      ? Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppDS.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppDS.accent.withValues(alpha: 0.25))),
+            child: Row(children: [
+              const Icon(Icons.calculate_outlined, size: 13, color: AppDS.accent),
+              const SizedBox(width: 6),
+              Text('Total daily food: ', style: GoogleFonts.spaceGrotesk(
+                fontSize: 11, color: context.appTextSecondary)),
+              Text('${total.toStringAsFixed(2)} g/day',
+                style: GoogleFonts.jetBrainsMono(fontSize: 12,
+                  fontWeight: FontWeight.w700, color: AppDS.accent)),
+            ]),
+          ))
+      : const SizedBox.shrink();
+
+    return _infoCard('Daily Food', Icons.calculate_outlined, [...rows, summary]);
+  }
+}
+
+// ─── EDIT TANK DIALOG ─────────────────────────────────────────────────────────
+class _EditTankDialog extends StatefulWidget {
+  final ZebrafishTank tank;
+  final Set<String>   occupiedTankIds;
+  final List<String>  availableRacks;
+  final ValueChanged<ZebrafishTank> onSave;
+  const _EditTankDialog({
+    required this.tank,
+    required this.occupiedTankIds,
+    required this.availableRacks,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditTankDialog> createState() => _EditTankDialogState();
+}
+
+class _EditTankDialogState extends State<_EditTankDialog> {
+  late TextEditingController _males, _females, _juvs, _resp, _exp, _notes, _foodAmount;
+  late String _status, _health, _type;
+  String? _selectedLine;
+  int?    _selectedLineId;
+  String? _foodType;
+  String? _foodFrequency;
+  String? _foodSource;
+  List<String> _lines = [];
+  Map<String, int> _lineIdByName = {};
+  bool _loadingLines = true;
+
+  static const _foodTypes   = ['GEMMA 75', 'GEMMA 150', 'GEMMA 300', 'SPAROS 400-600'];
+  static const _frequencies = ['1x', '2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x'];
+  static const _sources     = ['dry', 'live', 'mixed'];
+
+  // Position picker state
+  late String _rack;
+  late String _row;
+  late int    _col;
+  String? _posError;
+
+  bool _isOccupied(int col) =>
+      widget.occupiedTankIds.contains('$_rack-$_row$col');
+  int get _maxCol => _row == 'A' ? _rowACount : _rowBECount;
+  String get _newTankId => '$_rack-$_row$_col';
+
+  @override
+  void initState() {
+    super.initState();
+    final t = widget.tank;
+    _males      = TextEditingController(text: '${t.zebraMales ?? 0}');
+    _females    = TextEditingController(text: '${t.zebraFemales ?? 0}');
+    _juvs       = TextEditingController(text: '${t.zebraJuveniles ?? 0}');
+    _resp       = TextEditingController(text: t.zebraResponsible ?? '');
+    _exp        = TextEditingController(text: t.zebraExperimentId ?? '');
+    _notes      = TextEditingController(text: t.zebraNotes ?? '');
+    _foodAmount = TextEditingController(
+      text: t.zebraFoodAmount != null ? '${t.zebraFoodAmount}' : '');
+    _status       = t.zebraStatus ?? 'active';
+    _health       = t.zebraHealthStatus ?? 'healthy';
+    _type         = t.zebraTankType ?? 'holding';
+    _selectedLine   = t.zebraLine;
+    _selectedLineId = t.zebraLineId;
+    _foodType     = _foodTypes.contains(t.zebraFoodType) ? t.zebraFoodType : null;
+    _foodFrequency = _frequencies.contains(t.zebraFeedingSchedule) ? t.zebraFeedingSchedule : null;
+    _foodSource   = _sources.contains(t.zebraFoodSource) ? t.zebraFoodSource : null;
+    _rack = t.zebraRack   ?? 'R1';
+    _row  = t.zebraRow    ?? 'B';
+    _col  = int.tryParse(t.zebraColumn ?? '1') ?? 1;
+    _fetchLines();
+  }
+
+  Future<void> _fetchLines() async {
+    try {
+      final rows = (await Supabase.instance.client
+          .from('fish_lines')
+          .select('fish_line_id, fish_line_name')
+          .eq('fish_line_status', 'active')
+          .order('fish_line_name') as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      if (mounted) setState(() {
+        _lineIdByName = { for (final r in rows) r['fish_line_name'] as String: r['fish_line_id'] as int };
+        _lines = rows.map((r) => r['fish_line_name'] as String).toList();
+        // keep current line even if inactive
+        if (_selectedLine != null && !_lines.contains(_selectedLine)) {
+          _lines.insert(0, _selectedLine!);
+        }
+        // resolve line ID from name if not already set
+        if (_selectedLineId == null && _selectedLine != null) {
+          _selectedLineId = _lineIdByName[_selectedLine];
+        }
+        _loadingLines = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingLines = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _males.dispose(); _females.dispose(); _juvs.dispose();
+    _resp.dispose();  _exp.dispose();    _notes.dispose();
+    _foodAmount.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: context.appSurface2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: context.appBorder2)),
+      title: Row(children: [
+        Text('Edit ${widget.tank.zebraTankId}',
+          style: GoogleFonts.spaceGrotesk(
+            fontSize: 16, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
+        const SizedBox(width: 8),
+        StatusBadge(label: _status),
+        const SizedBox(width: 6),
+        Text(widget.tank.volumeLabel,
+          style: GoogleFonts.jetBrainsMono(fontSize: 10, color: context.appTextMuted)),
+      ]),
+      content: SizedBox(
+        width: 540,
+        child: SingleChildScrollView(child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Tank Position ──────────────────────────────────────────
+            _label('Tank Position'),
+            const SizedBox(height: 6),
+            _buildPositionPicker(),
+            if (_posError != null) ...[
+              const SizedBox(height: 4),
+              Text(_posError!, style: GoogleFonts.spaceGrotesk(
+                fontSize: 11, color: AppDS.red)),
+            ],
+            const SizedBox(height: 12),
+            // ── Fish line ──────────────────────────────────────────────
+            _label('Fish Line'),
+            const SizedBox(height: 3),
+            _loadingLines
+                ? const LinearProgressIndicator()
+                : DropdownButtonFormField<String>(
+                    initialValue: (_selectedLine != null && _lines.contains(_selectedLine))
+                        ? _selectedLine : null,
+                    dropdownColor: context.appSurface2,
+                    style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13),
+                    hint: Text('Select line', style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextMuted, fontSize: 13)),
+                    items: _lines.map((l) =>
+                      DropdownMenuItem(value: l, child: Text(l))).toList(),
+                    onChanged: (v) => setState(() {
+                      _selectedLine   = v;
+                      _selectedLineId = v != null ? _lineIdByName[v] : null;
+                    }),
+                    decoration: _inputDec()),
+            const SizedBox(height: 8),
+            // ── Fish counts ────────────────────────────────────────────
+            Row(children: [
+              Expanded(child: _f('Males ♂', _males)),
+              const SizedBox(width: 8),
+              Expanded(child: _f('Females ♀', _females)),
+              const SizedBox(width: 8),
+              Expanded(child: _f('Juveniles', _juvs)),
+            ]),
+            const SizedBox(height: 8),
+            // ── Status / health / type ─────────────────────────────────
+            Row(children: [
+              Expanded(child: _dd('Status', _status,
+                ['active', 'empty', 'quarantine', 'retired'],
+                (v) => setState(() => _status = v ?? _status))),
+              const SizedBox(width: 8),
+              Expanded(child: _dd('Health', _health,
+                ['healthy', 'observation', 'treatment', 'sick'],
+                (v) => setState(() => _health = v ?? _health))),
+              const SizedBox(width: 8),
+              Expanded(child: _dd('Type', _type,
+                ['holding', 'breeding', 'quarantine', 'experimental', 'sentinel'],
+                (v) => setState(() => _type = v ?? _type))),
+            ]),
+            const SizedBox(height: 12),
+            // ── Food ───────────────────────────────────────────────────
+            Text('Feeding', style: GoogleFonts.spaceGrotesk(
+              fontSize: 12, fontWeight: FontWeight.w700, color: AppDS.accent)),
+            const SizedBox(height: 6),
+            Row(children: [
+              Expanded(child: _ddOpt('Food Type', _foodType, _foodTypes,
+                (v) => setState(() => _foodType = v))),
+              const SizedBox(width: 8),
+              Expanded(child: _ddOpt('Frequency', _foodFrequency, _frequencies,
+                (v) => setState(() => _foodFrequency = v))),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: _ddOpt('Food Source', _foodSource, _sources,
+                (v) => setState(() => _foodSource = v))),
+              const SizedBox(width: 8),
+              Expanded(child: _f('Amount (g)', _foodAmount, mono: true)),
+            ]),
+            const SizedBox(height: 12),
+            // ── Other ──────────────────────────────────────────────────
+            _f('Responsible', _resp),
+            const SizedBox(height: 8),
+            _f('Experiment ID', _exp, mono: true),
+            const SizedBox(height: 8),
+            _f('Notes', _notes),
+          ],
+        )),
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: () => Navigator.pop(context),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: context.appTextSecondary,
+            side: BorderSide(color: context.appBorder)),
+          child: const Text('Cancel')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppDS.accent, foregroundColor: AppDS.bg),
+          onPressed: () {
+            if (_isOccupied(_col) && _newTankId != widget.tank.zebraTankId) {
+              setState(() => _posError = 'Tank $_newTankId is already occupied.');
+              return;
+            }
+            final t = widget.tank;
+            final isTop = _row == 'A';
+            widget.onSave(ZebrafishTank(
+              zebraId:           t.zebraId,
+              zebraTankId:       _newTankId,
+              zebraRack:         _rack,
+              zebraRow:          _row,
+              zebraColumn:       '$_col',
+              zebraVolumeL:      t.zebraVolumeL,
+              isEightLiter:      t.isEightLiter,
+              isTopRow:          isTop,
+              rackRowIndex:      _rowLabels.indexOf(_row),
+              rackColIndex:      _col - 1,
+              zebraLine:         _selectedLine,
+              zebraLineId:       _selectedLineId,
+              zebraMales:        int.tryParse(_males.text) ?? 0,
+              zebraFemales:      int.tryParse(_females.text) ?? 0,
+              zebraJuveniles:    int.tryParse(_juvs.text) ?? 0,
+              zebraResponsible:  _resp.text.trim().isEmpty ? null : _resp.text.trim(),
+              zebraStatus:       _status,
+              zebraHealthStatus: _health,
+              zebraTankType:     _type,
+              zebraFoodType:     _foodType,
+              zebraFoodSource:   _foodSource,
+              zebraFoodAmount:   _foodAmount.text.trim().isEmpty
+                  ? null : double.tryParse(_foodAmount.text.trim()),
+              zebraFeedingSchedule: _foodFrequency,
+              zebraExperimentId: _exp.text.trim().isEmpty ? null : _exp.text.trim(),
+              zebraNotes:        _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+            ));
+            Navigator.pop(context);
+          },
+          child: const Text('Save')),
+      ],
+    );
+  }
+
+  Widget _label(String t) => Text(t, style: GoogleFonts.spaceGrotesk(
+    fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700));
+
+  Widget _f(String l, TextEditingController c, {bool mono = false}) =>
+    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _label(l),
+      const SizedBox(height: 3),
+      TextField(controller: c,
+        style: (mono ? GoogleFonts.jetBrainsMono(fontSize: 13)
+            : GoogleFonts.spaceGrotesk(fontSize: 13))
+            .copyWith(color: context.appTextPrimary),
+        decoration: _inputDec()),
+    ]);
+
+  // Dropdown with a nullable value (shows placeholder when unset)
+  Widget _ddOpt(String l, String? val, List<String> opts, ValueChanged<String?> cb) =>
+    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _label(l),
+      const SizedBox(height: 3),
+      DropdownButtonFormField<String>(
+        initialValue: opts.contains(val) ? val : null,
+        dropdownColor: context.appSurface2,
+        style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13),
+        hint: Text('—', style: GoogleFonts.spaceGrotesk(
+          color: context.appTextMuted, fontSize: 13)),
+        items: opts.map((v) =>
+          DropdownMenuItem(value: v, child: Text(v))).toList(),
+        onChanged: cb,
+        decoration: _inputDec()),
+    ]);
+
+  Widget _dd(String l, String val, List<String> opts, ValueChanged<String?> cb) =>
+    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _label(l),
+      const SizedBox(height: 3),
+      DropdownButtonFormField<String>(
+        initialValue: opts.contains(val) ? val : opts.first,
+        dropdownColor: context.appSurface2,
+        style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13),
+        items: opts.map((v) =>
+          DropdownMenuItem(value: v, child: Text(v))).toList(),
+        onChanged: cb,
+        decoration: _inputDec()),
+    ]);
+
+  InputDecoration _inputDec() => InputDecoration(
+    isDense: true, filled: true, fillColor: context.appSurface3,
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: BorderSide(color: context.appBorder)),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: const BorderSide(color: AppDS.accent, width: 1.5)));
+
+  Widget _buildPositionPicker() {
+    final rackList = widget.availableRacks;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.appSurface3,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.appBorder)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Rack
+        Row(children: [
+          Text('Rack:', style: GoogleFonts.spaceGrotesk(
+            fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 10),
+          ...rackList.map((r) => Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: InkWell(
+              onTap: () => setState(() {
+                _rack = r;
+                _posError = null;
+              }),
+              borderRadius: BorderRadius.circular(6),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                width: 38, height: 32,
+                decoration: BoxDecoration(
+                  color: _rack == r
+                      ? AppDS.accent.withValues(alpha: 0.2) : context.appSurface2,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: _rack == r ? AppDS.accent : context.appBorder,
+                    width: _rack == r ? 1.5 : 1)),
+                child: Center(child: Text(r, style: GoogleFonts.jetBrainsMono(
+                  fontSize: 11, fontWeight: FontWeight.w700,
+                  color: _rack == r ? AppDS.accent : context.appTextSecondary))),
+              ),
+            ),
+          )),
+        ]),
+        const SizedBox(height: 10),
+        // Row
+        Row(children: [
+          Text('Row:', style: GoogleFonts.spaceGrotesk(
+            fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 10),
+          ..._rowLabels.map((r) => Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: InkWell(
+              onTap: () => setState(() {
+                _row = r;
+                if (_col > _maxCol) _col = 1;
+                _posError = null;
+              }),
+              borderRadius: BorderRadius.circular(6),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                width: 38, height: 44,
+                decoration: BoxDecoration(
+                  color: _row == r
+                      ? AppDS.accent.withValues(alpha: 0.2) : context.appSurface2,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: _row == r ? AppDS.accent : context.appBorder,
+                    width: _row == r ? 1.5 : 1)),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(r, style: GoogleFonts.jetBrainsMono(
+                    fontSize: 12, fontWeight: FontWeight.w700,
+                    color: _row == r ? AppDS.accent : context.appTextSecondary)),
+                  Text(r == 'A' ? '1.1 L' : '3.5 L',
+                    style: GoogleFonts.jetBrainsMono(fontSize: 8,
+                      color: _row == r
+                          ? AppDS.accent.withValues(alpha: 0.8)
+                          : context.appTextMuted)),
+                ]),
+              ),
+            ),
+          )),
+        ]),
+        const SizedBox(height: 10),
+        // Column
+        Text('Column:', style: GoogleFonts.spaceGrotesk(
+          fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 5, runSpacing: 5,
+          children: List.generate(_maxCol, (i) {
+            final c = i + 1;
+            final sel      = _col == c;
+            final occupied = _isOccupied(c);
+            return InkWell(
+              onTap: () => setState(() { _col = c; _posError = null; }),
+              borderRadius: BorderRadius.circular(5),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                width: 34, height: 30,
+                decoration: BoxDecoration(
+                  color: occupied
+                      ? AppDS.red.withValues(alpha: 0.12)
+                      : (sel ? AppDS.accent.withValues(alpha: 0.18) : context.appSurface2),
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(
+                    color: occupied
+                        ? AppDS.red.withValues(alpha: 0.5)
+                        : (sel ? AppDS.accent : context.appBorder),
+                    width: sel ? 1.5 : 1)),
+                child: Center(child: Text('$c', style: GoogleFonts.jetBrainsMono(
+                  fontSize: 11, fontWeight: FontWeight.w600,
+                  color: occupied
+                      ? AppDS.red
+                      : (sel ? AppDS.accent : context.appTextSecondary)))),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 8),
+        Text('Red = already occupied by another stock.',
+          style: GoogleFonts.jetBrainsMono(fontSize: 10, color: context.appTextMuted)),
+        const SizedBox(height: 4),
+        Row(children: [
+          const Icon(Icons.location_on_outlined, size: 13, color: AppDS.accent),
+          const SizedBox(width: 4),
+          Text('Selected: $_newTankId',
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 12, fontWeight: FontWeight.w700, color: AppDS.accent)),
+        ]),
+      ]),
+    );
+  }
+}
+
+// ─── 8L CONFIG DIALOG ────────────────────────────────────────────────────────
+class _RackSettingsDialog extends StatefulWidget {
+  final List<ZebrafishTank> tanks;
+  final ValueChanged<List<ZebrafishTank>> onUpdate;
+  const _RackSettingsDialog({required this.tanks, required this.onUpdate});
+
+  @override
+  State<_RackSettingsDialog> createState() => _RackSettingsDialogState();
+}
+
+class _RackSettingsDialogState extends State<_RackSettingsDialog> {
+  late List<ZebrafishTank> _tanks;
+
+  @override
+  void initState() {
+    super.initState();
+    _tanks = List.from(widget.tanks);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final byRow = <String, List<ZebrafishTank>>{};
+    for (final t in _tanks) byRow.putIfAbsent(t.zebraRow ?? '?', () => []).add(t);
+    final sortedRows = byRow.keys.toList()
+      ..sort()
+      ..removeWhere((k) => k == 'A');
+
+    return AlertDialog(
+      backgroundColor: AppDS.surface2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppDS.border2)),
+      title: Text('4.8 L Slot Configuration',
+        style: GoogleFonts.spaceGrotesk(
+          fontSize: 16, fontWeight: FontWeight.w700, color: AppDS.textPrimary)),
+      content: SizedBox(width: 540, height: 400,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Tap any slot to toggle its size. '
+              'Row A: 1.1 L → 2.4 L.  Rows B-E: 3.5 L → 8.0 L. '
+              'A merged slot spans 2 adjacent positions.',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 12, color: AppDS.textSecondary)),
+            const SizedBox(height: 14),
+            Expanded(child: SingleChildScrollView(
+              child: Column(
+                children: sortedRows.map(
+                  (r) => _rowCfg(r, byRow[r]!)).toList()))),
+          ],
+        ),
+      ),
+      actions: [
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppDS.accent, foregroundColor: AppDS.bg),
+          onPressed: () {
+            widget.onUpdate(_tanks);
+            Navigator.pop(context);
+          },
+          child: const Text('Apply')),
+      ],
+    );
+  }
+
+  Widget _rowCfg(String row, List<ZebrafishTank> tanks) =>
+    Padding(padding: const EdgeInsets.only(bottom: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Row $row', style: GoogleFonts.spaceGrotesk(
+          fontSize: 12, fontWeight: FontWeight.w700, color: AppDS.textSecondary)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 5, runSpacing: 5, children: tanks.map((t) {
+          final is8 = t.isEightLiter;
+          return InkWell(
+            onTap: () {
+              setState(() {
+                final idx = _tanks.indexWhere(
+                  (x) => x.zebraTankId == t.zebraTankId);
+                if (idx >= 0) {
+                  final tgt = _tanks[idx];
+                  final volL = !is8
+                      ? (tgt.isTopRow ? 2.4 : 8.0)
+                      : (tgt.isTopRow ? 1.1 : 3.5);
+                  _tanks[idx] = tgt.copyWith(isEightLiter: !is8, zebraVolumeL: volL);
+                }
+              });
+            },
+            borderRadius: BorderRadius.circular(5),
+            child: Container(
+              width: 54, height: 36,
+              decoration: BoxDecoration(
+                color: is8 ? AppDS.accent.withValues(alpha:0.15) : AppDS.surface3,
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: is8 ? AppDS.accent : AppDS.border)),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(t.zebraColumn ?? '', style: GoogleFonts.jetBrainsMono(
+                    fontSize: 9, color: AppDS.textMuted)),
+                  Text(is8
+                      ? (t.isTopRow ? '2.4 L' : '8.0 L')
+                      : (t.isTopRow ? '1.1 L' : '2.4 L'),
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 9, fontWeight: FontWeight.w700,
+                      color: is8 ? AppDS.accent : AppDS.textMuted)),
+                ]),
+            ),
+          );
+        }).toList()),
+      ]),
+    );
+}
+

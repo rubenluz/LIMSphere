@@ -1,5 +1,5 @@
 #define MyAppName "BlueOpenLIMS"
-#define MyAppVersion "0.1"
+#define MyAppVersion "0.1.2"
 #define MyAppPublisher "Rúben Luz"
 #define MyAppExeName "culture_app.exe"
 
@@ -23,8 +23,8 @@ Compression=lzma2
 WizardStyle=modern
 
 ; Usar userdesktop simplifica se mudares de computador
-OutputDir=inno_exe
-OutputBaseFilename={#MyAppName}_Setup
+OutputDir=desktop_release
+OutputBaseFilename={#MyAppName}_installer_v{#MyAppVersion}
 SetupIconFile=C:\Users\ruben\Documents\blue_open_lims\windows\runner\resources\app_icon.ico
 
 [Languages]

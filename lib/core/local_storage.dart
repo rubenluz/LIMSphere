@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../pages/database_connection/database_connection_model.dart';
+import '../database_connection/database_connection_model.dart';
 
 class LocalStorage {
   static const _connectionsKey = 'connections';
   static const _lastConnectionKey = 'last_connection';
   static const _sessionExpiryKey = 'session_expiry_ms';
   static const _rememberDurationKey = 'remember_duration_days'; // 0 = session only
+  static const _rememberedEmailKey = 'remembered_email';
 
   // ── Connections list ────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ class LocalStorage {
     await prefs.remove(_lastConnectionKey);
     await prefs.remove(_sessionExpiryKey);
     await prefs.remove(_rememberDurationKey);
+    await prefs.remove(_rememberedEmailKey);
   }
 
   // ── Session persistence ─────────────────────────────────────────────────────
@@ -83,6 +85,23 @@ class LocalStorage {
   static Future<int> getRememberDays() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_rememberDurationKey) ?? 0;
+  }
+
+  // ── Remembered email ────────────────────────────────────────────────────────
+
+  static Future<void> saveRememberedEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_rememberedEmailKey, email);
+  }
+
+  static Future<void> clearRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_rememberedEmailKey);
+  }
+
+  static Future<String?> getRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_rememberedEmailKey);
   }
 
 }

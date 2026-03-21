@@ -99,3 +99,29 @@ class AppDS {
     }
   }
 }
+
+// --- Adaptive colour getters -------------------------------------------------
+// Use these instead of raw AppDS constants wherever a background/surface/
+// text colour needs to flip between light and dark mode.
+extension AppThemeContext on BuildContext {
+  bool get isDark => Theme.of(this).brightness == Brightness.dark;
+
+  // Page / toolbar backgrounds
+  Color get appBg       => isDark ? AppDS.bg      : Colors.white;
+  Color get appSurface  => isDark ? AppDS.surface  : const Color(0xFFF1F5F9);
+  Color get appSurface2 => isDark ? AppDS.surface2 : const Color(0xFFE8EEF4);
+  Color get appSurface3 => isDark ? AppDS.surface3 : const Color(0xFFDDE3ED);
+
+  // Borders
+  Color get appBorder  => isDark ? AppDS.border  : const Color(0xFFE2E8F0);
+  Color get appBorder2 => isDark ? AppDS.border2 : const Color(0xFFCBD5E1);
+
+  // Text on toolbars / page backgrounds
+  Color get appTextPrimary   => isDark ? AppDS.textPrimary   : const Color(0xFF0F172A);
+  Color get appTextSecondary => isDark ? AppDS.textSecondary : const Color(0xFF475569);
+  Color get appTextMuted     => isDark ? AppDS.textMuted     : const Color(0xFF94A3B8);
+
+  // Table column-header row
+  Color get appHeaderBg   => isDark ? AppDS.surface        : const Color(0xFFF8FAFC);
+  Color get appHeaderText => isDark ? AppDS.textSecondary  : const Color(0xFF475569);
+}
