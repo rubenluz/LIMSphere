@@ -33,18 +33,15 @@ extension ModulePermissionContext on BuildContext {
 
   /// Shows a "View only" snackbar — call this when a blocked edit is attempted.
   void warnReadOnly() {
-    ScaffoldMessenger.of(this).showSnackBar(SnackBar(
-      backgroundColor: const Color(0xFF1E293B),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      duration: const Duration(seconds: 3),
-      content: const Row(children: [
-        Icon(Icons.visibility_outlined, color: Color(0xFFFBBF24), size: 16),
+    ScaffoldMessenger.of(this).showSnackBar(const SnackBar(
+      duration: Duration(seconds: 3),
+      content: Row(children: [
+        Icon(Icons.visibility_outlined, color: Color(0xFFD97706), size: 16),
         SizedBox(width: 10),
         Expanded(
           child: Text(
             'View only — contact an admin to request edit access.',
-            style: TextStyle(color: Colors.white70, fontSize: 13),
+            style: TextStyle(color: Color(0xFF334155), fontSize: 13),
           ),
         ),
       ]),

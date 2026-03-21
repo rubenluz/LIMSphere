@@ -608,9 +608,7 @@ class _LabChatPageState extends State<LabChatPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: _body(size: 12)),
-      backgroundColor: isError ? AppDS.red.withValues(alpha: 0.9) : context.appSurface2,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      backgroundColor: isError ? AppDS.red.withValues(alpha: 0.9) : null,
     ));
   }
 

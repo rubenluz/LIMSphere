@@ -1,7 +1,6 @@
 // stocks_page.dart - Fish stock inventory with rack visualisation, status
 // filters, links to lines, add/edit/transfer workflows.
 
-﻿
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -39,6 +38,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
   bool _sortAsc = true;
   Map<String, dynamic>? _editingCell;
   final _editController = TextEditingController();
+  List<String> _lineNames = [];
   List<String> _activeLineNames = [];
   /// name → fish_line_id, used when writing edits so the FK is always set.
   Map<String, int> _lineIdByName = {};
@@ -326,6 +326,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
     if (_filterHealth != null) d = d.where((r) => r.health == _filterHealth).toList();
     if (_filterLine   != null) d = d.where((r) => r.line   == _filterLine).toList();
     _applySortToList(d);
+    _lineNames = _stocks.map((s) => s.line).toSet().toList()..sort();
     setState(() => _filtered = d);
   }
 
@@ -358,19 +359,35 @@ class _FishStocksPageState extends State<FishStocksPage> {
     });
   }
 
-  /// Natural sort for tank IDs like "R1-A2" vs "R1-A10".
-  /// Splits into rack, row letter, and column number for correct ordering.
+  /// Natural sort for tank IDs like "R1-A2" vs "R10-A2" vs "R1-A10".
+  /// Splits into rack (natural), row letter, and column number.
   static int _compareTankId(String a, String b) {
-    // Format: "R1-A5" → rack="R1", row="A", col=5
     final re = RegExp(r'^([^-]+)-([A-Za-z]+)(\d+)$');
     final ma = re.firstMatch(a);
     final mb = re.firstMatch(b);
-    if (ma == null || mb == null) return a.compareTo(b);
-    final rack = ma.group(1)!.compareTo(mb.group(1)!);
+    if (ma == null || mb == null) return _naturalStr(a, b);
+    final rack = _naturalStr(ma.group(1)!, mb.group(1)!);
     if (rack != 0) return rack;
     final row = ma.group(2)!.compareTo(mb.group(2)!);
     if (row != 0) return row;
     return int.parse(ma.group(3)!).compareTo(int.parse(mb.group(3)!));
+  }
+
+  /// Compares two strings treating embedded digit runs numerically.
+  /// e.g. "R2" < "R10" (not "R10" < "R2").
+  static int _naturalStr(String a, String b) {
+    final re = RegExp(r'(\d+)|(\D+)');
+    final ta = re.allMatches(a).toList();
+    final tb = re.allMatches(b).toList();
+    for (var i = 0; i < ta.length && i < tb.length; i++) {
+      final sa = ta[i].group(0)!;
+      final sb = tb[i].group(0)!;
+      final na = int.tryParse(sa);
+      final nb = int.tryParse(sb);
+      final c = (na != null && nb != null) ? na.compareTo(nb) : sa.compareTo(sb);
+      if (c != 0) return c;
+    }
+    return a.length.compareTo(b.length);
   }
 
   void _sort(String key) {
@@ -390,7 +407,6 @@ class _FishStocksPageState extends State<FishStocksPage> {
 
   @override
   Widget build(BuildContext context) {
-    final lines      = _stocks.map((s) => s.line).toSet().toList()..sort();
     final totalFish  = _filtered.fold(0, (s, r) => s + r.totalFish);
     final tableWidth = _cols.fold(0.0, (s, c) => s + c.$3) + 36;
 
@@ -407,7 +423,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
               const SizedBox(width: 10),
               // Filter pills
               AppFilterChip(
-                label: 'Line', value: _filterLine, options: lines,
+                label: 'Line', value: _filterLine, options: _lineNames,
                 onChanged: (v) { setState(() => _filterLine = v); _applyFilters(); },
               ),
               const SizedBox(width: 8),
@@ -841,6 +857,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
     final display = current?.toIso8601String().substring(0, 10);
     return GestureDetector(
       onDoubleTap: () async {
+        if (!context.canEditModule) { context.warnReadOnly(); return; }
         final picked = await showDatePicker(
           context: context,
           initialDate: current ?? DateTime.now(),

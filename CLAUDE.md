@@ -1,6 +1,8 @@
 # BlueOpenLIMS — CLAUDE.md
 
-Flutter + Supabase desktop LIMS app. Primary target: Windows desktop, shoudl also be fully compatabilble with phone (android and iOS; layout may change for compatability purposes). Uses Material 3 with lighta and dark theme.
+Flutter + Supabase desktop LIMS app. 
+Primary target: Windows desktop, shoudl also be fully compatabilble with phone (android and iOS; layout may change for compatability purposes). 
+Uses Material 3 with light and dark theme.
 
 ---
 

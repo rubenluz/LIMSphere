@@ -1228,17 +1228,32 @@ class _FishTanksPageState extends State<FishTanksPage> {
       ]),
     );
 
-  /// Natural sort for IDs like "R1-A2" vs "R1-A10" — compares column as int.
+  /// Natural sort for IDs like "R1-A2" vs "R10-A2" vs "R1-A10".
   static int _compareTankId(String a, String b) {
     final re = RegExp(r'^([^-]+)-([A-Za-z]+)(\d+)$');
     final ma = re.firstMatch(a);
     final mb = re.firstMatch(b);
-    if (ma == null || mb == null) return a.compareTo(b);
-    final rack = ma.group(1)!.compareTo(mb.group(1)!);
+    if (ma == null || mb == null) return _naturalStr(a, b);
+    final rack = _naturalStr(ma.group(1)!, mb.group(1)!);
     if (rack != 0) return rack;
     final row = ma.group(2)!.compareTo(mb.group(2)!);
     if (row != 0) return row;
     return int.parse(ma.group(3)!).compareTo(int.parse(mb.group(3)!));
+  }
+
+  static int _naturalStr(String a, String b) {
+    final re = RegExp(r'(\d+)|(\D+)');
+    final ta = re.allMatches(a).toList();
+    final tb = re.allMatches(b).toList();
+    for (var i = 0; i < ta.length && i < tb.length; i++) {
+      final sa = ta[i].group(0)!;
+      final sb = tb[i].group(0)!;
+      final na = int.tryParse(sa);
+      final nb = int.tryParse(sb);
+      final c = (na != null && nb != null) ? na.compareTo(nb) : sa.compareTo(sb);
+      if (c != 0) return c;
+    }
+    return a.length.compareTo(b.length);
   }
 
   Widget _buildStocksWidget() {

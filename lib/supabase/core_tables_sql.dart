@@ -894,14 +894,17 @@ CREATE TABLE IF NOT EXISTS label_templates (
     tpl_label_h     FLOAT       NOT NULL DEFAULT 30,
     tpl_paper_size  TEXT        NOT NULL DEFAULT '62x30',
     tpl_dpi         INT         NOT NULL DEFAULT 300,
-    tpl_auto_cut    BOOLEAN     NOT NULL DEFAULT true,
-    tpl_half_cut    BOOLEAN     NOT NULL DEFAULT false,
-    tpl_rotate      BOOLEAN     NOT NULL DEFAULT false,
-    tpl_copies      INT         NOT NULL DEFAULT 1,
-    tpl_fields      JSONB       NOT NULL DEFAULT '[]',
-    tpl_created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    tpl_updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    tpl_auto_cut        BOOLEAN     NOT NULL DEFAULT true,
+    tpl_half_cut        BOOLEAN     NOT NULL DEFAULT false,
+    tpl_rotate          BOOLEAN     NOT NULL DEFAULT false,
+    tpl_continuous_roll BOOLEAN     NOT NULL DEFAULT true,
+    tpl_copies          INT         NOT NULL DEFAULT 1,
+    tpl_fields          JSONB       NOT NULL DEFAULT '[]',
+    tpl_created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    tpl_updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Migration: add tpl_continuous_roll to existing installs
+ALTER TABLE label_templates ADD COLUMN IF NOT EXISTS tpl_continuous_roll BOOLEAN NOT NULL DEFAULT true;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Seed

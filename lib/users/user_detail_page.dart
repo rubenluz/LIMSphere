@@ -120,7 +120,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
-      backgroundColor: isError ? AppDS.red : AppDS.surface3,
+      backgroundColor: isError ? AppDS.red : null,
     ));
   }
 

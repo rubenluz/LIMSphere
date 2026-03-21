@@ -238,12 +238,10 @@ class _MenuPageState extends State<MenuPage> {
         _wasOffline = true;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Row(children: [
-            Icon(Icons.wifi_off_rounded, color: Color(0xFFF59E0B), size: 18),
+            Icon(Icons.wifi_off_rounded, color: Color(0xFFD97706), size: 18),
             SizedBox(width: 8),
             Text('No internet connection'),
           ]),
-          backgroundColor: Color(0xFF1E293B),
-          behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 5),
         ));
       } else if (online && _wasOffline) {
@@ -254,8 +252,6 @@ class _MenuPageState extends State<MenuPage> {
             SizedBox(width: 8),
             Text('Back online'),
           ]),
-          backgroundColor: Color(0xFF1E293B),
-          behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 3),
         ));
       }
@@ -399,9 +395,6 @@ class _MenuPageState extends State<MenuPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: AppDS.surface,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 6),
         content: Row(children: [
           const Icon(Icons.lock_outline, color: AppDS.red, size: 20),
@@ -409,15 +402,15 @@ class _MenuPageState extends State<MenuPage> {
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                style: const TextStyle(color: Color(0xFF334155), fontSize: 13),
                 children: [
                   const TextSpan(text: 'Access restricted. Contact '),
                   TextSpan(text: adminName,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
                   if (adminEmail.isNotEmpty) ...[
                     const TextSpan(text: ' · '),
                     TextSpan(text: adminEmail,
-                        style: const TextStyle(color: Color(0xFF93C5FD))),
+                        style: const TextStyle(color: Color(0xFF0284C7))),
                   ],
                 ],
               ),

@@ -2,6 +2,7 @@
 // Excel import trigger, and navigation to StrainDetailPage.
 // Has its own Scaffold + AppBar (exception to the no-scaffold page rule).
 
+//TODO; check if next_trnasfer is being save in supabase or updated in supabase after cycle of last trasnfer is changed. Also check if next_trasnfer is empty this should be updated if cycle and las_transfer are filled, otherwise if infoormation for any of these is cleaned or missing, clean the nextr trasnfer info for that strains and dont updated on next time.
 
 
 import 'package:flutter/material.dart';
