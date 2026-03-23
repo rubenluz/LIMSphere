@@ -74,81 +74,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
   }
 
-  Future<Widget> _resolveRoute(QrPayload payload) async {
-    switch (payload.type) {
-      case 'machines':
-        return MachineDetailPage(machineId: payload.id);
-
-      case 'reagents':
-        return ReagentDetailPage(reagentId: payload.id);
-
-      case 'locations':
-        return LocationDetailPage(locationId: payload.id);
-
-      case 'strains':
-        return StrainDetailPage(strainId: payload.id);
-
-      case 'samples':
-        return SampleDetailPage(sampleId: payload.id);
-
-      case 'fish_lines':
-        final row = await Supabase.instance.client
-            .from(FishSch.linesTable)
-            .select()
-            .eq(FishSch.lineId, payload.id)
-            .single();
-        return FishLineDetailPage(fishLine: FishLine.fromMap(Map<String, dynamic>.from(row)));
-
-      case 'fish_stocks':
-        final row = await Supabase.instance.client
-            .from(FishSch.stocksTable)
-            .select()
-            .eq(FishSch.stockId, payload.id)
-            .single();
-        return TankDetailPage(tank: ZebrafishTank.fromMap(Map<String, dynamic>.from(row)));
-
-      case 'users':
-        final row = await Supabase.instance.client
-            .from('users')
-            .select()
-            .eq('user_id', payload.id)
-            .single();
-        return UserDetailPage(userMap: Map<String, dynamic>.from(row));
-
-      case 'sops':
-        final row = await Supabase.instance.client
-            .from(SopSch.table)
-            .select()
-            .eq(SopSch.id, payload.id)
-            .single();
-        final sop = FacilitySop.fromMap(Map<String, dynamic>.from(row));
-        final String filePath;
-        final String fileName;
-        final DocViewMode mode;
-        if (sop.hasPdfFile) {
-          filePath = sop.filePath!;
-          fileName = sop.fileName!;
-          mode = DocViewMode.pdf;
-        } else if (sop.hasTxtFile) {
-          filePath = sop.txtFilePath!;
-          fileName = sop.txtFileName!;
-          mode = DocViewMode.txt;
-        } else if (sop.hasDocFile) {
-          filePath = sop.docFilePath!;
-          fileName = sop.docFileName!;
-          mode = DocViewMode.doc;
-        } else {
-          throw Exception('"${sop.name}" has no attached file.');
-        }
-        final bytes = await Supabase.instance.client.storage
-            .from(SopSch.bucket)
-            .download(filePath);
-        return DocViewerPage(bytes: bytes, title: sop.name, fileName: fileName, viewMode: mode);
-
-      default:
-        throw StateError('unhandled type: ${payload.type}');
-    }
-  }
+  Future<Widget> _resolveRoute(QrPayload payload) => resolveQrRoute(payload);
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -261,4 +187,81 @@ class _CornerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter _) => false;
+}
+
+/// Top-level — shared by [QrScannerPage] and the MenuPage deep-link handler.
+Future<Widget> resolveQrRoute(QrPayload payload) async {
+  switch (payload.type) {
+    case 'machines':
+      return MachineDetailPage(machineId: payload.id);
+
+    case 'reagents':
+      return ReagentDetailPage(reagentId: payload.id);
+
+    case 'locations':
+      return LocationDetailPage(locationId: payload.id);
+
+    case 'strains':
+      return StrainDetailPage(strainId: payload.id);
+
+    case 'samples':
+      return SampleDetailPage(sampleId: payload.id);
+
+    case 'fish_lines':
+      final row = await Supabase.instance.client
+          .from(FishSch.linesTable)
+          .select()
+          .eq(FishSch.lineId, payload.id)
+          .single();
+      return FishLineDetailPage(fishLine: FishLine.fromMap(Map<String, dynamic>.from(row)));
+
+    case 'fish_stocks':
+      final row = await Supabase.instance.client
+          .from(FishSch.stocksTable)
+          .select()
+          .eq(FishSch.stockId, payload.id)
+          .single();
+      return TankDetailPage(tank: ZebrafishTank.fromMap(Map<String, dynamic>.from(row)));
+
+    case 'users':
+      final row = await Supabase.instance.client
+          .from('users')
+          .select()
+          .eq('user_id', payload.id)
+          .single();
+      return UserDetailPage(userMap: Map<String, dynamic>.from(row));
+
+    case 'sops':
+      final row = await Supabase.instance.client
+          .from(SopSch.table)
+          .select()
+          .eq(SopSch.id, payload.id)
+          .single();
+      final sop = FacilitySop.fromMap(Map<String, dynamic>.from(row));
+      final String filePath;
+      final String fileName;
+      final DocViewMode mode;
+      if (sop.hasPdfFile) {
+        filePath = sop.filePath!;
+        fileName = sop.fileName!;
+        mode = DocViewMode.pdf;
+      } else if (sop.hasTxtFile) {
+        filePath = sop.txtFilePath!;
+        fileName = sop.txtFileName!;
+        mode = DocViewMode.txt;
+      } else if (sop.hasDocFile) {
+        filePath = sop.docFilePath!;
+        fileName = sop.docFileName!;
+        mode = DocViewMode.doc;
+      } else {
+        throw Exception('"${sop.name}" has no attached file.');
+      }
+      final bytes = await Supabase.instance.client.storage
+          .from(SopSch.bucket)
+          .download(filePath);
+      return DocViewerPage(bytes: bytes, title: sop.name, fileName: fileName, viewMode: mode);
+
+    default:
+      throw StateError('unhandled type: ${payload.type}');
+  }
 }

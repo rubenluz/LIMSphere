@@ -69,7 +69,8 @@ class _BuilderTabState extends State<_BuilderTab> {
       x: atX ?? 4, y: atY ?? 4,
       w: type == LabelFieldType.qrcode ? 24 : type == LabelFieldType.barcode ? 60 : isPlaceholder ? 20 : 40,
       h: type == LabelFieldType.qrcode ? 24 : type == LabelFieldType.barcode ? 16 : isPlaceholder ? 5.5 : 8,
-      isPlaceholder: isPlaceholder,
+      // QR code content is always a {placeholder} regardless of how it was added
+      isPlaceholder: isPlaceholder || type == LabelFieldType.qrcode,
     );
     setState(() {
       _tpl.fields.add(field);

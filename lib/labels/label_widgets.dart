@@ -355,15 +355,13 @@ class _FieldRenderer extends StatelessWidget {
           overflow: TextOverflow.visible,
         ),
       ),
-      LabelFieldType.qrcode => Center(
-        child: QrImageView(
-          data: _resolvedContent.isEmpty ? 'QR' : _resolvedContent,
-          version: QrVersions.auto,
-          size: field.h * scale * 0.9,
-          eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
-          dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
-          backgroundColor: Colors.white,
-        ),
+      LabelFieldType.qrcode => QrImageView(
+        data: _resolvedContent.isEmpty ? 'QR' : _resolvedContent,
+        version: QrVersions.auto,
+        size: math.min(field.w, field.h) * scale,
+        eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
+        dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
+        backgroundColor: Colors.white,
       ),
       LabelFieldType.barcode => Center(child: CustomPaint(
         painter: _BarcodePlaceholderPainter(),

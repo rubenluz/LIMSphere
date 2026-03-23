@@ -121,7 +121,7 @@ Future<ui.Image> _renderLabelToImage(
           text: TextSpan(
             text: content,
             style: TextStyle(
-              fontSize: f.fontSize * pxPerMm / (25.4 / 72), // pt → px at target DPI
+              fontSize: f.fontSize * pxPerMm * (25.4 / 72), // pt → px: pt × mm/pt × px/mm
               fontWeight: f.fontWeight,
               color: f.color,
             ),
@@ -145,7 +145,8 @@ Future<ui.Image> _renderLabelToImage(
           );
           canvas.save();
           canvas.translate(x, y);
-          qrPainter.paint(canvas, Size(fh, fh));
+          final qrSize = fh < fw ? fh : fw;
+          qrPainter.paint(canvas, Size(qrSize, qrSize));
           canvas.restore();
         }
       case LabelFieldType.barcode:
@@ -187,26 +188,34 @@ Future<Uint8List> _generateBrotherQlData(
   buf.add(List.filled(200, 0));
   buf.add(const [0x1B, 0x40]);
 
+  final pxPerMm   = tpl.dpi / 25.4;
+  final rasterH   = (tpl.labelH * pxPerMm).ceil();
+  // Pack raster line count as 4-byte little-endian
+  final rasterBytes = [rasterH & 0xFF, (rasterH >> 8) & 0xFF, (rasterH >> 16) & 0xFF, (rasterH >> 24) & 0xFF];
+  final mediaTypeByte = tpl.continuousRoll ? 0x0A : 0x0B;
+  final labelLenByte  = tpl.continuousRoll ? 0 : tpl.labelH.round();
+
   int pageNum = 0;
   for (final record in printRecords) {
     for (int c = 0; c < tpl.copies; c++, pageNum++) {
       // Switch to raster mode (ESC i a 0x01)
       buf.add(const [0x1B, 0x69, 0x61, 0x01]);
 
-      // Print info (ESC i z) — flags | media type | width mm | length mm | ... | page#
+      // Auto-cut mode (ESC i M) + cut-every-1 trigger (ESC i K) — before print-info
+      buf.add([0x1B, 0x69, 0x4D, tpl.autoCut ? 0x40 : 0x00]);
+      if (tpl.autoCut) buf.add(const [0x1B, 0x69, 0x4B, 0x08, 0x01]);
+
+      // Print info (ESC i z) — flags | media type | width mm | length mm | raster count (4B LE) | page#
       buf.add([
         0x1B, 0x69, 0x7A,
-        0x8E,                   // flags: auto-detect
-        0x0B,                   // media type: die-cut label
+        0x8E,                   // PI flags
+        mediaTypeByte,          // 0x0A continuous roll / 0x0B die-cut
         tpl.labelW.round(),     // tape width in mm
-        tpl.labelH.round(),     // label length in mm
-        0, 0, 0, 0,
+        labelLenByte,           // 0 for continuous, label height for die-cut
+        ...rasterBytes,         // raster line count (little-endian)
         pageNum,
         0,
       ]);
-
-      // Auto-cut (ESC i M) if enabled
-      if (tpl.autoCut) { buf.add(const [0x1B, 0x69, 0x4D, 0x40]); }
 
       // Render label to RGBA image
       final image = await _renderLabelToImage(tpl, record, tpl.dpi);
@@ -217,18 +226,21 @@ Future<Uint8List> _generateBrotherQlData(
       final ih = image.height;
 
       // Brother QL uses 90 bytes per raster line for 62 mm tape (720 dots).
-      // Adjust bytesPerLine for other tape widths.
+      // Byte 0 MSB = rightmost tape dot → data is right-to-left.
       const bytesPerLine = 90;
+      const totalDots = bytesPerLine * 8; // 720
 
       for (int row = 0; row < ih; row++) {
         final line = List<int>.filled(bytesPerLine, 0);
-        for (int col = 0; col < iw && col < bytesPerLine * 8; col++) {
+        for (int dot = 0; dot < totalDots; dot++) {
+          // Proportionally map printer dot → image column (fits any render width)
+          final col = (dot * iw ~/ totalDots).clamp(0, iw - 1);
           final idx = (row * iw + col) * 4;
           final gray = (rgba[idx] * 0.299 + rgba[idx + 1] * 0.587 + rgba[idx + 2] * 0.114).round();
           if (gray < 128) {
-            // Black pixel — set bit (MSB first)
-            final byteIdx = col ~/ 8;
-            if (byteIdx < bytesPerLine) { line[byteIdx] |= (1 << (7 - col % 8)); }
+            // Flip left↔right: dot 0 (left image) → rightmost tape dot (719)
+            final revDot = totalDots - 1 - dot;
+            line[revDot ~/ 8] |= (1 << (7 - revDot % 8));
           }
         }
         buf.add([0x67, 0x00, bytesPerLine]);
@@ -307,19 +319,100 @@ Future<void> _sendBrotherQl(String ip, Uint8List data) async {
 
 /// Sends raw bytes to a USB-connected printer.
 /// - Linux/macOS: writes directly to the device file (e.g. /dev/usb/lp0).
-/// - Windows: spools to the print queue via `COPY /B`.
+/// - Windows: sends a RAW job through the Windows Print Spooler (winspool.drv).
 Future<void> _sendViaUsb(String path, Uint8List data) async {
   if (Platform.isLinux || Platform.isMacOS) {
     final raf = await File(path).open(mode: FileMode.writeOnly);
     try { await raf.writeFrom(data); } finally { await raf.close(); }
   } else if (Platform.isWindows) {
     final tmp = File('${Directory.systemTemp.path}\\bluelims_print.prn');
+    final ps1 = File('${Directory.systemTemp.path}\\bluelims_print.ps1');
     await tmp.writeAsBytes(data);
+    await ps1.writeAsString(r'''
+param([string]$dataFile, [string]$printerName)
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi)]
+public class DOCINFOA {
+  [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+  [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+  [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
+}
+public class WinSpool {
+  [DllImport("winspool.drv", EntryPoint="OpenPrinterA")]
+  public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string n, out IntPtr h, IntPtr d);
+  [DllImport("winspool.drv")]
+  public static extern bool ClosePrinter(IntPtr h);
+  [DllImport("winspool.drv", EntryPoint="StartDocPrinterA")]
+  public static extern int StartDocPrinter(IntPtr h, int lv, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
+  [DllImport("winspool.drv")]
+  public static extern bool EndDocPrinter(IntPtr h);
+  [DllImport("winspool.drv")]
+  public static extern bool StartPagePrinter(IntPtr h);
+  [DllImport("winspool.drv")]
+  public static extern bool EndPagePrinter(IntPtr h);
+  [DllImport("winspool.drv")]
+  public static extern bool WritePrinter(IntPtr h, byte[] b, int n, out int w);
+}
+"@ -ErrorAction SilentlyContinue
+$bytes = [System.IO.File]::ReadAllBytes($dataFile)
+$h = [IntPtr]::Zero
+if (-not [WinSpool]::OpenPrinter($printerName, [ref]$h, [IntPtr]::Zero)) { throw "OpenPrinter failed for: $printerName" }
+try {
+  $di = New-Object DOCINFOA
+  $di.pDocName  = 'BlueOpenLIMS'
+  $di.pDataType = 'RAW'
+  $job = [WinSpool]::StartDocPrinter($h, 1, $di)
+  if ($job -le 0) { throw "StartDocPrinter failed (job=$job)" }
+  try {
+    [WinSpool]::StartPagePrinter($h) | Out-Null
+    $written = 0
+    if (-not [WinSpool]::WritePrinter($h, $bytes, $bytes.Length, [ref]$written)) { throw 'WritePrinter failed' }
+    [WinSpool]::EndPagePrinter($h) | Out-Null
+  } finally { [WinSpool]::EndDocPrinter($h) | Out-Null }
+} finally { [WinSpool]::ClosePrinter($h) | Out-Null }
+
+# Poll Win32_PrintJob by job ID for up to 8 s to catch printer-side errors
+$flagLabels = [ordered]@{
+  0x0002 = 'Print error';
+  0x0040 = 'Out of paper / wrong media';
+  0x0020 = 'Printer offline';
+  0x0200 = 'Job blocked by device queue';
+  0x0400 = 'User intervention required (check media/cover)'
+}
+$deadline = (Get-Date).AddSeconds(8)
+while ((Get-Date) -lt $deadline) {
+  Start-Sleep -Milliseconds 400
+  $pj = Get-WmiObject Win32_PrintJob 2>$null | Where-Object { $_.Name -like "*,$job" }
+  if ($null -eq $pj) { break }   # Job completed and removed — treat as success
+  $mask = [int]$pj.StatusMask
+  if ($mask -band 0x0080) { break }  # PRINTED flag — success
+  if ($mask -band 0x0100) { break }  # DELETED flag — success
+  foreach ($flag in $flagLabels.Keys) {
+    if ($mask -band $flag) {
+      throw "Printer error: $($flagLabels[$flag])"
+    }
+  }
+}
+''');
     try {
-      final r = await Process.run('cmd', ['/c', 'COPY /B "${tmp.path}" "$path"'], runInShell: true);
-      if (r.exitCode != 0) throw Exception('USB print failed: ${r.stderr}');
+      final r = await Process.run('powershell', [
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-File', ps1.path, '-dataFile', tmp.path, '-printerName', path,
+      ]);
+      if (r.exitCode != 0) {
+        // Extract the innermost throw message from PowerShell's verbose error block
+        final raw = (r.stderr as String).trim();
+        final match = RegExp(r'throw\s+"([^"]+)"').firstMatch(raw)
+            ?? RegExp(r':\s+(.+?)\s+At\s').firstMatch(raw);
+        final msg = match?.group(1)?.trim() ?? raw.split('\n').first.trim();
+        throw Exception(msg.isNotEmpty ? msg : 'USB print failed');
+      }
     } finally {
-      await tmp.delete();
+      await tmp.delete().catchError((_) => tmp);
+      await ps1.delete().catchError((_) => ps1);
     }
   } else {
     throw UnsupportedError('USB printing is not supported on this platform.');

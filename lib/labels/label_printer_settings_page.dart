@@ -96,7 +96,7 @@ class _PrinterTabState extends State<_PrinterTab> {
         ),
         const SizedBox(height: 12),
         if (cfg.connectionType == 'usb') ...[
-          _PropLabel(Platform.isWindows ? r'USB Port Path (e.g. \\.\USB001)' : 'USB Device Path'),
+          _PropLabel(Platform.isWindows ? 'Printer Name (Windows queue)' : 'USB Device Path'),
           const SizedBox(height: 4),
           TextField(
             controller: _usbCtrl,
@@ -220,13 +220,8 @@ class _PrinterTabState extends State<_PrinterTab> {
       cfg.connectionType = info.protocol == 'brother_ql_legacy' ? 'usb' : info.connectionType;
       cfg.deviceName     = info.matchedModel ?? _modelsByProtocol[info.protocol]!.first;
       if (info.connectionType == 'usb') {
-        // On Windows, COPY /B requires the device port path (e.g. \\.\USB001),
-        // not the printer display name.
-        final usbPath = Platform.isWindows
-            ? r'\\.\' + info.portName.replaceAll(':', '')
-            : info.name;
-        cfg.usbPath  = usbPath;
-        _usbCtrl.text = usbPath;
+        cfg.usbPath  = info.name;
+        _usbCtrl.text = info.name;
       } else if (info.connectionType == 'wifi' && info.ipAddress != null) {
         cfg.ipAddress = info.ipAddress!;
         _ipCtrl.text  = info.ipAddress!;

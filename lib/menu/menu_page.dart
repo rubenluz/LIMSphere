@@ -3,6 +3,8 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'package:app_links/app_links.dart';
+import '../qr_scanner/qr_code_rules.dart';
 import 'package:blue_open_lims/lab_chat/lab_chat_page.dart';
 import 'package:blue_open_lims/labels/label_page.dart';
 import '../locations/locations_page.dart';
@@ -121,6 +123,7 @@ class _MenuPageState extends State<MenuPage> {
   static const _perItemVisibilityKeys = {'reservations'};
   Timer? _connectivityTimer;
   bool _wasOffline = false;
+  StreamSubscription<Uri>? _deepLinkSub;
 
   final Set<String> _expandedGroups = {'Culture Collection', 'Fish Facility', 'Resources', 'Admin'};
 
@@ -224,12 +227,47 @@ class _MenuPageState extends State<MenuPage> {
     LabChatPage.startBackgroundListener();
     RequestsPage.startBackgroundListener();
     _startConnectivityTimer();
+    if (Platform.isAndroid || Platform.isIOS) _initDeepLinks();
   }
 
   @override
   void dispose() {
     _connectivityTimer?.cancel();
+    _deepLinkSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _initDeepLinks() async {
+    final appLinks = AppLinks();
+    // Cold-start link
+    try {
+      final initial = await appLinks.getInitialLink();
+      if (initial != null && mounted) _handleDeepLink(initial);
+    } catch (_) {}
+    // Warm-start links
+    _deepLinkSub = appLinks.uriLinkStream.listen((uri) {
+      if (mounted) _handleDeepLink(uri);
+    });
+  }
+
+  Future<void> _handleDeepLink(Uri uri) async {
+    final payload = QrRules.parse(uri.toString());
+    if (payload == null) return;
+    Widget page;
+    try {
+      page = await resolveQrRoute(payload);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Could not open record: $e'),
+        backgroundColor: const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      return;
+    }
+    if (!mounted) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 
   void _startConnectivityTimer() {
