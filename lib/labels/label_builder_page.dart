@@ -1,7 +1,6 @@
 // label_builder_page.dart - Part of label_page.dart.
 // Label template builder UI: drag-to-place fields, paper size selector,
 // live preview, ZPL/Brother QL rendering.
-
 part of 'label_page.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,7 +32,21 @@ class _BuilderTabState extends State<_BuilderTab> {
     super.initState();
     _tpl = widget.template?.clone() ?? LabelTemplate(id: 'new', name: 'New Template');
     _nameCtrl = TextEditingController(text: _tpl.name);
+    _loadZoom();
     if (widget.template != null) _togglePreview();
+  }
+
+  Future<void> _loadZoom() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _scale = (prefs.getDouble('label_builder_zoom') ?? 4.0).clamp(_minScale, 12.0);
+    });
+  }
+
+  Future<void> _saveZoom() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('label_builder_zoom', _scale);
   }
 
   @override
@@ -368,7 +381,7 @@ class _BuilderTabState extends State<_BuilderTab> {
           // Zoom controls
           Row(mainAxisSize: MainAxisSize.min, children: [
             InkWell(
-              onTap: () => setState(() => _scale = (_scale - 0.5).clamp(_minScale, 8.0)),
+              onTap: () { setState(() => _scale = (_scale - 0.5).clamp(_minScale, 12.0)); _saveZoom(); },
               borderRadius: BorderRadius.circular(4),
               child: Padding(
                 padding: const EdgeInsets.all(4),
@@ -384,7 +397,7 @@ class _BuilderTabState extends State<_BuilderTab> {
               ),
             ),
             InkWell(
-              onTap: () => setState(() => _scale = (_scale + 0.5).clamp(_minScale, 8.0)),
+              onTap: () { setState(() => _scale = (_scale + 0.5).clamp(_minScale, 12.0)); _saveZoom(); },
               borderRadius: BorderRadius.circular(4),
               child: Padding(
                 padding: const EdgeInsets.all(4),
@@ -634,7 +647,7 @@ class _BuilderTabState extends State<_BuilderTab> {
                       builder: (context, candidateData, _) => Listener(
                         onPointerSignal: (event) {
                           if (event is PointerScrollEvent && HardwareKeyboard.instance.isControlPressed) {
-                            setState(() => _scale = (_scale - event.scrollDelta.dy * 0.008).clamp(_minScale, 8.0));
+                            setState(() => _scale = (_scale - event.scrollDelta.dy * 0.008).clamp(_minScale, 12.0)); _saveZoom();
                           }
                         },
                         child: Container(
@@ -680,9 +693,15 @@ class _BuilderTabState extends State<_BuilderTab> {
                                     },
                                     onResize: (id, dw, dh) {
                                       final f = _tpl.fields.firstWhereOrNull((f) => f.id == id);
-                                      if (f != null) { _updateField(f.copyWith(
-                                          w: (f.w + dw / _scale).clamp(10, _tpl.labelW),
-                                          h: (f.h + dh / _scale).clamp(5, _tpl.labelH))); }
+                                      if (f != null) {
+                                        var newW = (f.w + dw / _scale).clamp(10.0, _tpl.labelW);
+                                        var newH = (f.h + dh / _scale).clamp(5.0, _tpl.labelH);
+                                        if (f.type == LabelFieldType.qrcode) {
+                                          final s = math.max(newW, newH).clamp(10.0, math.min(_tpl.labelW, _tpl.labelH)) as double;
+                                          newW = s; newH = s;
+                                        }
+                                        _updateField(f.copyWith(w: newW, h: newH));
+                                      }
                                     },
                                   ),
                                 ),

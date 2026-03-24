@@ -343,9 +343,19 @@ class _FieldRenderer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (field.type) {
-      LabelFieldType.text => Align(
-        alignment: Alignment.topLeft,
-        child: Text(_resolvedContent,
+      LabelFieldType.text => field.content.contains('{strain_scientific_name}')
+        ? _scientificNameText(
+            _resolvedContent,
+            TextStyle(
+              fontSize: (field.fontSize * scale * (25.4 / 72)).clamp(4.0, 200.0),
+              fontWeight: field.fontWeight,
+              color: field.color,
+            ),
+            textAlign: field.textAlign,
+            softWrap: true,
+            overflow: TextOverflow.visible,
+          )
+        : Text(_resolvedContent,
           style: TextStyle(
             // Convert pt → canvas px so the font is proportional to the label size
             fontSize: (field.fontSize * scale * (25.4 / 72)).clamp(4.0, 200.0),
@@ -356,14 +366,16 @@ class _FieldRenderer extends StatelessWidget {
           softWrap: true,
           overflow: TextOverflow.visible,
         ),
-      ),
-      LabelFieldType.qrcode => QrImageView(
-        data: _resolvedContent.isEmpty ? 'QR' : _resolvedContent,
-        version: QrVersions.auto,
-        size: math.min(field.w, field.h) * scale,
-        eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
-        dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
-        backgroundColor: Colors.white,
+      LabelFieldType.qrcode => FittedBox(
+        fit: BoxFit.contain,
+        child: QrImageView(
+          data: _resolvedContent.isEmpty ? 'QR' : _resolvedContent,
+          version: QrVersions.auto,
+          size: 200,
+          eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
+          dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
+          backgroundColor: Colors.white,
+        ),
       ),
       LabelFieldType.barcode => Center(child: CustomPaint(
         painter: _BarcodePlaceholderPainter(),
@@ -380,6 +392,58 @@ class _FieldRenderer extends StatelessWidget {
       ),
     };
   }
+}
+
+// Suffixes that identify names at family rank and above (not italicised).
+// Genus, species, and infraspecific epithets carry none of these endings.
+bool _isHigherTaxon(String word) {
+  const suffixes = [
+    'aceae',    // family – plants, fungi, bacteria
+    'idae',     // family – animals
+    'oideae',   // subfamily – plants
+    'inae',     // subfamily – animals
+    'ales',     // order – plants, fungi, bacteria
+    'iformes',  // order – vertebrates
+    'phyceae',  // class – algae
+    'mycetes',  // class – fungi
+    'opsida',   // class – plants
+    'mycota',   // phylum – fungi
+    'phyta',    // phylum – plants
+    'viridae',  // family – viruses
+    'virales',  // order – viruses
+  ];
+  final lower = word.toLowerCase();
+  return suffixes.any((s) => lower.endsWith(s));
+}
+
+// Renders a scientific name word-by-word:
+// – abbreviations (ending in '.') and higher-taxon names (family and above)
+//   stay upright; genus, species, and infraspecific epithets are italic.
+Widget _scientificNameText(
+  String name,
+  TextStyle base, {
+  TextAlign textAlign = TextAlign.start,
+  bool softWrap = false,
+  TextOverflow overflow = TextOverflow.ellipsis,
+}) {
+  final words = name.split(' ');
+  final spans = <TextSpan>[];
+  for (var i = 0; i < words.length; i++) {
+    final word = words[i];
+    final upright = word.endsWith('.') || _isHigherTaxon(word);
+    spans.add(TextSpan(
+      text: i < words.length - 1 ? '$word ' : word,
+      style: base.copyWith(
+        fontStyle: upright ? FontStyle.normal : FontStyle.italic,
+      ),
+    ));
+  }
+  return Text.rich(
+    TextSpan(children: spans),
+    textAlign: textAlign,
+    softWrap: softWrap,
+    overflow: overflow,
+  );
 }
 
 class _BarcodePlaceholderPainter extends CustomPainter {

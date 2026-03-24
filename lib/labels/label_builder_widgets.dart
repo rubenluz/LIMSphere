@@ -280,9 +280,11 @@ class _FieldProperties extends StatelessWidget {
         const SizedBox(height: 6),
         _PropLabel('Size'),
         Row(children: [
-          Expanded(child: _NumField('W', field.w, (v) => onChange(field.copyWith(w: v)))),
+          Expanded(child: _NumField('W', field.w, (v) => onChange(
+              field.type == LabelFieldType.qrcode ? field.copyWith(w: v, h: v) : field.copyWith(w: v)))),
           const SizedBox(width: 6),
-          Expanded(child: _NumField('H', field.h, (v) => onChange(field.copyWith(h: v)))),
+          Expanded(child: _NumField('H', field.h, (v) => onChange(
+              field.type == LabelFieldType.qrcode ? field.copyWith(w: v, h: v) : field.copyWith(h: v)))),
         ]),
       ],
     );
@@ -349,8 +351,23 @@ class _PropFieldState extends State<_PropField> {
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: context.appBorder)),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppDS.accent)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      suffixIcon: _ctrl.text.isNotEmpty
+          ? IconButton(
+              icon: Icon(Icons.clear_rounded, size: 13, color: context.appTextSecondary),
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+              onPressed: () {
+                _ctrl.clear();
+                setState(() {});
+                widget.onChanged('');
+              },
+            )
+          : null,
     ),
-    onChanged: widget.onChanged,
+    onChanged: (v) {
+      setState(() {});
+      widget.onChanged(v);
+    },
   );
 }
 

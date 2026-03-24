@@ -572,13 +572,10 @@ class _MenuPageState extends State<MenuPage> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(children: [
-                  Container(
+                  Image.asset(
+                    'assets/icon/logo.png',
                     width: 32, height: 32,
-                    decoration: BoxDecoration(
-                      color: AppDS.indigo,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.biotech, color: Colors.white, size: 18),
+                    fit: BoxFit.contain,
                   ),
                   // Hide title when collapsed
                   if (!collapsed) ...[
@@ -708,35 +705,21 @@ class _MenuPageState extends State<MenuPage> {
             // ── User strip — hidden when collapsed, only avatar icon shown ──
             if (!collapsed)
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                padding: const EdgeInsets.fromLTRB(12, 10, 6, 4),
                 child: Row(children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: _goToUserDetail,
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: AppDS.indigo.withValues(alpha: 0.3),
-                      child: Text(
-                        userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: InkWell(
-                    onTap: _goToUserDetail,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(userName, style: const TextStyle(color: Colors.white,
-                            fontSize: 12, fontWeight: FontWeight.w600),
-                            overflow: TextOverflow.ellipsis),
-                        Text(userRole, style: const TextStyle(
-                            color: Colors.white38, fontSize: 10),
-                            overflow: TextOverflow.ellipsis),
-                      ],
-                    ),
+                  const Icon(Icons.person, size: 16, color: Colors.white54),
+                  const SizedBox(width: 6),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(userName, style: const TextStyle(color: Colors.white,
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis),
+                      Text(userRole, style: const TextStyle(
+                          color: Colors.white38, fontSize: 10),
+                          overflow: TextOverflow.ellipsis),
+                    ],
                   )),
                   if (pendingCount > 0)
                     Tooltip(
@@ -755,10 +738,22 @@ class _MenuPageState extends State<MenuPage> {
                         ),
                       ),
                     ),
+                  const SizedBox(width: 2),
+                  Tooltip(
+                    message: 'Edit profile',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _goToUserDetail,
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.edit, size: 14, color: Colors.white38),
+                      ),
+                    ),
+                  ),
                 ]),
               )
             else
-              // Collapsed: just the avatar icon centered
+              // Collapsed: person icon centered
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Tooltip(
@@ -766,14 +761,7 @@ class _MenuPageState extends State<MenuPage> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(20),
                     onTap: _goToUserDetail,
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: AppDS.indigo.withValues(alpha: 0.3),
-                      child: Text(
-                        userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    ),
+                    child: const Icon(Icons.person, size: 20, color: Colors.white54),
                   ),
                 ),
               ),

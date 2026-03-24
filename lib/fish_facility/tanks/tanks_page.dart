@@ -695,9 +695,14 @@ class _FishTanksPageState extends State<FishTanksPage> {
                             fontSize: 9.0, color: AppDS.accent,
                             fontStyle: FontStyle.italic)),
                       if (tank.zebraFoodType?.isNotEmpty == true)
-                        Text(tank.zebraFoodType!,
+                        Text(
+                          [
+                            if (tank.zebraFeedingSchedule?.isNotEmpty == true)
+                              tank.zebraFeedingSchedule!,
+                            tank.zebraFoodType!,
+                          ].join(' - '),
                           style: GoogleFonts.spaceGrotesk(
-                            fontSize: 8.0, color: AppDS.yellow),
+                            fontSize: 8.0, color: const Color(0xFF9B6B1A)),
                           overflow: TextOverflow.ellipsis, maxLines: 1),
                       if (tank.zebraResponsible?.isNotEmpty == true)
                         Text(tank.zebraResponsible!,
