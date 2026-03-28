@@ -13,11 +13,9 @@ import '../tanks/tanks_connection_model.dart';
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
 import '/theme/grid_widgets.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import '/supabase/supabase_manager.dart';
-import '/qr_scanner/qr_code_rules.dart';
 import '../add_stock_dialog.dart';
 import '../../requests/requests_page.dart';
+import '../../labels/label_page.dart';
 
 
 
@@ -61,27 +59,26 @@ class _FishStocksPageState extends State<FishStocksPage> {
   static final _tsMonoMut   = GoogleFonts.jetBrainsMono(fontSize: 12,   color: AppDS.tableTextMute);
 
   static const _cols = [
-    ('tankId',           'Tank',       110.0, true),
-    ('line',             'Line',       140.0, false),
-    ('status',           'Status',     110.0, false),
-    ('feedingSchedule',  'Freq.',       70.0, false),
-    ('foodType',         'Food Type',  130.0, false),
-    ('ageDays',          'Age (d)',     80.0, true),
-    ('ageMonths',   'Age (mo)',      70.0, true),
-    ('maturity',    'Maturity',      90.0, true),
-    ('total',       'Total',         60.0, true),
-    ('males',       '♂',             50.0, false),
-    ('females',     '♀',             50.0, false),
-    ('juveniles',   'Juv.',          60.0, false),
-    ('mortality',   'Dead',          55.0, false),
-    ('lastCleaning', 'Last Clean',   105.0, false),
-    ('cleaningInt',  'Clean (d)',     80.0, false),
-    ('nextCleaning', 'Next Clean',   110.0, false),
-    ('health',      'Health',       110.0, false),
-
-    ('responsible',  'Responsible',  130.0, false),
-    ('experiment',   'Experiment',   140.0, true),
-    ('notes',        'Notes',        160.0, false),
+    ('tankId',            'Tank',        110.0, true),
+    ('line',              'Line',        140.0, false),
+    ('status',            'Status',      110.0, false),
+    ('feedingAmount',     'Feed Amt.',    80.0, false),
+    ('feedingAmountUnit', 'Unit',         75.0, false),
+    ('foodType',          'Food Type',   130.0, false),
+    ('ageDays',           'Age (d)',      80.0, true),
+    ('ageMonths',         'Age (mo)',     85.0, true),
+    ('maturity',          'Maturity',     90.0, true),
+    ('total',             'Total',        60.0, true),
+    ('males',             '♂',            50.0, false),
+    ('females',           '♀',            50.0, false),
+    ('juveniles',         'Juv.',         60.0, false),
+    ('mortality',         'Dead',         55.0, false),
+    ('lastCleaning',      'Last Clean',  105.0, false),
+    ('cleaningInt',       'Clean (d)',    80.0, false),
+    ('nextCleaning',      'Next Clean',  110.0, false),
+    ('lastBreeding',      'Last Breed',  105.0, false),
+    ('health',            'Health',      110.0, false),
+    ('responsible',       'Responsible', 130.0, false),
   ];
 
   @override
@@ -165,6 +162,13 @@ class _FishStocksPageState extends State<FishStocksPage> {
           : null,
       feedingSchedule: row[FishSch.stockFeedingSchedule]?.toString(),
       foodType:        row[FishSch.stockFoodType]?.toString(),
+      feedingAmount:   row[FishSch.stockFoodAmount] != null
+          ? double.tryParse(row[FishSch.stockFoodAmount].toString())
+          : null,
+      feedingAmountUnit: row[FishSch.stockFeedingAmountUnit]?.toString(),
+      lastBreeding:    row[FishSch.stockLastBreeding] != null
+          ? DateTime.tryParse(row[FishSch.stockLastBreeding].toString())
+          : null,
     );
   }
 
@@ -282,16 +286,20 @@ class _FishStocksPageState extends State<FishStocksPage> {
       case 'status':      s.status = v;                                  dbCol = 'fish_stocks_status';        dbVal = v; break;
       case 'health':      s.health = v;                                  dbCol = 'fish_stocks_health_status'; dbVal = v; break;
       case 'experiment':  s.experiment = v.isEmpty ? null : v;          dbCol = 'fish_stocks_experiment_id';            dbVal = s.experiment; break;
-      case 'notes':       s.notes = v.isEmpty ? null : v;               dbCol = 'fish_stocks_notes';                    dbVal = s.notes; break;
       case 'cleaningInt':
         s.cleaningIntervalDays = v.isEmpty ? null : int.tryParse(v);
         dbCol = FishSch.stockCleaningInterval;
         dbVal = s.cleaningIntervalDays;
         break;
-      case 'feedingSchedule':
-        s.feedingSchedule = v.isEmpty ? null : v;
-        dbCol = FishSch.stockFeedingSchedule;
-        dbVal = s.feedingSchedule;
+      case 'feedingAmount':
+        s.feedingAmount = v.isEmpty ? null : double.tryParse(v);
+        dbCol = FishSch.stockFoodAmount;
+        dbVal = s.feedingAmount;
+        break;
+      case 'feedingAmountUnit':
+        s.feedingAmountUnit = v.isEmpty ? null : v;
+        dbCol = FishSch.stockFeedingAmountUnit;
+        dbVal = s.feedingAmountUnit;
         break;
       case 'foodType':
         s.foodType = v.isEmpty ? null : v;
@@ -402,40 +410,6 @@ class _FishStocksPageState extends State<FishStocksPage> {
     _applyFilters();
   }
 
-  void _showQr(FishStock stock) {
-    if (stock.id == null) return;
-    final ref = SupabaseManager.projectRef ?? 'local';
-    final data = QrRules.build(ref, 'fish_stocks', stock.id!);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppDS.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(stock.tankId,
-            style: GoogleFonts.spaceGrotesk(color: AppDS.textPrimary)),
-        content: SizedBox(
-          width: 260,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(12),
-              child: QrImageView(data: data, size: 200),
-            ),
-            const SizedBox(height: 10),
-            Text(data,
-                style: GoogleFonts.spaceGrotesk(
-                    color: AppDS.textSecondary, fontSize: 11)),
-          ]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Close',
-                style: GoogleFonts.spaceGrotesk(color: AppDS.textSecondary))),
-        ],
-      ),
-    );
-  }
 
   Future<void> _openDetail(FishStock stock) async {
     await Navigator.push(context, MaterialPageRoute(
@@ -447,7 +421,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
   @override
   Widget build(BuildContext context) {
     final totalFish  = _filtered.fold(0, (s, r) => s + r.totalFish);
-    final tableWidth = _cols.fold(0.0, (s, c) => s + c.$3) + 36;
+    final tableWidth = _cols.fold(0.0, (s, c) => s + c.$3) + 84;
 
     return Column(
       children: [
@@ -546,7 +520,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
                                           height: AppDS.tableHeaderH,
                                           color: context.appHeaderBg,
                                           child: Row(children: [
-                                            const SizedBox(width: 36),
+                                            const SizedBox(width: 84),
                                             ..._cols.map((c) => SizedBox(
                                               width: c.$3,
                                               child: Padding(
@@ -641,21 +615,14 @@ class _FishStocksPageState extends State<FishStocksPage> {
       child: Row(
           children: [
             SizedBox(
-              width: 36,
+              width: 28,
               child: AppIconButton(
                 icon: Icons.open_in_new, tooltip: 'Open detail',
                 color: AppDS.textMuted,
                 onPressed: () => _openDetail(stock)),
             ),
             SizedBox(
-              width: 36,
-              child: AppIconButton(
-                icon: Icons.qr_code_outlined, tooltip: 'QR Code',
-                color: AppDS.textMuted,
-                onPressed: () => _showQr(stock)),
-            ),
-            SizedBox(
-              width: 36,
+              width: 28,
               child: AppIconButton(
                 icon: Icons.outbox_outlined, tooltip: 'Quick Request',
                 color: AppDS.textMuted,
@@ -665,16 +632,41 @@ class _FishStocksPageState extends State<FishStocksPage> {
                   prefillTitle: stock.line,
                 )),
             ),
+            SizedBox(
+              width: 28,
+              child: AppIconButton(
+                icon: Icons.print_outlined, tooltip: 'Quick Print',
+                color: AppDS.textMuted,
+                onPressed: () => showQuickPrintDialog(
+                  context,
+                  category: 'Stocks',
+                  entityId: stock.stockId.isNotEmpty ? stock.stockId : null,
+                  data: {
+                    'fish_stocks_tank_id':    stock.tankId,
+                    'fish_stocks_line':       stock.line,
+                    'fish_line_name':         stock.line,
+                    'fish_stocks_males':      stock.males.toString(),
+                    'fish_stocks_females':    stock.females.toString(),
+                    'fish_stocks_juveniles':  stock.juveniles.toString(),
+                    'fish_stocks_status':     stock.status,
+                    'fish_stocks_responsible': stock.responsible,
+                    'fish_stocks_arrival_date': stock.arrivalDate != null
+                        ? stock.arrivalDate!.toIso8601String().substring(0, 10)
+                        : '',
+                  },
+                )),
+            ),
             _cell(stock, 'tankId',      110, mono: true),
             _cell(stock, 'line',        140),
             _statusCell(stock, 'status', 110,
               ['active', 'empty', 'quarantine', 'retired']),
-            _dropdownCell(stock, 'feedingSchedule', 70, stock.feedingSchedule,
-              ['1x', '2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x']),
+            _cell(stock, 'feedingAmount', 80, mono: true),
+            _dropdownCell(stock, 'feedingAmountUnit', 75, stock.feedingAmountUnit,
+              ['grams', 'mL', 'clicks']),
             _dropdownCell(stock, 'foodType', 130, stock.foodType,
               ['GEMMA 75', 'GEMMA 150', 'GEMMA 300', 'SPAROS 400-600']),
             _cell(stock, 'ageDays',      80, mono: true),
-            _cell(stock, 'ageMonths',    70, mono: true),
+            _cell(stock, 'ageMonths',    85, mono: true),
             _maturityCell(stock,          90),
             _totalCell(stock),
             _cell(stock, 'males',        50),
@@ -684,11 +676,10 @@ class _FishStocksPageState extends State<FishStocksPage> {
             _dateCell(stock, 'lastCleaning', 105),
             _cell(stock, 'cleaningInt',  80, mono: true),
             _nextCleaningCell(stock, 110),
+            _dateCell(stock, 'lastBreeding', 105),
             _statusCell(stock, 'health', 110,
               ['healthy', 'observation', 'treatment', 'sick']),
             _cell(stock, 'responsible', 130),
-            _cell(stock, 'experiment',  140, mono: true),
-            _cell(stock, 'notes',       160),
           ],
         ),
     );
@@ -709,10 +700,10 @@ class _FishStocksPageState extends State<FishStocksPage> {
       case 'females':     val = '${s.females}'; break;
       case 'juveniles':   val = '${s.juveniles}'; break;
       case 'mortality':   val = '${s.mortality}'; break;
-      case 'responsible': val = s.responsible.isEmpty ? null : s.responsible; break;
-      case 'experiment':  val = s.experiment; break;
-      case 'notes':       val = s.notes; break;
-      case 'cleaningInt': val = s.cleaningIntervalDays?.toString(); break;
+      case 'responsible':    val = s.responsible.isEmpty ? null : s.responsible; break;
+      case 'experiment':     val = s.experiment; break;
+      case 'feedingAmount':  val = s.feedingAmount?.toString(); break;
+      case 'cleaningInt':    val = s.cleaningIntervalDays?.toString(); break;
       default: val = null;
     }
 
@@ -910,7 +901,11 @@ class _FishStocksPageState extends State<FishStocksPage> {
   }
 
   Widget _dateCell(FishStock s, String key, double width) {
-    final current = key == 'lastCleaning' ? s.lastCleaning : null;
+    final current = switch (key) {
+      'lastCleaning' => s.lastCleaning,
+      'lastBreeding' => s.lastBreeding,
+      _ => null,
+    };
     final display = current?.toIso8601String().substring(0, 10);
     return GestureDetector(
       onDoubleTap: () async {
@@ -931,11 +926,20 @@ class _FishStocksPageState extends State<FishStocksPage> {
           ),
         );
         if (picked == null || s.id == null) return;
-        setState(() => s.lastCleaning = picked);
+        final String dbCol;
+        switch (key) {
+          case 'lastCleaning':
+            setState(() => s.lastCleaning = picked);
+            dbCol = FishSch.stockLastCleaning;
+          case 'lastBreeding':
+            setState(() => s.lastBreeding = picked);
+            dbCol = FishSch.stockLastBreeding;
+          default: return;
+        }
         try {
           await Supabase.instance.client
               .from('fish_stocks')
-              .update({FishSch.stockLastCleaning: picked.toIso8601String().substring(0, 10)})
+              .update({dbCol: picked.toIso8601String().substring(0, 10)})
               .eq('fish_stocks_id', s.id!);
         } catch (e) {
           if (mounted) {

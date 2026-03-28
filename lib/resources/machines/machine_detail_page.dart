@@ -520,13 +520,13 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
         ),
       ]),
       const SizedBox(height: 10),
-      _FieldRow(children: [
-        _InlineField(
+      Row(children: [
+        Expanded(child: _InlineField(
           label: 'Maintenance interval (days)',
           controller: _maintIntervalCtrl,
           keyboardType: TextInputType.number,
-        ),
-        const SizedBox(width: 0),
+        )),
+        const Expanded(child: SizedBox()),
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
@@ -544,13 +544,13 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
         ),
       ]),
       const SizedBox(height: 10),
-      _FieldRow(children: [
-        _InlineField(
+      Row(children: [
+        Expanded(child: _InlineField(
           label: 'Calibration interval (days)',
           controller: _calibIntervalCtrl,
           keyboardType: TextInputType.number,
-        ),
-        const SizedBox(width: 0),
+        )),
+        const Expanded(child: SizedBox()),
       ]),
     ]);
   }

@@ -16,9 +16,6 @@ import 'fish_lines_detail_page.dart';
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
 import '/theme/grid_widgets.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import '/supabase/supabase_manager.dart';
-import '/qr_scanner/qr_code_rules.dart';
 
 part 'fish_lines_dialogs.dart';
 
@@ -202,40 +199,6 @@ class _FishLinesPageState extends State<FishLinesPage> {
     _applyFilters();
   }
 
-  void _showQr(FishLine line) {
-    if (line.fishlineId == null) return;
-    final ref = SupabaseManager.projectRef ?? 'local';
-    final data = QrRules.build(ref, 'fish_lines', line.fishlineId!);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppDS.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(line.fishlineName,
-            style: GoogleFonts.spaceGrotesk(color: AppDS.textPrimary)),
-        content: SizedBox(
-          width: 260,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(12),
-              child: QrImageView(data: data, size: 200),
-            ),
-            const SizedBox(height: 10),
-            Text(data,
-                style: GoogleFonts.spaceGrotesk(
-                    color: AppDS.textSecondary, fontSize: 11)),
-          ]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Close',
-                style: GoogleFonts.spaceGrotesk(color: AppDS.textSecondary))),
-        ],
-      ),
-    );
-  }
 
   void _openDetail(FishLine line) {
     Navigator.push(context, MaterialPageRoute(
@@ -462,13 +425,6 @@ class _FishLinesPageState extends State<FishLinesPage> {
               icon: Icons.open_in_new, tooltip: 'Open detail page',
               color: AppDS.textMuted,
               onPressed: () => _openDetail(line)),
-          ),
-          SizedBox(
-            width: 36,
-            child: AppIconButton(
-              icon: Icons.qr_code_outlined, tooltip: 'QR Code',
-              color: AppDS.textMuted,
-              onPressed: () => _showQr(line)),
           ),
           _nameCell(line, 180),
           _dateCell(line, 100),

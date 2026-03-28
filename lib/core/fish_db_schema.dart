@@ -81,8 +81,9 @@ abstract class FishSch {
   static const stockCleaningInterval = 'fish_stocks_cleaning_interval_days';
   static const stockFoodType         = 'fish_stocks_food_type';
   static const stockFoodSource       = 'fish_stocks_food_source';
-  static const stockFoodAmount       = 'fish_stocks_food_amount';
-  static const stockFeedingSchedule  = 'fish_stocks_feeding_schedule';
+  static const stockFoodAmount          = 'fish_stocks_food_amount';
+  static const stockFeedingAmountUnit   = 'fish_stocks_feeding_amount_unit';
+  static const stockFeedingSchedule     = 'fish_stocks_feeding_schedule';
   static const stockLastHealthCheck  = 'fish_stocks_last_health_check';
   static const stockHealthStatus     = 'fish_stocks_health_status';
   static const stockTreatment        = 'fish_stocks_treatment';

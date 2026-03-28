@@ -29,6 +29,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   final Set<int> _expanded = {0, 1, 2, 3, 4};
 
   // Controllers
+  late final TextEditingController _codeCtrl;
   late final TextEditingController _nameCtrl;
   late final TextEditingController _brandCtrl;
   late final TextEditingController _supplierCtrl;
@@ -55,6 +56,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   @override
   void initState() {
     super.initState();
+    _codeCtrl          = TextEditingController();
     _nameCtrl          = TextEditingController();
     _brandCtrl         = TextEditingController();
     _supplierCtrl      = TextEditingController();
@@ -74,6 +76,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
 
   @override
   void dispose() {
+    _codeCtrl.dispose();
     _nameCtrl.dispose();
     _brandCtrl.dispose();
     _supplierCtrl.dispose();
@@ -124,6 +127,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
       });
 
       if (mounted) {
+        _codeCtrl.text          = reagent.code ?? '';
         _nameCtrl.text          = reagent.name;
         _brandCtrl.text         = reagent.brand ?? '';
         _supplierCtrl.text      = reagent.supplier ?? '';
@@ -164,6 +168,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     setState(() => _saving = true);
     try {
       final data = <String, dynamic>{
+        'reagent_code':         _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
         'reagent_name':         _nameCtrl.text.trim(),
         'reagent_type':         _type,
         'reagent_brand':        _brandCtrl.text.trim().isEmpty        ? null : _brandCtrl.text.trim(),
@@ -437,6 +442,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   Widget _buildIdentificationSection(BuildContext context) {
     return Column(children: [
       _FieldRow(children: [
+        _InlineField(label: 'Code (e.g. BR001)', controller: _codeCtrl),
         _InlineField(label: 'Reference', controller: _referenceCtrl),
         _InlineField(label: 'CAS Number', controller: _casCtrl),
       ]),

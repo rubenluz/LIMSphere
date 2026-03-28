@@ -183,7 +183,11 @@ class _AddConnectionPageState extends State<AddConnectionPage> {
 
     if (mounted) {
       setState(() => _isSaving = false);
-      Navigator.pop(context);
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      } else {
+        Navigator.pushReplacementNamed(context, '/connections');
+      }
     }
   }
 

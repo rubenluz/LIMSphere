@@ -1,124 +1,148 @@
 // machines_widgets.dart - Part of machines_page.dart.
-// _MachineCard: card for a single machine with spec/status summary.
-// _StatusBadge, _SmallBadge, _MetaText, _Chip: small UI atoms.
+// _MachineRow: table row for a single machine.
+// _StatusBadge, _SmallBadge, _RowBtn, _Chip: small UI atoms.
 // _MachineFormDialog: add/edit machine form dialog.
 part of 'machines_page.dart';
 
-// ─── Machine Card ──────────────────────────────────────────────────────────────
-class _MachineCard extends StatelessWidget {
+// ─── Machine Row ──────────────────────────────────────────────────────────────
+class _MachineRow extends StatelessWidget {
   final MachineModel machine;
   final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onQr;
+  final VoidCallback onDetail;
+  final VoidCallback onReserve;
 
-  const _MachineCard({
+  const _MachineRow({
     required this.machine,
     required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onQr,
+    required this.onDetail,
+    required this.onReserve,
   });
 
   @override
   Widget build(BuildContext context) {
     final m = machine;
-    final sc = m.statusColor;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            decoration: BoxDecoration(
-              color: context.appSurface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: m.status == 'broken'
-                      ? AppDS.red.withValues(alpha: 0.5)
-                      : context.appBorder),
-            ),
-            padding: const EdgeInsets.all(14),
-            child: Row(children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: sc.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.precision_manufacturing_outlined,
-                    color: sc, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Flexible(
-                          child: Text(m.name,
-                              style: GoogleFonts.spaceGrotesk(
-                                  color: context.appTextPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                        const SizedBox(width: 8),
-                        _StatusBadge(status: m.status),
-                        if (m.maintenanceOverdue) ...[
-                          const SizedBox(width: 6),
-                          _SmallBadge(
-                              label: 'Maintenance overdue',
-                              color: AppDS.red),
-                        ] else if (m.maintenanceDueSoon) ...[
-                          const SizedBox(width: 6),
-                          _SmallBadge(
-                              label: 'Maintenance due soon',
-                              color: AppDS.yellow),
-                        ],
-                      ]),
-                      const SizedBox(height: 4),
-                      Wrap(spacing: 14, children: [
-                        if (m.brand != null || m.model != null)
-                          _MetaText(
-                              '${m.brand ?? ''}${m.brand != null && m.model != null ? ' · ' : ''}${m.model ?? ''}'),
-                        if (m.type != null) _MetaText(m.type!),
-                        if (m.locationName != null)
-                          _MetaText(m.locationName!,
-                              icon: Icons.place_outlined),
-                        if (m.nextMaintenance != null)
-                          _MetaText(
-                              'Next maint: ${m.nextMaintenance!.toIso8601String().substring(0, 10)}',
-                              icon: Icons.build_outlined),
-                      ]),
-                    ]),
-              ),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                IconButton(
-                    icon: Icon(Icons.qr_code,
-                        size: 18, color: context.appTextSecondary),
-                    tooltip: 'QR Code',
-                    onPressed: onQr),
-                IconButton(
-                    icon: Icon(Icons.edit_outlined,
-                        size: 16, color: context.appTextSecondary),
-                    tooltip: 'Edit',
-                    onPressed: onEdit),
-                IconButton(
-                    icon: Icon(Icons.delete_outline,
-                        size: 16, color: context.appTextSecondary),
-                    tooltip: 'Delete',
-                    onPressed: onDelete),
-              ]),
-            ]),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: context.appBorder)),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(children: [
+            // ── Actions ──────────────────────────────────────────────────
+            _RowBtn(icon: Icons.open_in_new, tooltip: 'View detail', onTap: onDetail),
+            _RowBtn(icon: Icons.event_available_outlined, tooltip: 'Quick Reservation', onTap: onReserve),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 5,
+              child: Row(children: [
+                Flexible(
+                  child: Text(m.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 8),
+                _StatusBadge(status: m.status),
+                if (m.maintenanceOverdue) ...[
+                  const SizedBox(width: 4),
+                  _SmallBadge(label: 'Overdue', color: AppDS.red),
+                ] else if (m.maintenanceDueSoon) ...[
+                  const SizedBox(width: 4),
+                  _SmallBadge(label: 'Due soon', color: AppDS.yellow),
+                ],
+              ]),
+            ),
+            Expanded(
+              flex: 3,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (m.type != null)
+                    Text(m.type!,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextPrimary, fontSize: 12)),
+                  if (m.brand != null || m.model != null)
+                    Text(
+                      '${m.brand ?? ''}${m.brand != null && m.model != null ? ' · ' : ''}${m.model ?? ''}',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextSecondary, fontSize: 11),
+                    ),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: m.locationName != null
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(m.locationName!,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.spaceGrotesk(
+                                color: context.appTextPrimary, fontSize: 12)),
+                        if (m.room != null)
+                          Text(m.room!,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.spaceGrotesk(
+                                  color: context.appTextSecondary,
+                                  fontSize: 11)),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            Expanded(
+              flex: 2,
+              child: m.nextMaintenance != null
+                  ? Text(
+                      m.nextMaintenance!.toIso8601String().substring(0, 10),
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.jetBrainsMono(
+                          color: m.maintenanceOverdue
+                              ? AppDS.red
+                              : m.maintenanceDueSoon
+                                  ? AppDS.yellow
+                                  : context.appTextSecondary,
+                          fontSize: 11),
+                    )
+                  : Text('—',
+                      style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextMuted, fontSize: 12)),
+            ),
+          ]),
         ),
       ),
     );
   }
+}
+
+class _RowBtn extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  const _RowBtn(
+      {required this.icon, required this.tooltip, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: tooltip,
+        child: IconButton(
+          icon: Icon(icon, size: 16),
+          color: context.appTextSecondary,
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          onPressed: onTap,
+        ),
+      );
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -163,25 +187,6 @@ class _SmallBadge extends StatelessWidget {
       );
 }
 
-class _MetaText extends StatelessWidget {
-  final String label;
-  final IconData? icon;
-  const _MetaText(this.label, {this.icon});
-
-  @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 12, color: context.appTextMuted),
-            const SizedBox(width: 3),
-          ],
-          Text(label,
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextSecondary, fontSize: 12)),
-        ],
-      );
-}
 
 class _Chip extends StatelessWidget {
   final String label;

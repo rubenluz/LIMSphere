@@ -8,15 +8,11 @@ part of 'reagents_page.dart';
 class _ReagentRow extends StatelessWidget {
   final ReagentModel reagent;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
-  final VoidCallback onQr;
   final VoidCallback onRequest;
 
   const _ReagentRow({
     required this.reagent,
     required this.onTap,
-    required this.onDelete,
-    required this.onQr,
     required this.onRequest,
   });
 
@@ -33,8 +29,6 @@ class _ReagentRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = reagent;
     final accent = _typeAccent[r.type] ?? const Color(0xFF94A3B8);
-    final expiryStr =
-        r.expiryDate?.toIso8601String().substring(0, 10);
 
     return Material(
       color: Colors.transparent,
@@ -42,17 +36,7 @@ class _ReagentRow extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: context.appBorder),
-              left: BorderSide(
-                color: r.isExpired
-                    ? AppDS.red
-                    : r.isExpiringSoon
-                        ? AppDS.yellow
-                        : accent,
-                width: 3,
-              ),
-            ),
+            border: Border(bottom: BorderSide(color: context.appBorder)),
             color: r.isExpired
                 ? AppDS.red.withValues(alpha: 0.04)
                 : context.appSurface,
@@ -60,9 +44,25 @@ class _ReagentRow extends StatelessWidget {
           height: 48,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
-            // ── Name / type ──────────────────────────────────────────────
+            // ── Actions ──────────────────────────────────────────────────
+            _RowBtn(Icons.open_in_new, 'View detail', onTap),
+            _RowBtn(Icons.outbox_outlined, 'Quick Request', onRequest),
+            const SizedBox(width: 4),
+            // ── Code ─────────────────────────────────────────────────────
             Expanded(
-              flex: 5,
+              flex: 1,
+              child: r.code != null && r.code!.isNotEmpty
+                  ? Text(r.code!,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.jetBrainsMono(
+                          color: AppDS.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600))
+                  : const SizedBox.shrink(),
+            ),
+            // ── Name ─────────────────────────────────────────────────────
+            Expanded(
+              flex: 4,
               child: Row(children: [
                 Flexible(
                   child: Text(r.name,
@@ -72,8 +72,6 @@ class _ReagentRow extends StatelessWidget {
                           fontSize: 13,
                           fontWeight: FontWeight.w500)),
                 ),
-                const SizedBox(width: 6),
-                _Badge(label: ReagentModel.typeLabel(r.type), color: accent),
                 if (r.isExpired) ...[
                   const SizedBox(width: 4),
                   _Badge(label: 'Expired', color: AppDS.red),
@@ -95,27 +93,10 @@ class _ReagentRow extends StatelessWidget {
                 ],
               ]),
             ),
-            // ── Brand / ref ──────────────────────────────────────────────
-            Expanded(
-              flex: 3,
-              child: Text(
-                [r.brand, if (r.reference != null) r.reference]
-                    .whereType<String>()
-                    .join(' · '),
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextSecondary, fontSize: 12),
-              ),
-            ),
-            // ── Qty / unit ───────────────────────────────────────────────
+            // ── Type ─────────────────────────────────────────────────────
             Expanded(
               flex: 2,
-              child: Text(
-                r.quantity != null ? r.displayQuantity : '—',
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.jetBrainsMono(
-                    color: context.appTextSecondary, fontSize: 12),
-              ),
+              child: _Badge(label: ReagentModel.typeLabel(r.type), color: accent),
             ),
             // ── Location ─────────────────────────────────────────────────
             Expanded(
@@ -127,31 +108,48 @@ class _ReagentRow extends StatelessWidget {
                     color: context.appTextSecondary, fontSize: 12),
               ),
             ),
-            // ── Expiry ───────────────────────────────────────────────────
+            // ── Brand ────────────────────────────────────────────────────
             Expanded(
               flex: 2,
               child: Text(
-                expiryStr ?? '—',
+                r.brand ?? '—',
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.jetBrainsMono(
-                    color: r.isExpired
-                        ? AppDS.red
-                        : r.isExpiringSoon
-                            ? AppDS.yellow
-                            : context.appTextSecondary,
-                    fontSize: 12),
+                style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextSecondary, fontSize: 12),
               ),
             ),
-            // ── Actions ──────────────────────────────────────────────────
-            SizedBox(
-              width: 144,
-              child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                _RowBtn(Icons.open_in_new, 'View detail', onTap),
-                _RowBtn(Icons.qr_code, 'QR Code', onQr),
-                _RowBtn(Icons.outbox_outlined, 'Quick Request', onRequest),
-                _RowBtn(Icons.delete_outline, 'Delete', onDelete,
-                    color: AppDS.red.withValues(alpha: 0.7)),
-              ]),
+            // ── Size (concentration) ──────────────────────────────────────
+            Expanded(
+              flex: 1,
+              child: Text(
+                r.concentration ?? '—',
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.jetBrainsMono(
+                    color: context.appTextSecondary, fontSize: 11),
+              ),
+            ),
+            // ── Unit ─────────────────────────────────────────────────────
+            Expanded(
+              flex: 1,
+              child: Text(
+                r.unit ?? '—',
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextSecondary, fontSize: 12),
+              ),
+            ),
+            // ── Amount ───────────────────────────────────────────────────
+            Expanded(
+              flex: 1,
+              child: Text(
+                r.quantity != null ? r.quantity.toString() : '—',
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.jetBrainsMono(
+                    color: r.isLowStock
+                        ? AppDS.orange
+                        : context.appTextSecondary,
+                    fontSize: 12),
+              ),
             ),
           ]),
         ),
@@ -247,6 +245,7 @@ class _ReagentFormDialog extends StatefulWidget {
 
 class _ReagentFormDialogState extends State<_ReagentFormDialog> {
   final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _codeCtrl;
   late final TextEditingController _nameCtrl;
   late final TextEditingController _brandCtrl;
   late final TextEditingController _refCtrl;
@@ -272,6 +271,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
   void initState() {
     super.initState();
     final e = widget.existing;
+    _codeCtrl = TextEditingController(text: e?.code ?? '');
     _nameCtrl = TextEditingController(text: e?.name ?? '');
     _brandCtrl = TextEditingController(text: e?.brand ?? '');
     _refCtrl = TextEditingController(text: e?.reference ?? '');
@@ -298,7 +298,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
   @override
   void dispose() {
     for (final c in [
-      _nameCtrl, _brandCtrl, _refCtrl, _casCtrl, _unitCtrl,
+      _codeCtrl, _nameCtrl, _brandCtrl, _refCtrl, _casCtrl, _unitCtrl,
       _qtyCtrl, _qtyMinCtrl, _concCtrl, _lotCtrl, _supplierCtrl,
       _hazardCtrl, _responsibleCtrl, _notesCtrl, _positionCtrl,
     ]) {
@@ -314,6 +314,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
       final data = {
         'reagent_name': _nameCtrl.text.trim(),
         'reagent_type': _type,
+        'reagent_code': _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
         if (_brandCtrl.text.isNotEmpty) 'reagent_brand': _brandCtrl.text.trim(),
         if (_refCtrl.text.isNotEmpty) 'reagent_reference': _refCtrl.text.trim(),
         if (_casCtrl.text.isNotEmpty) 'reagent_cas_number': _casCtrl.text.trim(),
@@ -411,9 +412,16 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
           key: _formKey,
           child: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              _field(context, _nameCtrl, 'Name *',
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null),
+              Row(children: [
+                Expanded(
+                  flex: 2,
+                  child: _field(context, _nameCtrl, 'Name *',
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null)),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 1,
+                  child: _field(context, _codeCtrl, 'Code (e.g. BR001)')),
+              ]),
               const SizedBox(height: 10),
               Row(children: [
                 Expanded(child: _field(context, _brandCtrl, 'Brand')),

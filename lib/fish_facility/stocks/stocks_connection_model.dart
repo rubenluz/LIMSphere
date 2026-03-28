@@ -26,6 +26,9 @@ class FishStock {
   int? cleaningIntervalDays;
   String? feedingSchedule;
   String? foodType;
+  double? feedingAmount;
+  String? feedingAmountUnit;
+  DateTime? lastBreeding;
   /// Date of birth from the linked fish_line record (from the FK join).
   final DateTime? lineDateBirth;
   /// Set post-construction when the FK join returned null but a name-lookup found a date.
@@ -57,6 +60,9 @@ class FishStock {
     this.cleaningIntervalDays,
     this.feedingSchedule,
     this.foodType,
+    this.feedingAmount,
+    this.feedingAmountUnit,
+    this.lastBreeding,
   }) : _ageMonths = ageMonths;
 
   /// Computed next cleaning date. Null if either field is missing.
@@ -132,6 +138,13 @@ class FishStock {
           : null,
       feedingSchedule: m[FishSch.stockFeedingSchedule]?.toString(),
       foodType:        m[FishSch.stockFoodType]?.toString(),
+      feedingAmount:   m[FishSch.stockFoodAmount] != null
+          ? double.tryParse(m[FishSch.stockFoodAmount].toString())
+          : null,
+      feedingAmountUnit: m[FishSch.stockFeedingAmountUnit]?.toString(),
+      lastBreeding:    m[FishSch.stockLastBreeding] != null
+          ? DateTime.tryParse(m[FishSch.stockLastBreeding].toString())
+          : null,
     );
   }
 }

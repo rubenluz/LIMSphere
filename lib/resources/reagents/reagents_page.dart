@@ -6,13 +6,10 @@
 import 'package:flutter/material.dart';
 import '/theme/module_permission.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:io';
-import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
-import '../../supabase/supabase_manager.dart';
 import '/core/data_cache.dart';
 import '/theme/theme.dart';
 import 'reagent_model.dart';
@@ -89,6 +86,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
         if (_statusFilter == 'low' && !r.isLowStock) return false;
         if (q.isEmpty) return true;
         return r.name.toLowerCase().contains(q) ||
+            (r.code?.toLowerCase().contains(q) ?? false) ||
             (r.brand?.toLowerCase().contains(q) ?? false) ||
             (r.reference?.toLowerCase().contains(q) ?? false) ||
             (r.casNumber?.toLowerCase().contains(q) ?? false) ||
@@ -121,93 +119,21 @@ class _ReagentsPageState extends State<ReagentsPage> {
     }
   }
 
-  Future<void> _delete(ReagentModel r) async {
-    if (!context.canEditModule) { context.warnReadOnly(); return; }
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Delete Reagent',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary)),
-        content: Text('Delete "${r.name}"? This cannot be undone.',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Cancel',
-                  style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary))),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Delete',
-                  style: GoogleFonts.spaceGrotesk(color: AppDS.red))),
-        ],
-      ),
-    );
-    if (confirm != true) return;
-    try {
-      await Supabase.instance.client
-          .from('reagents')
-          .delete()
-          .eq('reagent_id', r.id);
-      _load();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
-      }
-    }
-  }
 
-  void _showQr(ReagentModel r) {
-    final ref = SupabaseManager.projectRef ?? 'local';
-    final data = 'bluelims://$ref/reagents/${r.id}';
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('QR — ${r.name}',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary)),
-        content: SizedBox(
-          width: 260,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-                color: Colors.white,
-                padding: const EdgeInsets.all(12),
-                child: QrImageView(data: data, size: 200)),
-            const SizedBox(height: 10),
-            Text(data,
-                style: GoogleFonts.spaceGrotesk(
-                    color: ctx.appTextMuted, fontSize: 11)),
-          ]),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: data));
-                if (context.mounted) Navigator.pop(ctx);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied to clipboard')));
-              },
-              child: Text('Copy Link',
-                  style: GoogleFonts.spaceGrotesk(color: AppDS.accent))),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Close',
-                  style:
-                      GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary))),
-        ],
-      ),
-    );
-  }
+  Widget _hdr(BuildContext context, String t) => Text(t,
+      style: GoogleFonts.spaceGrotesk(
+          color: context.appTextMuted,
+          fontSize: 10,
+          letterSpacing: 0.8,
+          fontWeight: FontWeight.w600));
 
   Future<void> _exportCsv() async {
     final buf = StringBuffer();
     buf.writeln(
-        'ID,Name,Brand,Reference,CAS,Type,Quantity,Unit,Storage,Location,Lot,Expiry,Supplier,Responsible');
+        'ID,Code,Name,Brand,Reference,CAS,Type,Quantity,Unit,Storage,Location,Lot,Expiry,Supplier,Responsible');
     for (final r in _filtered) {
       buf.writeln(
-          '${r.id},"${r.name}","${r.brand ?? ''}","${r.reference ?? ''}","${r.casNumber ?? ''}","${r.type}","${r.quantity ?? ''}","${r.unit ?? ''}","${r.storageTemp ?? ''}","${r.locationName ?? ''}","${r.lotNumber ?? ''}","${r.expiryDate != null ? r.expiryDate!.toIso8601String().substring(0, 10) : ''}","${r.supplier ?? ''}","${r.responsible ?? ''}"');
+          '${r.id},"${r.code ?? ''}","${r.name}","${r.brand ?? ''}","${r.reference ?? ''}","${r.casNumber ?? ''}","${r.type}","${r.quantity ?? ''}","${r.unit ?? ''}","${r.storageTemp ?? ''}","${r.locationName ?? ''}","${r.lotNumber ?? ''}","${r.expiryDate != null ? r.expiryDate!.toIso8601String().substring(0, 10) : ''}","${r.supplier ?? ''}","${r.responsible ?? ''}"');
     }
     try {
       final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
@@ -443,53 +369,15 @@ class _ReagentsPageState extends State<ReagentsPage> {
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(children: [
-                        const SizedBox(width: 4), // accent strip
-                        Expanded(
-                          flex: 5,
-                          child: Text('NAME / TYPE',
-                              style: GoogleFonts.spaceGrotesk(
-                                  color: context.appTextMuted,
-                                  fontSize: 10,
-                                  letterSpacing: 0.8,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Text('BRAND / REF',
-                              style: GoogleFonts.spaceGrotesk(
-                                  color: context.appTextMuted,
-                                  fontSize: 10,
-                                  letterSpacing: 0.8,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text('QTY / UNIT',
-                              style: GoogleFonts.spaceGrotesk(
-                                  color: context.appTextMuted,
-                                  fontSize: 10,
-                                  letterSpacing: 0.8,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text('LOCATION',
-                              style: GoogleFonts.spaceGrotesk(
-                                  color: context.appTextMuted,
-                                  fontSize: 10,
-                                  letterSpacing: 0.8,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text('EXPIRY',
-                              style: GoogleFonts.spaceGrotesk(
-                                  color: context.appTextMuted,
-                                  fontSize: 10,
-                                  letterSpacing: 0.8,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                        const SizedBox(width: 108), // actions
+                        const SizedBox(width: 72), // view detail + quick request btns
+                        Expanded(flex: 1, child: _hdr(context, 'CODE')),
+                        Expanded(flex: 4, child: _hdr(context, 'NAME')),
+                        Expanded(flex: 2, child: _hdr(context, 'TYPE')),
+                        Expanded(flex: 2, child: _hdr(context, 'LOCATION')),
+                        Expanded(flex: 2, child: _hdr(context, 'BRAND')),
+                        Expanded(flex: 1, child: _hdr(context, 'SIZE')),
+                        Expanded(flex: 1, child: _hdr(context, 'UNIT')),
+                        Expanded(flex: 1, child: _hdr(context, 'AMOUNT')),
                       ]),
                     ),
                     // ── Rows ───────────────────────────────────────────────
@@ -507,8 +395,6 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                 builder: (_) =>
                                     ReagentDetailPage(reagentId: r.id),
                               )).then((_) => _load()),
-                            onDelete: () => _delete(r),
-                            onQr: () => _showQr(r),
                             onRequest: () => showQuickRequestDialog(
                               context,
                               type: 'reagents',

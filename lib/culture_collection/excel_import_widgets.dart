@@ -1,6 +1,7 @@
 // excel_import_widgets.dart - Part of function_excel_import_page.dart.
 // _ImportModeCard: card for selecting samples vs strains import mode.
-// _StepIndicator: horizontal step progress bar (steps 0-6).
+// _FilePicker: file pick button row showing selected file name.
+// _StepIndicator: horizontal step progress bar.
 // _FakeVsync: TickerProvider stub for dialogs without a State mixin.
 part of 'function_excel_import_page.dart';
 
@@ -33,7 +34,7 @@ class _ImportModeCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
           color: selected
-              ? primary.withOpacity(0.08)
+              ? primary.withValues(alpha: 0.08)
               : const Color(0xFFF8FAFC),
           border: Border.all(
               color: selected ? primary : const Color(0xFFCBD5E1),
@@ -118,6 +119,45 @@ class _StepIndicator extends StatelessWidget {
             ]),
           );
         }),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// File picker row
+// ─────────────────────────────────────────────────────────────────────────────
+class _FilePicker extends StatelessWidget {
+  final String label;
+  final String fileName;
+  final IconData icon;
+  final VoidCallback onPick;
+
+  const _FilePicker({
+    required this.label,
+    required this.fileName,
+    required this.icon,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final picked = fileName.isNotEmpty;
+    return OutlinedButton.icon(
+      onPressed: onPick,
+      icon: Icon(picked ? Icons.check_circle : icon,
+          color: picked ? Colors.green : null),
+      label: Text(
+        picked ? fileName : label,
+        overflow: TextOverflow.ellipsis,
+      ),
+      style: OutlinedButton.styleFrom(
+        alignment: Alignment.centerLeft,
+        minimumSize: const Size.fromHeight(44),
+        foregroundColor: picked ? Colors.green : null,
+        side: picked
+            ? BorderSide(color: Colors.green.shade400)
+            : null,
       ),
     );
   }

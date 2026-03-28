@@ -177,7 +177,12 @@ class _LabChatPageState extends State<LabChatPage> {
     _resolveCurrentUser();
     _loadAndSubscribe(_channel);
     _loadAllCounts();
-    LabChatPage.setActiveChannel(_channel);
+    // Defer until after the first frame — setActiveChannel → _recomputeBgUnread
+    // → unreadNotifier.value fires synchronously, which would hit "setState during
+    // build" because initState() is called while the parent is still building.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) LabChatPage.setActiveChannel(_channel);
+    });
   }
 
   Future<void> _loadSidebarPref() async {
@@ -780,6 +785,11 @@ class _LabChatPageState extends State<LabChatPage> {
         final compact = prev != null &&
             prev.senderKey == msg.senderKey &&
             msg.createdAt.difference(prev.createdAt).inMinutes < 5;
+        final currentAuthUid = _supabase.auth.currentUser?.id;
+        final currentRole = _currentUser?['user_role'] as String?;
+        final isAdmin = currentRole == 'admin' || currentRole == 'superadmin';
+        final canEditDelete = isAdmin ||
+            (currentAuthUid != null && msg.userAuthUid == currentAuthUid);
         return _MessageBubble(
           key: ValueKey(msg.id),
           message: msg,
@@ -788,6 +798,7 @@ class _LabChatPageState extends State<LabChatPage> {
           channelColor: _currentChannel.color,
           isEditing: _editingId == msg.id,
           editCtrl: _editCtrl,
+          canEditDelete: canEditDelete,
           onReply: (m) {
             setState(() => _replyingTo = m);
             _focusNode.requestFocus();

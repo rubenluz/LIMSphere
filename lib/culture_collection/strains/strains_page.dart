@@ -6,12 +6,10 @@
 import 'package:flutter/material.dart';
 import '/theme/module_permission.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'strain_detail_page.dart';
 import '../function_excel_import_page.dart';
-import 'package:excel/excel.dart' hide Border;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'dart:io';
@@ -643,35 +641,22 @@ class _StrainsPageState extends State<StrainsPage> {
     _snack('Copied ${rows.length} row(s) x ${cols.length} col(s)');
   }
 
-  Future<void> _exportSelectedToExcel() async {
-    final rows = _selectedRows; final cols = _exportCols;
+  Future<void> _exportSelectedCsv() async {
+    final rows = _selectedRows;
+    final cols = _exportCols;
     if (rows.isEmpty) { _snack('Select at least one row'); return; }
-    final excel = Excel.createExcel();
-    final sheet = excel['Sheet1'];
-    for (int c = 0; c < cols.length; c++) {
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: 0)).value =
-          TextCellValue(cols[c].label);
+    final buf = StringBuffer()..writeln(cols.map((c) => '"${c.label}"').join(','));
+    for (final row in rows) {
+      buf.writeln(cols.map((c) {
+        final v = row[c.key]?.toString() ?? '';
+        return '"${v.replaceAll('"', '""')}"';
+      }).join(','));
     }
-    for (int r = 0; r < rows.length; r++)
-      for (int c = 0; c < cols.length; c++) {
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1)).value =
-            _toCellValue(rows[r][cols[c].key]);
-      }
     final dir = await getTemporaryDirectory();
-    final safeDate = DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now());
-    final path = '${dir.path}\\strains_export_$safeDate.xlsx';
-    File(path)..createSync(recursive: true)..writeAsBytesSync(excel.encode()!);
+    final path = '${dir.path}/strains_export_${DateTime.now().millisecondsSinceEpoch}.csv';
+    File(path)..createSync(recursive: true)..writeAsStringSync(buf.toString());
     await OpenFilex.open(path);
-    _snack('Excel exported (${rows.length} rows)');
-  }
-
-  CellValue _toCellValue(dynamic v) {
-    if (v == null)     return TextCellValue('');
-    if (v is int)      return IntCellValue(v);
-    if (v is double)   return DoubleCellValue(v);
-    if (v is bool)     return BoolCellValue(v);
-    if (v is DateTime) return DateCellValue(year: v.year, month: v.month, day: v.day);
-    return TextCellValue(v.toString());
+    _snack('CSV exported (${rows.length} rows)');
   }
 
   Future<void> _showAddStrainDialog({dynamic preselectedSampleId}) async {
@@ -752,7 +737,7 @@ class _StrainsPageState extends State<StrainsPage> {
               onToggleAllRows: _selectAllRows,
               onToggleAllCols: _selectAllCols,
               onCopy: _copySelectedInfo,
-              onExport: _exportSelectedToExcel,
+              onExport: _exportSelectedCsv,
             )
           : buildStrainsNormalAppBar(
               context: context,

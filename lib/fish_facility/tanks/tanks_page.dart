@@ -17,6 +17,7 @@ import '../shared_widgets.dart';
 import '../stocks/stocks_detail_page.dart';
 import '/theme/theme.dart';
 import '../add_stock_dialog.dart';
+import '../../labels/label_page.dart';
 
 part 'tanks_dialogs.dart';
 
@@ -39,8 +40,8 @@ const _rowACount  = 15;    // 1.1 L
 const _rowBECount = 10;    // 2.4 L
 const _labelW     = 44.0;  // row-label column width
 const _gap        = 3.0;   // inner padding per cell (each side)
-const _rowHTop    = 60.0;  // row A cell height
-const _rowHMain   = 82.0;  // rows B-E cell height
+const _rowHTop    = 72.0;  // row A cell height
+const _rowHMain   = 96.0;  // rows B-E cell height
 
 // ─── Tank state helpers ───────────────────────────────────────────────────────
 bool _isOccupied(ZebrafishTank t) =>
@@ -180,6 +181,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
     final lineData  = r['fish_lines'] as Map<String, dynamic>?;
     final liveName  = lineData?['fish_line_name']?.toString();
     return def.copyWith(
+      zebraId:           r['fish_stocks_id'] as int?,
       zebraVolumeL:      volL,
       isEightLiter:      is8,
       zebraLine:         liveName ?? r['fish_stocks_line'],
@@ -196,11 +198,14 @@ class _FishTanksPageState extends State<FishTanksPage> {
       zebraFoodType:     r['fish_stocks_food_type'],
       zebraFoodSource:   r['fish_stocks_food_source'],
       zebraFoodAmount:   (r['fish_stocks_food_amount'] as num?)?.toDouble(),
+      zebraFeedingAmountUnit: r['fish_stocks_feeding_amount_unit']?.toString(),
       zebraFeedingSchedule: r['fish_stocks_feeding_schedule'],
       zebraExperimentId: r['fish_stocks_experiment_id'],
       zebraNotes:        r['fish_stocks_notes'],
       zebraTemperatureC: (r['fish_stocks_temperature_c'] as num?)?.toDouble(),
       zebraPh:           (r['fish_stocks_ph'] as num?)?.toDouble(),
+      zebraLastTankCleaning: r['fish_stocks_last_tank_cleaning'] != null
+          ? DateTime.tryParse(r['fish_stocks_last_tank_cleaning'] as String) : null,
     );
   }
 
@@ -252,8 +257,9 @@ class _FishTanksPageState extends State<FishTanksPage> {
         'fish_stocks_food_source':     t.zebraFoodSource,
         'fish_stocks_food_amount':     t.zebraFoodAmount,
         'fish_stocks_feeding_schedule': t.zebraFeedingSchedule,
-        'fish_stocks_experiment_id':   t.zebraExperimentId,
-        'fish_stocks_notes':       t.zebraNotes,
+        'fish_stocks_experiment_id':        t.zebraExperimentId,
+        'fish_stocks_notes':                t.zebraNotes,
+        'fish_stocks_last_tank_cleaning':   t.zebraLastTankCleaning?.toIso8601String().substring(0, 10),
       };
       if (t.zebraId != null) {
         await Supabase.instance.client
@@ -694,16 +700,25 @@ class _FishTanksPageState extends State<FishTanksPage> {
                           style: GoogleFonts.spaceGrotesk(
                             fontSize: 9.0, color: AppDS.accent,
                             fontStyle: FontStyle.italic)),
-                      if (tank.zebraFoodType?.isNotEmpty == true)
+                      if (tank.zebraFoodType?.isNotEmpty == true) ...[
                         Text(
-                          [
-                            if (tank.zebraFeedingSchedule?.isNotEmpty == true)
-                              tank.zebraFeedingSchedule!,
-                            tank.zebraFoodType!,
-                          ].join(' - '),
+                          tank.zebraFoodType!,
                           style: GoogleFonts.spaceGrotesk(
                             fontSize: 8.0, color: const Color(0xFF9B6B1A)),
                           overflow: TextOverflow.ellipsis, maxLines: 1),
+                        if (tank.zebraFeedingSchedule?.isNotEmpty == true ||
+                            tank.zebraFoodAmount != null)
+                          Text(
+                            [
+                              if (tank.zebraFeedingSchedule?.isNotEmpty == true)
+                                tank.zebraFeedingSchedule!,
+                              if (tank.zebraFoodAmount != null)
+                                '(${tank.zebraFoodAmount}${tank.zebraFeedingAmountUnit != null ? ' ${tank.zebraFeedingAmountUnit}' : ''})',
+                            ].join(' '),
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 8.0, color: const Color(0xFF9B6B1A)),
+                            overflow: TextOverflow.ellipsis, maxLines: 1),
+                      ],
                       if (tank.zebraResponsible?.isNotEmpty == true)
                         Text(tank.zebraResponsible!,
                           style: GoogleFonts.spaceGrotesk(
@@ -922,6 +937,28 @@ class _FishTanksPageState extends State<FishTanksPage> {
                 setState(() { _patch(u); _menuTank = null; });
                 _persist(u);
               }),
+
+            _mi(Icons.print_outlined, 'Quick Print', context.appTextPrimary, () {
+              setState(() => _menuTank = null);
+              final lineVal = tank.zebraLine ?? '';
+              showQuickPrintDialog(
+                context,
+                category: 'Stocks',
+                entityId: tank.zebraId != null && tank.zebraId! > 0
+                    ? tank.zebraId.toString()
+                    : null,
+                data: {
+                  'fish_stocks_tank_id':     tank.zebraTankId,
+                  'fish_stocks_line':        lineVal,
+                  'fish_line_name':          lineVal,
+                  'fish_stocks_males':       (tank.zebraMales ?? 0).toString(),
+                  'fish_stocks_females':     (tank.zebraFemales ?? 0).toString(),
+                  'fish_stocks_juveniles':   (tank.zebraJuveniles ?? 0).toString(),
+                  'fish_stocks_status':      tank.zebraStatus ?? '',
+                  'fish_stocks_responsible': tank.zebraResponsible ?? '',
+                },
+              );
+            }),
 
             Divider(height: 1, color: context.appBorder),
             _mi(Icons.refresh, 'Reset to Empty', AppDS.red, () async {

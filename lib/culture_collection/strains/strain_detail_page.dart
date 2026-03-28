@@ -9,7 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../samples/sample_detail_page.dart';
 import '/theme/theme.dart';
 import '/supabase/supabase_manager.dart';
-import '/qr_scanner/qr_code_rules.dart';
+import '../../camera/qr_scanner/qr_code_rules.dart';
 import '../../requests/requests_page.dart';
 
 part 'strain_detail_widgets.dart';

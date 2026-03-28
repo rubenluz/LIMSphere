@@ -83,7 +83,7 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
     }
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(BuildContext context) {
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.all(24),
@@ -151,13 +151,13 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
               Expanded(
                 child: Text(e.key,
                     style: GoogleFonts.spaceGrotesk(
-                        fontSize: 12, color: Colors.black),
+                        fontSize: 12, color: context.appTextPrimary),
                     overflow: TextOverflow.ellipsis),
               ),
               countCell(e.value.$1, colM, AppDS.accent),
               countCell(e.value.$2, colF, AppDS.pink),
               countCell(e.value.$3, colJ, AppDS.textMuted),
-              countCell(e.value.$4, colT, Colors.black, bold: true),
+              countCell(e.value.$4, colT, context.appTextPrimary, bold: true),
             ]),
           )),
 
@@ -172,7 +172,7 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
                     style: GoogleFonts.spaceGrotesk(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Colors.black)),
+                        color: context.appTextPrimary)),
               ),
               countCell(
                   _rows.fold(0, (s, e) => s + e.value.$1), colM, AppDS.accent,
@@ -183,7 +183,7 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
               countCell(
                   _rows.fold(0, (s, e) => s + e.value.$3), colJ, AppDS.textMuted,
                   bold: true),
-              countCell(_totalFish, colT, Colors.black, bold: true),
+              countCell(_totalFish, colT, context.appTextPrimary, bold: true),
             ]),
           ],
         ],
@@ -243,9 +243,9 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
           ),
           const Divider(height: 1),
           if (desktop)
-            Expanded(child: SingleChildScrollView(child: _buildContent()))
+            Expanded(child: SingleChildScrollView(child: _buildContent(context)))
           else
-            _buildContent(),
+            _buildContent(context),
         ],
       ),
     );

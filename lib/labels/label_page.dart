@@ -1,9 +1,11 @@
-// label_page.dart - Label designer and printer driver integration.
+// label_page.dart — Label designer and printer driver integration.
 // Defines shared types: LabelField, LabelTemplate, PrinterConfig, _ConnState.
-// Part files: label_driver (ZPL/QL/USB), label_builder_page (_BuilderTab),
-// label_builder_widgets (builder helpers), label_widgets (templates UI),
-// label_print_dialog (print dialog), label_printer_settings_page,
-// label_templates_dialog, label_db_field_picker.
+//
+// Folder structure:
+//   templates/    — main labels page: template listing, preview canvas
+//   builder/      — label designer: canvas, palette, properties, DB field picker
+//   print/        — print page: record list, filters, print dispatch UI
+//   printer_drivers/ — all PC→printer communication: drivers, USB, settings
 
 import 'dart:async';
 import 'dart:convert';
@@ -13,25 +15,41 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '/theme/theme.dart';
-import '../qr_scanner/qr_code_rules.dart';
+import '../camera/qr_scanner/qr_code_rules.dart';
 import '../supabase/supabase_manager.dart';
 
-part 'label_builder_page.dart';
-part 'label_printer_settings_page.dart';
-part 'label_templates_dialog.dart';
-part 'label_db_field_picker.dart';
-part 'printer_machine_driver.dart';
-part 'label_widgets.dart';
-part 'label_builder_widgets.dart';
-part 'label_print_dialog.dart';
+// printer_drivers — all PC→printer communication
+part 'printer_drivers/zpl_driver.dart';
+part 'printer_drivers/brother_ql_570.dart';
+part 'printer_drivers/brother_ql_700.dart';
+part 'printer_drivers/printer_machine_driver.dart';
+part 'printer_drivers/label_printer_settings_page.dart';
 
-const _kPaperSizes = ['62x30', '62x100', '62x29', '29x90', '38x90', '54x29'];
+// templates — main labels page
+part 'templates/label_widgets.dart';
+part 'templates/label_preview_canvas.dart';
+part 'templates/label_templates_dialog.dart';
+
+// builder — label designer
+part 'builder/label_builder_page.dart';
+part 'builder/label_db_field_picker.dart';
+part 'builder/label_builder_widgets.dart';
+part 'builder/label_builder_properties.dart';
+
+// print — print page
+part 'print/label_print_page.dart';
+part 'print/label_print_filters.dart';
+part 'print/label_print_records.dart';
+part 'print/label_quick_print_dialog.dart';
+
+const _kPaperSizes = ['62x30', '62x100', '62x29', '29x62', '29x90', '38x90', '54x29'];
 
 /// Printer reachability states — finer-grained than a simple bool so we can
 /// distinguish "driver installed but printer offline/not connected" from
@@ -141,11 +159,11 @@ class LabelTemplate {
   // Per-template print settings
   String paperSize;    // '62x30' | '62x100' etc.
   int dpi;             // 300 | 600
-  bool autoCut;
+  String cutMode;      // 'none' | 'between' | 'end'
   bool halfCut;
   bool rotate;         // 90°
-  bool continuousRoll; // true = continuous roll, false = pre-sized die-cut labels
   int copies;
+  double topOffsetMm;  // shift content up by this many mm to compensate for printer top feed
 
   LabelTemplate({
     required this.id,
@@ -156,18 +174,19 @@ class LabelTemplate {
     List<LabelField>? fields,
     this.paperSize = '62x30',
     this.dpi = 300,
-    this.autoCut = true,
+    this.cutMode = 'between',
     this.halfCut = false,
     this.rotate = false,
-    this.continuousRoll = true,
     this.copies = 1,
+    this.topOffsetMm = 0.0,
   }) : fields = fields ?? [];
 
   LabelTemplate clone() => LabelTemplate(
     id: id, name: name, category: category, labelW: labelW, labelH: labelH,
     fields: fields.map((f) => f.copyWith()).toList(),
-    paperSize: paperSize, dpi: dpi, autoCut: autoCut,
-    halfCut: halfCut, rotate: rotate, continuousRoll: continuousRoll, copies: copies,
+    paperSize: paperSize, dpi: dpi, cutMode: cutMode,
+    halfCut: halfCut, rotate: rotate, copies: copies,
+    topOffsetMm: topOffsetMm,
   );
 
   Map<String, dynamic> toDb() => {
@@ -178,10 +197,10 @@ class LabelTemplate {
     'tpl_label_h': labelH,
     'tpl_paper_size': paperSize,
     'tpl_dpi': dpi,
-    'tpl_auto_cut': autoCut,
+    'tpl_cut_mode': cutMode,
+    'tpl_top_offset_mm': topOffsetMm,
     'tpl_half_cut': halfCut,
     'tpl_rotate': rotate,
-    'tpl_continuous_roll': continuousRoll,
     'tpl_copies': copies,
     'tpl_fields': fields.map((f) => f.toJson()).toList(),
     'tpl_updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -189,6 +208,10 @@ class LabelTemplate {
 
   factory LabelTemplate.fromDb(Map<String, dynamic> row) {
     final rawFields = row['tpl_fields'] as List<dynamic>? ?? [];
+    // Migrate from old bool tpl_auto_cut if tpl_cut_mode not yet stored.
+    final cutModeRaw = row['tpl_cut_mode'] as String?;
+    final cutMode = cutModeRaw ??
+        ((row['tpl_auto_cut'] as bool? ?? true) ? 'between' : 'none');
     return LabelTemplate(
       id: row['tpl_id'] as String,
       name: row['tpl_name'] as String,
@@ -197,10 +220,10 @@ class LabelTemplate {
       labelH: (row['tpl_label_h'] as num?)?.toDouble() ?? 30,
       paperSize: row['tpl_paper_size'] as String? ?? '62x30',
       dpi: row['tpl_dpi'] as int? ?? 300,
-      autoCut: row['tpl_auto_cut'] as bool? ?? true,
+      cutMode: cutMode,
+      topOffsetMm: (row['tpl_top_offset_mm'] as num?)?.toDouble() ?? 0.0,
       halfCut: row['tpl_half_cut'] as bool? ?? false,
       rotate: row['tpl_rotate'] as bool? ?? false,
-      continuousRoll: row['tpl_continuous_roll'] as bool? ?? true,
       copies: row['tpl_copies'] as int? ?? 1,
       fields: rawFields
           .whereType<Map<String, dynamic>>()
@@ -216,6 +239,7 @@ class PrinterConfig {
   String deviceName;
   String ipAddress;
   String usbPath;          // '/dev/usb/lp0' on Linux/macOS, printer name on Windows
+  bool   continuousRoll;   // true = continuous roll, false = die-cut pre-sized
 
   PrinterConfig({
     this.protocol = 'zpl',
@@ -223,7 +247,80 @@ class PrinterConfig {
     this.deviceName = 'Zebra ZD421',
     this.ipAddress = '192.168.1.100',
     this.usbPath = '/dev/usb/lp0',
+    this.continuousRoll = true,
   });
+}
+
+/// A named printer profile that bundles all connection + quality settings.
+/// Multiple profiles can exist; one is "active" at a time.
+class PrinterProfile {
+  String id;
+  String name;
+  String protocol;         // 'zpl' | 'brother_ql' | 'brother_ql_legacy'
+  String connectionType;   // 'usb' | 'wifi' | 'bluetooth'
+  String deviceName;
+  String ipAddress;
+  String usbPath;
+  int    dpi;              // 300 | 600
+  String cutMode;          // 'none' | 'between' | 'end'
+  bool   halfCut;
+  bool   continuousRoll;   // true = continuous roll, false = die-cut pre-sized
+  double topOffsetMm;      // shift content up by this many mm to compensate for printer top feed
+
+  PrinterProfile({
+    String? id,
+    this.name = 'New Printer',
+    this.protocol = 'zpl',
+    this.connectionType = 'usb',
+    this.deviceName = 'Zebra ZD421',
+    this.ipAddress = '192.168.1.100',
+    this.usbPath = '',
+    this.dpi = 300,
+    this.cutMode = 'between',
+    this.halfCut = false,
+    this.continuousRoll = true,
+    this.topOffsetMm = 0.0,
+  }) : id = id ?? 'p_${DateTime.now().millisecondsSinceEpoch}';
+
+  /// Returns a bare PrinterConfig for driver routing.
+  PrinterConfig toPrinterConfig() => PrinterConfig(
+    protocol: protocol, connectionType: connectionType,
+    deviceName: deviceName, ipAddress: ipAddress, usbPath: usbPath,
+    continuousRoll: continuousRoll,
+  );
+
+  /// Stamps this profile's quality settings onto a template clone for printing.
+  LabelTemplate applyTo(LabelTemplate tpl) {
+    final c = tpl.clone();
+    c.dpi = dpi; c.cutMode = cutMode; c.halfCut = halfCut;
+    c.topOffsetMm = topOffsetMm;
+    return c;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id, 'name': name, 'protocol': protocol,
+    'connectionType': connectionType, 'deviceName': deviceName,
+    'ipAddress': ipAddress, 'usbPath': usbPath,
+    'dpi': dpi, 'cutMode': cutMode, 'halfCut': halfCut,
+    'continuousRoll': continuousRoll, 'topOffsetMm': topOffsetMm,
+  };
+
+  factory PrinterProfile.fromJson(Map<String, dynamic> j) => PrinterProfile(
+    id:             j['id']             as String?,
+    name:           j['name']           as String? ?? 'Printer',
+    protocol:       j['protocol']       as String? ?? 'zpl',
+    connectionType: j['connectionType'] as String? ?? 'usb',
+    deviceName:     j['deviceName']     as String? ?? 'Zebra ZD421',
+    ipAddress:      j['ipAddress']      as String? ?? '192.168.1.100',
+    usbPath:        j['usbPath']        as String? ?? '',
+    dpi:            j['dpi']            as int?    ?? 300,
+    // Migrate from old autoCut bool if cutMode not yet stored.
+    cutMode:        j['cutMode'] as String? ??
+                    ((j['autoCut'] as bool? ?? true) ? 'between' : 'none'),
+    halfCut:        j['halfCut']        as bool?   ?? false,
+    continuousRoll: j['continuousRoll'] as bool?   ?? true,
+    topOffsetMm:    (j['topOffsetMm']   as num?)?.toDouble() ?? 0.0,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,7 +329,7 @@ class PrinterConfig {
 
 const _kFieldsByCategory = <String, List<({String key, String label})>>{
   'Strains': [
-    (key: '{strain_qrcode}',        label: 'QR Code'),
+    (key: '{__qr__}',               label: 'QR Code'),
     (key: '{strain_code}',          label: 'Strain Code'),
     (key: '{strain_status}',        label: 'Status'),
     (key: '{strain_species}',       label: 'Species'),
@@ -244,7 +341,7 @@ const _kFieldsByCategory = <String, List<({String key, String label})>>{
     (key: '{s_country}',            label: 'Country'),
   ],
   'Reagents': [
-    (key: '{reagent_qrcode}',        label: 'QR Code'),
+    (key: '{__qr__}',                label: 'QR Code'),
     (key: '{reagent_code}',          label: 'Reagent Code'),
     (key: '{reagent_name}',          label: 'Name'),
     (key: '{reagent_lot}',           label: 'Lot Number'),
@@ -254,7 +351,7 @@ const _kFieldsByCategory = <String, List<({String key, String label})>>{
     (key: '{reagent_concentration}', label: 'Concentration'),
   ],
   'Equipment': [
-    (key: '{equipment_qrcode}',    label: 'QR Code'),
+    (key: '{__qr__}',              label: 'QR Code'),
     (key: '{eq_code}',             label: 'Equipment Code'),
     (key: '{eq_name}',             label: 'Name'),
     (key: '{eq_serial}',           label: 'Serial Number'),
@@ -297,7 +394,7 @@ List<({String key, String label})> _fieldsForCategory(String category) =>
 // ─────────────────────────────────────────────────────────────────────────────
 const _kAllColsByCategory = <String, List<String>>{
   'Strains': [
-    'strain_qrcode', 'strain_code', 'strain_status', 'strain_origin',
+    '__qr__', 'strain_code', 'strain_status', 'strain_origin',
     'strain_situation', 'strain_toxins', 'strain_public', 'strain_private_collection',
     'strain_type_strain', 'strain_last_checked', 'strain_biosafety_level',
     'strain_access_conditions', 'strain_other_codes',
@@ -329,7 +426,7 @@ const _kAllColsByCategory = <String, List<String>>{
     'sample_substrate', 'sample_observations',
   ],
   'Reagents': [
-    'reagent_qrcode', 'reagent_name', 'reagent_brand', 'reagent_reference',
+    '__qr__', 'reagent_name', 'reagent_brand', 'reagent_reference',
     'reagent_cas_number', 'reagent_type', 'reagent_unit', 'reagent_quantity',
     'reagent_quantity_min', 'reagent_concentration', 'reagent_purity',
     'reagent_solvent', 'reagent_storage_temp', 'reagent_position',
@@ -339,7 +436,7 @@ const _kAllColsByCategory = <String, List<String>>{
     'reagent_project', 'reagent_responsible', 'reagent_notes',
   ],
   'Equipment': [
-    'equipment_qrcode', 'equipment_name', 'equipment_type', 'equipment_brand',
+    '__qr__', 'equipment_name', 'equipment_type', 'equipment_brand',
     'equipment_model', 'equipment_serial_number', 'equipment_patrimony_number',
     'equipment_room', 'equipment_status', 'equipment_purchase_date',
     'equipment_warranty_until', 'equipment_last_calibration',
@@ -426,32 +523,27 @@ String _colLabel(String col) {
       .replaceAll('Qrcode', 'QR Code');
 }
 
-/// Returns the placeholder key that a QR code field should encode by default
-/// for the given category. Uses the dedicated qrcode column where one exists.
-String _qrKeyForCategory(String category) => switch (category) {
-  'Strains'   => '{strain_qrcode}',
-  'Reagents'  => '{reagent_qrcode}',
-  'Equipment' => '{equipment_qrcode}',
-  _           => '{__qr__}',   // computed via QrRules at load time
-};
+/// Returns the placeholder key that a QR code field should encode.
+/// All categories use the computed bluelims:// deep-link injected as __qr__.
+String _qrKeyForCategory(String category) => '{__qr__}';
 
 Map<String, dynamic> _sampleDataFor(String category) => switch (category) {
   'Strains' => {
-    'strain_qrcode': 'STR-2024-001',
+    '__qr__': 'bluelims://demo/strains/1',
     'strain_code': 'STR-2024-001', 'strain_status': 'Active',
     'strain_species': 'Penicillium chrysogenum', 'strain_genus': 'Penicillium',
     'strain_medium': 'PDA', 'strain_room': 'Lab 1',
     'strain_next_transfer': '2025-04-01', 's_island': 'Gran Canaria', 's_country': 'Spain',
   },
   'Reagents' => {
-    'reagent_qrcode': 'REA-042',
+    '__qr__': 'bluelims://demo/reagents/42',
     'reagent_code': 'REA-042', 'reagent_name': 'Luria-Bertani Broth',
     'reagent_lot': 'LOT-8821', 'reagent_expiry': '2026-01-15',
     'reagent_supplier': 'Sigma-Aldrich', 'reagent_location': 'Fridge 3',
     'reagent_concentration': '25 g/L',
   },
   'Equipment' => {
-    'equipment_qrcode': 'EQ-0024',
+    '__qr__': 'bluelims://demo/machines/24',
     'eq_code': 'EQ-0024', 'eq_name': 'Centrifuge 5424',
     'eq_serial': 'SN-4821922', 'eq_location': 'Lab 2 — Bench B',
     'eq_calibration_due': '2025-12-31', 'eq_status': 'Operational',
@@ -508,10 +600,9 @@ String _idColForCategory(String category) => switch (category) {
   _           => 'id',
 };
 
-/// Injects `__qr__` (bluelims:// URL) into each row for categories that have
-/// no dedicated qrcode DB column. No-op for Strains/Reagents/Equipment.
+/// Injects `__qr__` (bluelims:// deep-link URL) into every row for the given
+/// category using its primary-key column. Works for all categories.
 void _injectQr(List<Map<String, dynamic>> rows, String category) {
-  if (category == 'Strains' || category == 'Reagents' || category == 'Equipment') return;
   final type = _qrTypeForCategory(category);
   if (type.isEmpty || !QrRules.validTypes.contains(type)) return;
   final ref = _projectRef();
@@ -542,7 +633,8 @@ class PrintStrainsPage extends StatefulWidget {
 }
 
 class _PrintStrainsPageState extends State<PrintStrainsPage> {
-  final _printer = PrinterConfig();
+  final _profiles = <PrinterProfile>[];
+  PrinterProfile? _activeProfile;
   LabelTemplate? _activeTemplate;
   late final List<LabelTemplate> _templates;
   _ConnState _connState = _ConnState.checking;
@@ -564,7 +656,7 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   }
 
   Future<void> _loadAndInit() async {
-    await _loadPrinterConfig();
+    await _loadProfiles();
     await _loadTemplates();
     _checkConnection();
   }
@@ -634,54 +726,78 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
     );
   }
 
-  Future<void> _loadPrinterConfig() async {
+  Future<void> _loadProfiles() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getStringList('printer_profiles_v2') ?? [];
+      List<PrinterProfile> loaded = raw.map((s) {
+        try { return PrinterProfile.fromJson(jsonDecode(s) as Map<String, dynamic>); }
+        catch (_) { return null; }
+      }).whereType<PrinterProfile>().toList();
+
+      // Migrate legacy single-printer keys → one profile
+      if (loaded.isEmpty) {
+        final proto = prefs.getString('printer_protocol');
+        if (proto != null) {
+          loaded = [PrinterProfile(
+            name:           prefs.getString('printer_deviceName') ?? 'Printer',
+            protocol:       proto,
+            connectionType: prefs.getString('printer_connectionType') ?? 'usb',
+            deviceName:     prefs.getString('printer_deviceName') ?? 'Zebra ZD421',
+            ipAddress:      prefs.getString('printer_ipAddress') ?? '192.168.1.100',
+            usbPath:        prefs.getString('printer_usbPath') ?? '',
+          )];
+        }
+      }
+
+      final activeId = prefs.getString('printer_active_profile_id');
       if (!mounted) return;
       setState(() {
-        _printer.protocol = prefs.getString('printer_protocol') ?? _printer.protocol;
-        _printer.connectionType = prefs.getString('printer_connectionType') ?? _printer.connectionType;
-        _printer.deviceName = prefs.getString('printer_deviceName') ?? _printer.deviceName;
-        _printer.ipAddress = prefs.getString('printer_ipAddress') ?? _printer.ipAddress;
-        _printer.usbPath = prefs.getString('printer_usbPath') ?? _printer.usbPath;
+        _profiles
+          ..clear()
+          ..addAll(loaded);
+        _activeProfile = _profiles.firstWhereOrNull((p) => p.id == activeId)
+            ?? _profiles.firstOrNull;
       });
     } catch (_) {}
   }
 
-  Future<void> _savePrinterConfig() async {
+  Future<void> _saveProfiles() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('printer_protocol', _printer.protocol);
-      await prefs.setString('printer_connectionType', _printer.connectionType);
-      await prefs.setString('printer_deviceName', _printer.deviceName);
-      await prefs.setString('printer_ipAddress', _printer.ipAddress);
-      await prefs.setString('printer_usbPath', _printer.usbPath);
+      await prefs.setStringList('printer_profiles_v2',
+          _profiles.map((p) => jsonEncode(p.toJson())).toList());
+      if (_activeProfile != null) {
+        await prefs.setString('printer_active_profile_id', _activeProfile!.id);
+      }
     } catch (_) {}
   }
 
   Future<void> _checkConnection() async {
     if (!mounted) return;
     setState(() => _connState = _ConnState.checking);
-    final state = await _checkPrinterConnection(_printer);
+    final cfg = _activeProfile?.toPrinterConfig() ?? PrinterConfig();
+    final state = await _checkPrinterConnection(cfg);
     if (mounted) setState(() => _connState = state);
   }
 
   Future<void> _showNewTemplateDialog() async {
     final nameCtrl = TextEditingController(text: 'New Template');
     String selectedCategory = widget.entityType;
+    String selectedPaperSize = '62x29';
     const categories = ['Strains', 'Samples', 'Reagents', 'Equipment', 'Stocks', 'General'];
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          backgroundColor: AppDS.surface,
+          backgroundColor: ctx.appSurface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Row(children: [
             const Icon(Icons.add_box_outlined, size: 18, color: AppDS.accent),
             const SizedBox(width: 8),
-            const Text('New Template',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppDS.textPrimary)),
+            Text('New Template',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: ctx.appTextPrimary)),
           ]),
           content: SizedBox(
             width: 340,
@@ -691,22 +807,22 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
               children: [
                 Text('Template Name',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                        color: AppDS.textSecondary)),
+                        color: ctx.appTextSecondary)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: nameCtrl,
                   autofocus: true,
-                  style: const TextStyle(fontSize: 13, color: AppDS.textPrimary),
+                  style: TextStyle(fontSize: 13, color: ctx.appTextPrimary),
                   decoration: InputDecoration(
                     isDense: true,
                     filled: true,
-                    fillColor: AppDS.bg,
+                    fillColor: ctx.appBg,
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppDS.border)),
+                        borderSide: BorderSide(color: ctx.appBorder)),
                     enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppDS.border)),
+                        borderSide: BorderSide(color: ctx.appBorder)),
                     focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: AppDS.accent)),
@@ -717,7 +833,7 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
                 const SizedBox(height: 16),
                 Text('Category',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                        color: AppDS.textSecondary)),
+                        color: ctx.appTextSecondary)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
@@ -729,17 +845,47 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: sel ? AppDS.accent.withValues(alpha: 0.15) : AppDS.bg,
+                          color: sel ? AppDS.accent.withValues(alpha: 0.15) : ctx.appBg,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                              color: sel ? AppDS.accent : AppDS.border,
+                              color: sel ? AppDS.accent : ctx.appBorder,
                               width: sel ? 1.5 : 1),
                         ),
                         child: Text(cat,
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: sel ? AppDS.accent : AppDS.textPrimary)),
+                                color: sel ? AppDS.accent : ctx.appTextPrimary)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                Text('Label Size',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                        color: ctx.appTextSecondary)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _kPaperSizes.map((size) {
+                    final sel = selectedPaperSize == size;
+                    return GestureDetector(
+                      onTap: () => setS(() => selectedPaperSize = size),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: sel ? AppDS.accent.withValues(alpha: 0.15) : ctx.appBg,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: sel ? AppDS.accent : ctx.appBorder,
+                              width: sel ? 1.5 : 1),
+                        ),
+                        child: Text('${size.replaceAll('x', '×')} mm',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: sel ? AppDS.accent : ctx.appTextPrimary)),
                       ),
                     );
                   }).toList(),
@@ -750,8 +896,8 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel',
-                  style: TextStyle(fontSize: 13, color: AppDS.textSecondary)),
+              child: Text('Cancel',
+                  style: TextStyle(fontSize: 13, color: ctx.appTextSecondary)),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -768,12 +914,16 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
 
     if (confirmed != true || !mounted) return;
     final name = nameCtrl.text.trim().isEmpty ? 'New Template' : nameCtrl.text.trim();
+    final sizeParts = selectedPaperSize.split('x');
+    final labelW = double.tryParse(sizeParts[0]) ?? 62;
+    final labelH = double.tryParse(sizeParts[1]) ?? 30;
     _openBuilder(LabelTemplate(
       id: 'tpl_${DateTime.now().millisecondsSinceEpoch}',
       name: name,
       category: selectedCategory,
-      labelW: 62,
-      labelH: 30,
+      paperSize: selectedPaperSize,
+      labelW: labelW,
+      labelH: labelH,
     ));
   }
 
@@ -789,6 +939,13 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => _BuilderPage(
         template: tpl,
+        profiles: _profiles,
+        activeProfile: _activeProfile,
+        onProfileChanged: (p) {
+          setState(() => _activeProfile = p);
+          _saveProfiles();
+          _checkConnection();
+        },
         onSave: (saved) async {
           await Supabase.instance.client.from('label_templates').upsert(saved.toDb());
           if (!mounted) return;
@@ -805,9 +962,19 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   void _openSettings() {
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => _PrinterSettingsPage(
-        config: _printer,
-        onChanged: () { setState(() {}); _checkConnection(); },
-        onSave: _savePrinterConfig,
+        profiles: _profiles,
+        activeProfileId: _activeProfile?.id,
+        onChanged: (profiles, activeId) {
+          setState(() {
+            _profiles
+              ..clear()
+              ..addAll(profiles);
+            _activeProfile = _profiles.firstWhereOrNull((p) => p.id == activeId)
+                ?? _profiles.firstOrNull;
+          });
+          _saveProfiles();
+          _checkConnection();
+        },
       ),
     ));
   }
@@ -833,29 +1000,36 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
             const SizedBox(width: 10),
             const Text('Label Printing',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(width: 8),
-            Tooltip(
-              message: switch (_connState) {
-                _ConnState.checking    => 'Checking printer…',
-                _ConnState.connected   => '${_printer.deviceName} — connected',
-                _ConnState.driverOnly  => 'Driver found — printer is offline or not connected',
-                _ConnState.unreachable => 'Printer not found — tap to retry',
-              },
-              child: GestureDetector(
-                onTap: _checkConnection,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: 8, height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: switch (_connState) {
-                      _ConnState.checking    => context.appTextMuted,
-                      _ConnState.connected   => AppDS.green,
-                      _ConnState.driverOnly  => const Color(0xFFF59E0B),
-                      _ConnState.unreachable => AppDS.red,
-                    },
-                  ),
-                ),
+            const SizedBox(width: 12),
+            // Profile switcher
+            if (_profiles.isNotEmpty)
+              _ProfileSwitcherChip(
+                profiles: _profiles,
+                activeProfile: _activeProfile,
+                onSelect: (p) {
+                  setState(() => _activeProfile = p);
+                  _saveProfiles();
+                  _checkConnection();
+                },
+              ),
+            const SizedBox(width: 10),
+            // 3-dot connection indicator
+            GestureDetector(
+              onTap: _checkConnection,
+              child: Tooltip(
+                message: switch (_connState) {
+                  _ConnState.checking    => 'Checking printer…',
+                  _ConnState.connected   => 'Connected',
+                  _ConnState.driverOnly  => 'Driver installed — printer offline',
+                  _ConnState.unreachable => 'Printer not found — tap to retry',
+                },
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  _ConnDot(AppDS.green,              lit: _connState == _ConnState.connected),
+                  const SizedBox(width: 4),
+                  _ConnDot(const Color(0xFFF59E0B),  lit: _connState == _ConnState.driverOnly),
+                  const SizedBox(width: 4),
+                  _ConnDot(AppDS.red,                lit: _connState == _ConnState.unreachable),
+                ]),
               ),
             ),
           ]),
@@ -890,7 +1064,8 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
         body: _TemplatesTab(
           templates: _templates,
           activeTemplate: _activeTemplate,
-          printer: _printer,
+          profiles: _profiles,
+          activeProfile: _activeProfile,
           connected: _connState,
           records: widget.initialData,
           entityType: widget.entityType,
@@ -904,6 +1079,11 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
             });
             _deleteTemplate(t);
           },
+          onProfileChanged: (p) {
+            setState(() => _activeProfile = p);
+            _saveProfiles();
+            _checkConnection();
+          },
         ),
       ),
     );
@@ -916,7 +1096,14 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
 class _BuilderPage extends StatelessWidget {
   final LabelTemplate template;
   final Future<void> Function(LabelTemplate) onSave;
-  const _BuilderPage({required this.template, required this.onSave});
+  final List<PrinterProfile> profiles;
+  final PrinterProfile? activeProfile;
+  final void Function(PrinterProfile) onProfileChanged;
+  const _BuilderPage({
+    required this.template, required this.onSave,
+    required this.profiles, required this.activeProfile,
+    required this.onProfileChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -925,6 +1112,9 @@ class _BuilderPage extends StatelessWidget {
       body: _BuilderTab(
         template: template,
         onSave: onSave,
+        profiles: profiles,
+        activeProfile: activeProfile,
+        onProfileChanged: onProfileChanged,
       ),
     );
   }
@@ -934,25 +1124,49 @@ class _BuilderPage extends StatelessWidget {
 // Printer Settings — full page (Navigator.push from AppBar settings icon)
 // ─────────────────────────────────────────────────────────────────────────────
 class _PrinterSettingsPage extends StatefulWidget {
-  final PrinterConfig config;
-  final VoidCallback onChanged;
-  final Future<void> Function() onSave;
+  final List<PrinterProfile> profiles;
+  final String? activeProfileId;
+  final void Function(List<PrinterProfile>, String?) onChanged;
   const _PrinterSettingsPage({
-    required this.config,
+    required this.profiles,
+    required this.activeProfileId,
     required this.onChanged,
-    required this.onSave,
   });
   @override State<_PrinterSettingsPage> createState() => _PrinterSettingsPageState();
 }
 
 class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
-  final _tabKey = GlobalKey<_PrinterTabState>();
+  late final List<PrinterProfile> _profiles;
+  String? _activeId;
+
+  @override
+  void initState() {
+    super.initState();
+    _profiles = List.of(widget.profiles);
+    _activeId = widget.activeProfileId;
+  }
+
+  void _notify() => widget.onChanged(List.of(_profiles), _activeId);
 
   void _openDetect() {
     showDialog(
       context: context,
       builder: (_) => _InstalledPrintersDialog(
-        onSelect: (info) => _tabKey.currentState?._applyDetected(info),
+        onSelect: (info) {
+          final profile = PrinterProfile(
+            name:           info.matchedModel ?? info.name,
+            protocol:       info.protocol,
+            connectionType: info.protocol == 'brother_ql_legacy' ? 'usb' : info.connectionType,
+            deviceName:     info.matchedModel ?? info.name,
+            ipAddress:      info.ipAddress ?? '192.168.1.100',
+            usbPath:        info.connectionType == 'usb' ? info.name : '',
+          );
+          setState(() {
+            _profiles.add(profile);
+            _activeId ??= profile.id;
+          });
+          _notify();
+        },
       ),
     );
   }
@@ -974,7 +1188,7 @@ class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
         title: const Row(children: [
           Icon(Icons.print_outlined, size: 16, color: AppDS.accent),
           SizedBox(width: 8),
-          Text('Printer Settings',
+          Text('Printer Profiles',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         ]),
         actions: [
@@ -994,21 +1208,49 @@ class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
-                widget.onSave().then((_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Printer settings saved')),
-                    );
-                  }
+                final profile = PrinterProfile();
+                setState(() {
+                  _profiles.add(profile);
+                  _activeId ??= profile.id;
                 });
+                _notify();
+                _openEditDialog(profile);
               },
-              icon: const Icon(Icons.save_rounded, size: 16),
-              label: const Text('Save', style: TextStyle(fontSize: 13)),
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add Profile', style: TextStyle(fontSize: 13)),
             ),
           ),
         ],
       ),
-      body: _PrinterTab(key: _tabKey, config: widget.config, onChanged: widget.onChanged),
+      body: _ProfileListTab(
+        profiles: _profiles,
+        activeId: _activeId,
+        onSetActive: (id) { setState(() => _activeId = id); _notify(); },
+        onEdit: (p) => _openEditDialog(p),
+        onDelete: (p) {
+          setState(() {
+            _profiles.removeWhere((x) => x.id == p.id);
+            if (_activeId == p.id) _activeId = _profiles.firstOrNull?.id;
+          });
+          _notify();
+        },
+      ),
+    );
+  }
+
+  void _openEditDialog(PrinterProfile profile) {
+    showDialog(
+      context: context,
+      builder: (_) => _ProfileEditDialog(
+        profile: profile,
+        onSave: (updated) {
+          setState(() {
+            final i = _profiles.indexWhere((p) => p.id == updated.id);
+            if (i >= 0) _profiles[i] = updated;
+          });
+          _notify();
+        },
+      ),
     );
   }
 }

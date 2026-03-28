@@ -4,7 +4,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:app_links/app_links.dart';
-import '../qr_scanner/qr_code_rules.dart';
+import '../camera/qr_scanner/qr_code_rules.dart';
 import 'package:blue_open_lims/lab_chat/lab_chat_page.dart';
 import 'package:blue_open_lims/labels/label_page.dart';
 import '../locations/locations_page.dart';
@@ -26,7 +26,7 @@ import '../dashboard/dashboard_page.dart';
 import '../users/users_page.dart';
 import '../users/user_detail_page.dart';
 import '../admin/app_settings.dart';
-import '../qr_scanner/qr_scanner_page.dart';
+import '../camera/qr_scanner/qr_scanner_page.dart';
 import '../audit_log/audit_log.dart';
 import '../requests/requests_page.dart';
 

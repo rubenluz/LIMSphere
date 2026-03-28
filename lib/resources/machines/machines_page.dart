@@ -5,17 +5,15 @@
 import 'package:flutter/material.dart';
 import '/theme/module_permission.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:io';
-import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
-import '../../supabase/supabase_manager.dart';
 import '/core/data_cache.dart';
 import '/theme/theme.dart';
 import 'machine_model.dart';
 import 'machine_detail_page.dart';
+import '../reservations/reservations_page.dart';
 
 part 'machines_widgets.dart';
 
@@ -116,86 +114,13 @@ class _MachinesPageState extends State<MachinesPage> {
     if (result == true) _load();
   }
 
-  Future<void> _delete(MachineModel m) async {
-    if (!context.canEditModule) { context.warnReadOnly(); return; }
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Delete Machine',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary)),
-        content: Text('Delete "${m.name}"? This cannot be undone.',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Cancel',
-                  style:
-                      GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary))),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child:
-                  Text('Delete', style: GoogleFonts.spaceGrotesk(color: AppDS.red))),
-        ],
-      ),
-    );
-    if (confirm != true) return;
-    try {
-      await Supabase.instance.client
-          .from('equipment')
-          .delete()
-          .eq('equipment_id', m.id);
-      _load();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
-      }
-    }
-  }
 
-  void _showQr(MachineModel m) {
-    final ref = SupabaseManager.projectRef ?? 'local';
-    final data = 'bluelims://$ref/machines/${m.id}';
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('QR — ${m.name}',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary)),
-        content: SizedBox(
-          width: 260,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(12),
-              child: QrImageView(data: data, size: 200)),
-          const SizedBox(height: 10),
-          Text(data,
-              style: GoogleFonts.spaceGrotesk(
-                  color: ctx.appTextMuted, fontSize: 11)),
-        ]),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: data));
-                if (context.mounted) Navigator.pop(ctx);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied to clipboard')));
-              },
-              child: Text('Copy Link',
-                  style: GoogleFonts.spaceGrotesk(color: AppDS.accent))),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Close',
-                  style:
-                      GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary))),
-        ],
-      ),
-    );
-  }
+  Widget _hdrText(BuildContext context, String t) => Text(t,
+      style: GoogleFonts.spaceGrotesk(
+          color: context.appHeaderText,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5));
 
   Future<void> _exportCsv() async {
     final buf = StringBuffer();
@@ -347,6 +272,23 @@ class _MachinesPageState extends State<MachinesPage> {
         ]),
       ),
 
+      // ── Column header ─────────────────────────────────────────────────────────
+      Container(
+        height: 32,
+        decoration: BoxDecoration(
+          color: context.appHeaderBg,
+          border: Border(bottom: BorderSide(color: context.appBorder)),
+        ),
+        padding: const EdgeInsets.only(left: 19, right: 16),
+        child: Row(children: [
+          const SizedBox(width: 68), // view detail + quick reservation btns
+          Expanded(flex: 5, child: _hdrText(context, 'NAME / STATUS')),
+          Expanded(flex: 3, child: _hdrText(context, 'TYPE / BRAND')),
+          Expanded(flex: 2, child: _hdrText(context, 'LOCATION')),
+          Expanded(flex: 2, child: _hdrText(context, 'NEXT MAINT')),
+          const SizedBox(width: 40),
+        ]),
+      ),
       // ── Body ─────────────────────────────────────────────────────────────────
       Expanded(
         child: _loading
@@ -363,11 +305,11 @@ class _MachinesPageState extends State<MachinesPage> {
                     ]),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.zero,
                     itemCount: _filtered.length,
                     itemBuilder: (ctx, i) {
                       final m = _filtered[i];
-                      return _MachineCard(
+                      return _MachineRow(
                         machine: m,
                         onTap: () => Navigator.push(
                           context,
@@ -375,9 +317,17 @@ class _MachinesPageState extends State<MachinesPage> {
                               builder: (_) =>
                                   MachineDetailPage(machineId: m.id)),
                         ).then((_) => _load()),
-                        onEdit: () => _showAddEditDialog(m),
-                        onDelete: () => _delete(m),
-                        onQr: () => _showQr(m),
+                        onDetail: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  MachineDetailPage(machineId: m.id)),
+                        ).then((_) => _load()),
+                        onReserve: () => showMachineQuickReservationDialog(
+                          context,
+                          machineId: m.id,
+                          machineName: m.name,
+                        ),
                       );
                     },
                   ),

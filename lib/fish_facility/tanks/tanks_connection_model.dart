@@ -30,6 +30,7 @@ class ZebrafishTank {
   final String? zebraFoodType;
   final String? zebraFoodSource;
   final double? zebraFoodAmount;
+  final String? zebraFeedingAmountUnit;
   final String? zebraFeedingSchedule;
   final DateTime? zebraLastHealthCheck;
   final String? zebraHealthStatus;
@@ -70,6 +71,7 @@ class ZebrafishTank {
     this.zebraFoodType,
     this.zebraFoodSource,
     this.zebraFoodAmount,
+    this.zebraFeedingAmountUnit,
     this.zebraFeedingSchedule,
     this.zebraLastHealthCheck,
     this.zebraHealthStatus,
@@ -110,6 +112,7 @@ class ZebrafishTank {
     zebraFoodType:         m[FishSch.stockFoodType] as String?,
     zebraFoodSource:       m[FishSch.stockFoodSource] as String?,
     zebraFoodAmount:       (m[FishSch.stockFoodAmount] as num?)?.toDouble(),
+    zebraFeedingAmountUnit: m[FishSch.stockFeedingAmountUnit] as String?,
     zebraFeedingSchedule:  m[FishSch.stockFeedingSchedule] as String?,
     zebraLastHealthCheck:  m[FishSch.stockLastHealthCheck] != null
         ? DateTime.tryParse(m[FishSch.stockLastHealthCheck]) : null,
@@ -147,6 +150,7 @@ class ZebrafishTank {
     FishSch.stockFoodType:         zebraFoodType,
     FishSch.stockFoodSource:       zebraFoodSource,
     FishSch.stockFoodAmount:       zebraFoodAmount,
+    FishSch.stockFeedingAmountUnit: zebraFeedingAmountUnit,
     FishSch.stockFeedingSchedule:  zebraFeedingSchedule,
     FishSch.stockLastHealthCheck:  zebraLastHealthCheck?.toIso8601String(),
     FishSch.stockHealthStatus:     zebraHealthStatus,
@@ -157,6 +161,7 @@ class ZebrafishTank {
   };
 
   ZebrafishTank copyWith({
+    int? zebraId,
     String? zebraTankId, String? zebraTankType, String? zebraRack,
     String? zebraRow, String? zebraColumn, int? zebraCapacity,
     double? zebraVolumeL, String? zebraLine, int? zebraLineId,
@@ -165,10 +170,10 @@ class ZebrafishTank {
     double? zebraTemperatureC, double? zebraPh, double? zebraConductivity,
     String? zebraHealthStatus, String? zebraExperimentId,
     String? zebraTreatment, String? zebraFoodType, String? zebraFoodSource,
-    double? zebraFoodAmount, String? zebraFeedingSchedule,
-    String? zebraNotes, bool? isEightLiter,
+    double? zebraFoodAmount, String? zebraFeedingAmountUnit, String? zebraFeedingSchedule,
+    String? zebraNotes, bool? isEightLiter, DateTime? zebraLastTankCleaning,
   }) => ZebrafishTank(
-    zebraId:               zebraId,
+    zebraId:               zebraId ?? this.zebraId,
     zebraTankId:           zebraTankId ?? this.zebraTankId,
     zebraTankType:         zebraTankType ?? this.zebraTankType,
     zebraRack:             zebraRack ?? this.zebraRack,
@@ -187,11 +192,12 @@ class ZebrafishTank {
     zebraTemperatureC:     zebraTemperatureC ?? this.zebraTemperatureC,
     zebraConductivity:     zebraConductivity ?? this.zebraConductivity,
     zebraPh:               zebraPh ?? this.zebraPh,
-    zebraLastTankCleaning: zebraLastTankCleaning,
+    zebraLastTankCleaning: zebraLastTankCleaning ?? this.zebraLastTankCleaning,
     zebraCleaningIntervalDays: zebraCleaningIntervalDays,
     zebraFoodType:         zebraFoodType ?? this.zebraFoodType,
     zebraFoodSource:       zebraFoodSource ?? this.zebraFoodSource,
     zebraFoodAmount:       zebraFoodAmount ?? this.zebraFoodAmount,
+    zebraFeedingAmountUnit: zebraFeedingAmountUnit ?? this.zebraFeedingAmountUnit,
     zebraFeedingSchedule:  zebraFeedingSchedule ?? this.zebraFeedingSchedule,
     zebraLastHealthCheck:  zebraLastHealthCheck,
     zebraHealthStatus:     zebraHealthStatus ?? this.zebraHealthStatus,

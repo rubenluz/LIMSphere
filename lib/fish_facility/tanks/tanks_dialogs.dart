@@ -30,6 +30,7 @@ class _EditTankDialogState extends State<_EditTankDialog> {
   String? _foodType;
   String? _foodFrequency;
   String? _foodSource;
+  DateTime? _lastCleaning;
   List<String> _lines = [];
   Map<String, int> _lineIdByName = {};
   bool _loadingLines = true;
@@ -69,6 +70,7 @@ class _EditTankDialogState extends State<_EditTankDialog> {
     _foodType     = _foodTypes.contains(t.zebraFoodType) ? t.zebraFoodType : null;
     _foodFrequency = _frequencies.contains(t.zebraFeedingSchedule) ? t.zebraFeedingSchedule : null;
     _foodSource   = _sources.contains(t.zebraFoodSource) ? t.zebraFoodSource : null;
+    _lastCleaning = t.zebraLastTankCleaning;
     _rack = t.zebraRack   ?? 'R1';
     _row  = t.zebraRow    ?? 'B';
     _col  = int.tryParse(t.zebraColumn ?? '1') ?? 1;
@@ -206,6 +208,11 @@ class _EditTankDialogState extends State<_EditTankDialog> {
             ]),
             const SizedBox(height: 12),
             // ── Other ──────────────────────────────────────────────────
+            // ── Last cleaning ──────────────────────────────────────────
+            _label('Last Cleaning'),
+            const SizedBox(height: 4),
+            _buildCleaningRow(),
+            const SizedBox(height: 12),
             _f('Responsible', _resp),
             const SizedBox(height: 8),
             _f('Experiment ID', _exp, mono: true),
@@ -256,14 +263,84 @@ class _EditTankDialogState extends State<_EditTankDialog> {
               zebraFoodAmount:   _foodAmount.text.trim().isEmpty
                   ? null : double.tryParse(_foodAmount.text.trim()),
               zebraFeedingSchedule: _foodFrequency,
-              zebraExperimentId: _exp.text.trim().isEmpty ? null : _exp.text.trim(),
-              zebraNotes:        _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+              zebraExperimentId:     _exp.text.trim().isEmpty ? null : _exp.text.trim(),
+              zebraNotes:            _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+              zebraLastTankCleaning: _lastCleaning,
             ));
             Navigator.pop(context);
           },
           child: const Text('Save')),
       ],
     );
+  }
+
+  Widget _buildCleaningRow() {
+    final label = _lastCleaning != null
+        ? '${_lastCleaning!.day.toString().padLeft(2, '0')}/'
+          '${_lastCleaning!.month.toString().padLeft(2, '0')}/'
+          '${_lastCleaning!.year}'
+        : '—';
+    return Row(children: [
+      Expanded(
+        child: InkWell(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: _lastCleaning ?? DateTime.now(),
+              firstDate: DateTime(2000),
+              lastDate: DateTime.now(),
+              builder: (ctx, child) => Theme(
+                data: Theme.of(ctx).copyWith(
+                  colorScheme: ColorScheme.dark(
+                    primary: AppDS.accent,
+                    surface: AppDS.surface2,
+                  ),
+                ),
+                child: child!,
+              ),
+            );
+            if (picked != null) setState(() => _lastCleaning = picked);
+          },
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: context.appSurface3,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: context.appBorder)),
+            child: Row(children: [
+              Icon(Icons.calendar_today_outlined, size: 13,
+                color: _lastCleaning != null ? AppDS.accent : context.appTextMuted),
+              const SizedBox(width: 8),
+              Text(label, style: GoogleFonts.jetBrainsMono(
+                fontSize: 13,
+                color: _lastCleaning != null ? context.appTextPrimary : context.appTextMuted)),
+            ]),
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      OutlinedButton(
+        onPressed: () => setState(() => _lastCleaning = DateTime.now()),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppDS.green,
+          side: BorderSide(color: AppDS.green.withValues(alpha: 0.5)),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        ),
+        child: Text('Today', style: GoogleFonts.spaceGrotesk(
+          fontSize: 12, fontWeight: FontWeight.w600)),
+      ),
+      if (_lastCleaning != null) ...[
+        const SizedBox(width: 6),
+        InkWell(
+          onTap: () => setState(() => _lastCleaning = null),
+          borderRadius: BorderRadius.circular(4),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Icon(Icons.close, size: 14, color: context.appTextMuted)),
+        ),
+      ],
+    ]);
   }
 
   Widget _label(String t) => Text(t, style: GoogleFonts.spaceGrotesk(

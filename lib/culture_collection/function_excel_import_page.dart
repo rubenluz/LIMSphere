@@ -1,10 +1,12 @@
-// function_excel_import_page.dart - 6-step wizard for bulk Excel import of
+// function_excel_import_page.dart - 6-step wizard for bulk CSV import of
 // samples and/or strains: pick file -> map columns -> link fields -> import.
 // Standalone widget classes extracted to excel_import_widgets.dart (part).
 
-import 'package:flutter/material.dart';
+import 'dart:convert';
+
+import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart' hide Border;
+import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -90,7 +92,7 @@ const _strainDbFields = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Auto-mapping dictionaries  (Excel header lowercase → DB field)
+// Auto-mapping dictionaries  (CSV header lowercase → DB field)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const Map<String, String> _sampleAutoMap = {
@@ -220,32 +222,34 @@ const Map<String, String> _strainAutoMap = {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-List<String> _detectHeaders(Sheet sheet) {
-  for (final row in sheet.rows) {
-    final cells = row.map((c) => c?.value?.toString().trim() ?? '').toList();
+List<List<dynamic>> _parseCsvBytes(List<int> bytes) {
+  var content = utf8.decode(bytes, allowMalformed: true);
+  if (content.startsWith('\uFEFF')) content = content.substring(1);
+  return const CsvDecoder(
+    fieldDelimiter: null, // auto-detect ',' or ';'
+    skipEmptyLines: true,
+  ).convert(content);
+}
+
+List<String> _detectHeaders(List<List<dynamic>> rows) {
+  for (final row in rows) {
+    final cells = row.map((c) => c?.toString().trim() ?? '').toList();
     if (cells.any((c) => c.isNotEmpty)) return cells;
   }
   return [];
 }
 
-List<Map<String, String>> _parseWithMapping(Sheet sheet, Map<int, String> colMap) {
-  final rows = sheet.rows;
-  if (rows.isEmpty) return [];
-  int dataStartRow = 0;
-  for (int i = 0; i < rows.length; i++) {
-    if (rows[i].any((c) => c?.value != null)) {
-      dataStartRow = i + 1;
-      break;
-    }
-  }
+List<Map<String, String>> _parseWithMapping(
+    List<List<dynamic>> rows, Map<int, String> colMap) {
+  if (rows.length < 2) return [];
   final result = <Map<String, String>>[];
-  for (int r = dataStartRow; r < rows.length; r++) {
+  for (int r = 1; r < rows.length; r++) {
     final row = rows[r];
     final record = <String, String>{};
     for (final e in colMap.entries) {
       if (e.value == '— ignore —') continue;
       final idx = e.key;
-      final val = idx < row.length ? (row[idx]?.value?.toString().trim() ?? '') : '';
+      final val = idx < row.length ? (row[idx]?.toString().trim() ?? '') : '';
       if (val.isNotEmpty) record[e.value] = val;
     }
     if (record.isNotEmpty) result.add(record);
@@ -265,7 +269,7 @@ String _colLetter(int index) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main wizard widget
-// Steps: 0=file  1=sheets  2=columns  3=link-field  4=preview  5=importing  6=done
+// Steps: 0=file  1=columns  2=link-field  3=preview  4=importing  5=done
 // ─────────────────────────────────────────────────────────────────────────────
 class ExcelImportPage extends StatefulWidget {
   /// 'samples' | 'strains' | 'both'
@@ -279,17 +283,12 @@ class ExcelImportPage extends StatefulWidget {
 class _ExcelImportPageState extends State<ExcelImportPage> {
   int _step = 0;
 
-  // 0 — mode selection (shown only when ExcelImportPage is opened without a
-  //     fixed mode, e.g. from a generic Import button).
-  // We promote mode selection to the first visible step when mode == 'both'
-  // and the user hasn't explicitly chosen yet.
   late String _importMode; // 'samples' | 'strains' | 'both'
 
-  Excel? _excel;
+  List<List<dynamic>>? _sampleCsvRows;
+  List<List<dynamic>>? _strainCsvRows;
   String _fileName = '';
-  List<String> _sheetNames = [];
-  String? _selectedSampleSheet;
-  String? _selectedStrainSheet;
+  String _strainFileName = '';
 
   Map<int, String> _sampleColMap = {};
   Map<int, String> _strainColMap = {};
@@ -297,10 +296,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
   List<String> _strainHeaders = [];
 
   // ── Link field state ────────────────────────────────────────────────────────
-  /// Which mapped field in the SAMPLE sheet is the primary key
   String _sampleLinkField = 'sample_code';
-
-  /// Which mapped field in the STRAIN sheet contains the matching value
   String _strainLinkField = 'strain_sample_code';
 
   List<String> _sampleLinkSampleValues = [];
@@ -329,32 +325,40 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     super.dispose();
   }
 
-  // ── Step 0: pick file ───────────────────────────────────────────────────────
-  Future<void> _pickFile() async {
+  // ── Step 0: pick file(s) ────────────────────────────────────────────────────
+  Future<void> _pickSampleFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls'],
+      allowedExtensions: ['csv'],
       withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     final bytes = result.files.first.bytes;
     if (bytes == null) return;
-
-    final excel = Excel.decodeBytes(bytes);
     setState(() {
-      _excel = excel;
+      _sampleCsvRows = _parseCsvBytes(bytes);
       _fileName = result.files.first.name;
-      _sheetNames = excel.tables.keys.toList();
-      _step = 1;
-      for (final s in _sheetNames) {
-        final sl = s.toLowerCase();
-        if (sl.contains('sample') || sl.contains('amostr')) _selectedSampleSheet = s;
-        if (sl.contains('strain') || sl.contains('cepa') || sl.contains('cult')) _selectedStrainSheet = s;
-      }
     });
+    if (_importMode != 'both') _buildMappings();
   }
 
-  // ── Step 1 → 2: detect headers and build auto-mappings ─────────────────────
+  Future<void> _pickStrainFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final bytes = result.files.first.bytes;
+    if (bytes == null) return;
+    setState(() {
+      _strainCsvRows = _parseCsvBytes(bytes);
+      _strainFileName = result.files.first.name;
+    });
+    if (_importMode != 'both') _buildMappings();
+  }
+
+  // ── Step 0 → 1: detect headers and build auto-mappings ─────────────────────
   void _buildMappings() {
     _sampleColMap = {};
     _strainColMap = {};
@@ -364,36 +368,36 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     final importSamples = _importMode != 'strains';
     final importStrains = _importMode != 'samples';
 
-    if (importSamples && _selectedSampleSheet != null) {
-      _sampleHeaders = _detectHeaders(_excel!.tables[_selectedSampleSheet]!);
+    if (importSamples && _sampleCsvRows != null) {
+      _sampleHeaders = _detectHeaders(_sampleCsvRows!);
       for (int i = 0; i < _sampleHeaders.length; i++) {
         final n = _sampleHeaders[i].toLowerCase().trim();
         _sampleColMap[i] = _sampleAutoMap[n] ?? '— ignore —';
       }
     }
-    if (importStrains && _selectedStrainSheet != null) {
-      _strainHeaders = _detectHeaders(_excel!.tables[_selectedStrainSheet]!);
+    if (importStrains && _strainCsvRows != null) {
+      _strainHeaders = _detectHeaders(_strainCsvRows!);
       for (int i = 0; i < _strainHeaders.length; i++) {
         final n = _strainHeaders[i].toLowerCase().trim();
         _strainColMap[i] = _strainAutoMap[n] ?? '— ignore —';
       }
     }
     setState(() {
-      _step = 2;
+      _step = 1;
       _mappingTab = 0;
     });
   }
 
-  // ── Step 2 → 3: parse with current mappings then show link-field chooser ───
+  // ── Step 1 → 2: parse with current mappings then show link-field chooser ───
   void _goToLinkStep() {
     final importSamples = _importMode != 'strains';
     final importStrains = _importMode != 'samples';
 
-    _parsedSamples = (importSamples && _selectedSampleSheet != null)
-        ? _parseWithMapping(_excel!.tables[_selectedSampleSheet]!, _sampleColMap)
+    _parsedSamples = (importSamples && _sampleCsvRows != null)
+        ? _parseWithMapping(_sampleCsvRows!, _sampleColMap)
         : [];
-    _parsedStrains = (importStrains && _selectedStrainSheet != null)
-        ? _parseWithMapping(_excel!.tables[_selectedStrainSheet]!, _strainColMap)
+    _parsedStrains = (importStrains && _strainCsvRows != null)
+        ? _parseWithMapping(_strainCsvRows!, _strainColMap)
         : [];
 
     _sampleLinkSampleValues = _parsedSamples
@@ -409,7 +413,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         .take(6)
         .toList();
 
-    setState(() => _step = 3);
+    setState(() => _step = 2);
   }
 
   void _refreshLinkPreviews() {
@@ -428,11 +432,11 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     setState(() {});
   }
 
-  void _confirmLink() => setState(() => _step = 4);
+  void _confirmLink() => setState(() => _step = 3);
 
-  // ── Step 4 → 5: import ─────────────────────────────────────────────────────
+  // ── Step 3 → 4: import ─────────────────────────────────────────────────────
   Future<void> _runImport() async {
-    setState(() => _step = 5);
+    setState(() => _step = 4);
     final sb = StringBuffer();
     final db = Supabase.instance.client;
     final importSamples = _importMode != 'strains';
@@ -440,7 +444,6 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
 
     try {
   // ── Get next available sample number ────────────────────────────────
-  // (used only for internal sequencing, not sample_code)
   int nextNumber = 1;
   final maxRes = await db
       .from('samples')
@@ -466,7 +469,6 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     for (final sample in _parsedSamples) {
       final linkVal = sample[_sampleLinkField]?.toString();
 
-      // If no sample_code, insert sample normally without linking
       if (linkVal == null || linkVal.isEmpty) {
         final row = _sampleRowFromMap(sample, nextNumber);
         final res = await db
@@ -479,13 +481,11 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         continue;
       }
 
-      // If code exists and already in DB, skip
       if (numberToId.containsKey(linkVal)) {
         sb.writeln('⚠ Sample #$linkVal already exists — skipped.');
         continue;
       }
 
-      // Insert sample with code
       final row = _sampleRowFromMap(sample, nextNumber);
       final res = await db
           .from('samples')
@@ -507,7 +507,6 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
 
       final linkVal = strain[_strainLinkField]?.toString();
 
-      // If no link or empty, insert strain without sample_id
       if (linkVal == null || linkVal.isEmpty) {
         await db.from('strains').upsert(
             _strainRowFromMap(strain, null),
@@ -516,7 +515,6 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         continue;
       }
 
-      // Link to sample if exists
       sampleId = numberToId[linkVal];
       if (sampleId != null) {
         await db.from('strains').upsert(
@@ -534,12 +532,12 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
 
   sb.writeln('\n✅ Import complete.');
 } catch (e) {
-  sb.writeln('\n❌ Error in strain import: $e');
+  sb.writeln('\n❌ Error in import: $e');
 }
 
     setState(() {
       _importLog = sb.toString();
-      _step = 6;
+      _step = 5;
     });
   }
 
@@ -733,10 +731,10 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
   // ── BUILD ───────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    const labels = ['File', 'Sheets', 'Columns', 'Link', 'Preview', 'Import', 'Done'];
+    const labels = ['File', 'Columns', 'Link', 'Preview', 'Import', 'Done'];
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Import from Excel'),
+        title: const Text('Import from CSV'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(32),
           child: _StepIndicator(current: _step, labels: labels),
@@ -746,18 +744,17 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         duration: const Duration(milliseconds: 220),
         child: [
           _buildStep0(),
-          _buildStep1(),
           _buildStep2(),
           _buildStep3(),
           _buildStep4(),
           _buildStep5(),
           _buildStep6(),
-        ][_step.clamp(0, 6)],
+        ][_step.clamp(0, 5)],
       ),
     );
   }
 
-  // ── Step 0: pick file + choose import mode ──────────────────────────────────
+  // ── Step 0: pick file(s) + choose import mode ───────────────────────────────
   Widget _buildStep0() => Center(
         key: const ValueKey(0),
         child: ConstrainedBox(
@@ -767,10 +764,10 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Icon(Icons.table_chart_outlined, size: 72, color: Colors.grey.shade400),
               const SizedBox(height: 20),
-              const Text('Import from Excel',
+              const Text('Import from CSV',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Select what to import, then choose your .xlsx / .xls file.',
+              Text('Select what to import, then choose your .csv file(s).',
                   style: TextStyle(color: Colors.grey.shade600), textAlign: TextAlign.center),
               const SizedBox(height: 28),
 
@@ -787,7 +784,13 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                 description: 'Import collection sample data — location, habitat, physical-chemical parameters.',
                 icon: Icons.colorize_outlined,
                 selected: _importMode == 'samples',
-                onTap: () => setState(() => _importMode = 'samples'),
+                onTap: () => setState(() {
+                  _importMode = 'samples';
+                  _sampleCsvRows = null;
+                  _strainCsvRows = null;
+                  _fileName = '';
+                  _strainFileName = '';
+                }),
               ),
               const SizedBox(height: 8),
               _ImportModeCard(
@@ -796,104 +799,66 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                 description: 'Import strain culture data — taxonomy, maintenance, molecular.',
                 icon: Icons.science_outlined,
                 selected: _importMode == 'strains',
-                onTap: () => setState(() => _importMode = 'strains'),
+                onTap: () => setState(() {
+                  _importMode = 'strains';
+                  _sampleCsvRows = null;
+                  _strainCsvRows = null;
+                  _fileName = '';
+                  _strainFileName = '';
+                }),
               ),
               const SizedBox(height: 8),
               _ImportModeCard(
                 mode: 'both',
                 label: 'Samples + Strains',
-                description: 'Import both sheets from the same workbook and link them automatically.',
+                description: 'Import two CSV files and link them automatically.',
                 icon: Icons.table_chart_outlined,
                 selected: _importMode == 'both',
-                onTap: () => setState(() => _importMode = 'both'),
+                onTap: () => setState(() {
+                  _importMode = 'both';
+                  _sampleCsvRows = null;
+                  _strainCsvRows = null;
+                  _fileName = '';
+                  _strainFileName = '';
+                }),
               ),
 
               const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: _pickFile,
-                icon: const Icon(Icons.upload_file),
-                label: const Text('Browse & Select File'),
-              ),
-            ]),
-          ),
-        ),
-      );
 
-  // ── Step 1: pick sheets ─────────────────────────────────────────────────────
-  Widget _buildStep1() => Center(
-        key: const ValueKey(1),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(children: [
-                    const Icon(Icons.insert_drive_file_outlined),
-                    const SizedBox(width: 8),
-                    Expanded(
-                        child: Text(_fileName,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold))),
-                  ]),
-                  Text('${_sheetNames.length} sheet(s) found · importing: $_importMode',
-                      style: TextStyle(
-                          color: Colors.grey.shade600, fontSize: 13)),
-                  const SizedBox(height: 24),
-                  if (_importMode != 'strains') ...[
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedSampleSheet,
-                      decoration: const InputDecoration(
-                          labelText: 'Samples Sheet',
-                          prefixIcon: Icon(Icons.colorize_outlined),
-                          border: OutlineInputBorder()),
-                      items: [
-                        const DropdownMenuItem(
-                            value: null, child: Text('— none —')),
-                        ..._sheetNames.map((s) =>
-                            DropdownMenuItem(value: s, child: Text(s)))
-                      ],
-                      onChanged: (v) =>
-                          setState(() => _selectedSampleSheet = v),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (_importMode != 'samples') ...[
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedStrainSheet,
-                      decoration: const InputDecoration(
-                          labelText: 'Strains Sheet',
-                          prefixIcon: Icon(Icons.science_outlined),
-                          border: OutlineInputBorder()),
-                      items: [
-                        const DropdownMenuItem(
-                            value: null, child: Text('— none —')),
-                        ..._sheetNames.map((s) =>
-                            DropdownMenuItem(value: s, child: Text(s)))
-                      ],
-                      onChanged: (v) =>
-                          setState(() => _selectedStrainSheet = v),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: () => setState(() => _step = 0),
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text('Back'),
-                  ),
-                  const SizedBox(height: 8),
-                  FilledButton.icon(
-                    onPressed: (_selectedSampleSheet != null ||
-                            _selectedStrainSheet != null)
-                        ? _buildMappings
-                        : null,
-                    icon: const Icon(Icons.table_rows_outlined),
-                    label: const Text('Next — Map Columns'),
-                  ),
-                ]),
+              if (_importMode != 'strains') ...[
+                _FilePicker(
+                  label: _importMode == 'both' ? 'Samples CSV' : 'Browse CSV File',
+                  fileName: _fileName,
+                  icon: Icons.colorize_outlined,
+                  onPick: _pickSampleFile,
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (_importMode == 'both') ...[
+                _FilePicker(
+                  label: 'Strains CSV',
+                  fileName: _strainFileName,
+                  icon: Icons.science_outlined,
+                  onPick: _pickStrainFile,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: (_sampleCsvRows != null && _strainCsvRows != null)
+                      ? _buildMappings
+                      : null,
+                  icon: const Icon(Icons.table_rows_outlined),
+                  label: const Text('Next — Map Columns'),
+                ),
+              ],
+              if (_importMode == 'strains') ...[
+                _FilePicker(
+                  label: 'Browse CSV File',
+                  fileName: _fileName.isEmpty ? _strainFileName : _fileName,
+                  icon: Icons.science_outlined,
+                  onPick: _pickStrainFile,
+                ),
+              ],
+            ]),
           ),
         ),
       );
@@ -908,7 +873,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
       children: [
         _actionBar(
           info: 'Verify column mappings. Amber = not auto-recognised.',
-          backStep: 1,
+          backStep: 0,
           nextLabel: 'Next — Choose Link Field',
           onNext: _goToLinkStep,
         ),
@@ -1088,7 +1053,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
       children: [
         _actionBar(
           info: 'Choose which field links strains to their sample.',
-          backStep: 2,
+          backStep: 1,
           nextLabel: 'Next — Preview Data',
           onNext: hasGoodMatch || !bothSheets ? _confirmLink : null,
         ),
@@ -1126,9 +1091,9 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                                 ]),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Select which field in each sheet shares the same value to link strains to their sample.\n'
-                                  'Typically this is the Sample Code — mapped to "sample_code" in the samples sheet '
-                                  'and "strain_sample_code" in the strains sheet.',
+                                  'Select which field in each file shares the same value to link strains to their sample.\n'
+                                  'Typically this is the Sample Code — mapped to "sample_code" in the samples file '
+                                  'and "strain_sample_code" in the strains file.',
                                   style: TextStyle(
                                       fontSize: 13,
                                       color: Theme.of(context)
@@ -1144,7 +1109,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                           child: Padding(
                             padding: EdgeInsets.all(16),
                             child: Text(
-                                'Only one sheet selected — no linking needed.'),
+                                'Only one file selected — no linking needed.'),
                           ),
                         )
                       else ...[
@@ -1167,7 +1132,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                                                     .colorScheme
                                                     .primary),
                                             const SizedBox(width: 6),
-                                            const Text('Samples sheet',
+                                            const Text('Samples file',
                                                 style: TextStyle(
                                                     fontWeight:
                                                         FontWeight.bold)),
@@ -1265,7 +1230,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                                                     .colorScheme
                                                     .primary),
                                             const SizedBox(width: 6),
-                                            const Text('Strains sheet',
+                                            const Text('Strains file',
                                                 style: TextStyle(
                                                     fontWeight:
                                                         FontWeight.bold)),
@@ -1398,7 +1363,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         _actionBar(
           info:
               '${_parsedSamples.length} samples · ${_parsedStrains.length} strains ready to import.',
-          backStep: 3,
+          backStep: 2,
           nextLabel: 'Import All',
           onNext: _runImport,
           nextIcon: Icons.upload,
@@ -1479,7 +1444,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                           : Theme.of(context)
                               .colorScheme
                               .surfaceContainerHighest
-                              .withOpacity(0.3),
+                              .withValues(alpha: 0.3),
                       child: Row(
                           children: cols
                               .map((c) => _pCell(rows[i][c] ?? ''))
@@ -1589,4 +1554,3 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     );
   }
 }
-

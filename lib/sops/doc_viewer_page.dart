@@ -1,16 +1,16 @@
 // doc_viewer_page.dart - Document viewer router: detects file type (PDF/DOCX)
-// and either opens SopPdfViewerPage or launches the file in an external app.
+// and either shows it as PDF (native or converted) or as plain text.
 
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '/theme/theme.dart';
+import 'docx_to_pdf_converter.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public enum — callers choose the rendering mode
@@ -21,8 +21,9 @@ enum DocViewMode { pdf, txt, doc }
 // DocViewerPage
 //   pdf → SfPdfViewer in-app
 //   txt → scrollable plain-text view
-//   doc → DOCX text extracted from ZIP/XML, shown with a "converted" banner
-//         "Open Externally" always opens the original file via system app
+//   doc → DOCX → PDF via docx_to_pdf_converter (LibreOffice or xml→pdf),
+//         then displayed in SfPdfViewer. "Open Externally" always opens the
+//         original DOCX file via the system app.
 // ─────────────────────────────────────────────────────────────────────────────
 class DocViewerPage extends StatefulWidget {
   final Uint8List   bytes;
@@ -45,54 +46,39 @@ class DocViewerPage extends StatefulWidget {
 class _DocViewerPageState extends State<DocViewerPage> {
   final _pdfController = PdfViewerController();
   final _txtScroll     = ScrollController();
-  final _docScroll     = ScrollController();
   int  _page       = 1;
   int  _totalPages = 0;
   bool _downloading = false;
 
-  // DOCX text state
-  String? _docText;
-  bool    _docExtracting = false;
+  // DOCX conversion state
+  Uint8List? _convertedPdf;
+  bool       _converting = false;
+  bool       _convertFailed = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.viewMode == DocViewMode.doc) _extractDocxText();
+    if (widget.viewMode == DocViewMode.doc) _convertDocx();
   }
 
   @override
   void dispose() {
     _txtScroll.dispose();
-    _docScroll.dispose();
     super.dispose();
   }
 
-  void _extractDocxText() {
-    setState(() => _docExtracting = true);
+  Future<void> _convertDocx() async {
+    setState(() => _converting = true);
     try {
-      final archive = ZipDecoder().decodeBytes(widget.bytes.toList());
-      final xmlFile = archive.findFile('word/document.xml');
-      if (xmlFile == null) {
-        setState(() { _docText = '[word/document.xml not found in archive]'; _docExtracting = false; });
-        return;
+      final pdf = await convertDocxToPdf(widget.bytes, widget.fileName);
+      if (!mounted) return;
+      if (pdf != null) {
+        setState(() { _convertedPdf = pdf; _converting = false; });
+      } else {
+        setState(() { _convertFailed = true; _converting = false; });
       }
-      final xml = utf8.decode(xmlFile.content as List<int>);
-      final paragraphs = <String>[];
-      final paraRe = RegExp(r'<w:p[ >].*?</w:p>', dotAll: true);
-      final textRe = RegExp(r'<w:t[^>]*>(.*?)</w:t>',  dotAll: true);
-      for (final p in paraRe.allMatches(xml)) {
-        final text = textRe
-            .allMatches(p.group(0)!)
-            .map((m) => m.group(1) ?? '')
-            .join('');
-        if (text.trim().isNotEmpty) paragraphs.add(text.trim());
-      }
-      setState(() {
-        _docText       = paragraphs.isEmpty ? '[No text content found]' : paragraphs.join('\n\n');
-        _docExtracting = false;
-      });
-    } catch (e) {
-      setState(() { _docText = '[Extraction failed: $e]'; _docExtracting = false; });
+    } catch (_) {
+      if (mounted) setState(() { _convertFailed = true; _converting = false; });
     }
   }
 
@@ -152,7 +138,7 @@ class _DocViewerPageState extends State<DocViewerPage> {
                   fontSize: 14, fontWeight: FontWeight.w600, color: context.appTextPrimary),
               maxLines: 1, overflow: TextOverflow.ellipsis,
             ),
-            if (widget.viewMode == DocViewMode.pdf && _totalPages > 0)
+            if (widget.viewMode != DocViewMode.txt && _totalPages > 0)
               Text('Page $_page of $_totalPages',
                   style: GoogleFonts.jetBrainsMono(fontSize: 10, color: context.appTextMuted)),
           ],
@@ -216,43 +202,54 @@ class _DocViewerPageState extends State<DocViewerPage> {
     );
   }
 
-  // ── DOC (text extraction) ────────────────────────────────────────────────────
+  // ── DOC (DOCX → PDF conversion) ──────────────────────────────────────────────
   Widget _buildDoc() {
-    if (_docExtracting) {
+    if (_converting) {
       return const Center(child: CircularProgressIndicator(color: AppDS.accent));
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Converted-file banner
-        Container(
-          color: const Color(0xFF2B5EB8).withValues(alpha: 0.12),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Row(children: [
-            const Icon(Icons.info_outline, size: 15, color: Color(0xFF7AA8F0)),
-            const SizedBox(width: 8),
-            Expanded(child: Text(
-              'Converted view — original formatting may differ. '
-              'Use "Open externally" to view the original DOCX file.',
-              style: GoogleFonts.spaceGrotesk(fontSize: 12, color: const Color(0xFF7AA8F0)),
-            )),
-          ]),
-        ),
-        Expanded(
-          child: Scrollbar(
-            controller: _docScroll,
-            child: SingleChildScrollView(
-              controller: _docScroll,
-              padding: const EdgeInsets.all(24),
-              child: SelectableText(
-                _docText ?? '',
-                style: GoogleFonts.spaceGrotesk(
-                    fontSize: 13, color: context.appTextPrimary, height: 1.7),
-              ),
+    if (_convertFailed || _convertedPdf == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.description_outlined, color: AppDS.textMuted, size: 40),
+            const SizedBox(height: 16),
+            Text(
+              'No DOCX converter found',
+              style: GoogleFonts.spaceGrotesk(
+                  fontSize: 15, fontWeight: FontWeight.w600,
+                  color: context.appTextPrimary),
             ),
-          ),
+            const SizedBox(height: 8),
+            Text(
+              'Install LibreOffice or Microsoft Office to enable\n'
+              'in-app DOCX preview with full formatting.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.spaceGrotesk(
+                  fontSize: 13, color: context.appTextMuted, height: 1.6),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _openExternally,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppDS.accent,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: Text('Open externally',
+                  style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600)),
+            ),
+          ],
         ),
-      ],
+      );
+    }
+    return SfPdfViewer.memory(
+      _convertedPdf!,
+      controller: _pdfController,
+      onPageChanged:    (d) => setState(() => _page       = d.newPageNumber),
+      onDocumentLoaded: (d) => setState(() => _totalPages = d.document.pages.count),
     );
   }
 }

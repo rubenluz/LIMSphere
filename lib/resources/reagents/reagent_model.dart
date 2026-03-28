@@ -3,6 +3,7 @@
 
 class ReagentModel {
   final int id;
+  final String? code;
   final String name;
   final String? brand;
   final String? reference;
@@ -32,6 +33,7 @@ class ReagentModel {
     required this.id,
     required this.name,
     required this.type,
+    this.code,
     this.brand,
     this.reference,
     this.casNumber,
@@ -58,6 +60,7 @@ class ReagentModel {
 
   factory ReagentModel.fromMap(Map<String, dynamic> m) => ReagentModel(
         id: (m['reagent_id'] as num).toInt(),
+        code: m['reagent_code'] as String?,
         name: m['reagent_name'] as String,
         type: (m['reagent_type'] as String?) ?? 'chemical',
         brand: m['reagent_brand'] as String?,
@@ -103,6 +106,7 @@ class ReagentModel {
   Map<String, dynamic> toInsertMap() => {
         'reagent_name': name,
         'reagent_type': type,
+        if (code != null) 'reagent_code': code,
         if (brand != null) 'reagent_brand': brand,
         if (reference != null) 'reagent_reference': reference,
         if (casNumber != null) 'reagent_cas_number': casNumber,

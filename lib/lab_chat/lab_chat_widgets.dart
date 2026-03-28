@@ -20,6 +20,7 @@ class _MessageBubble extends StatefulWidget {
   final ValueChanged<LabMessage> onDelete;
   final ValueChanged<LabMessage> onCopy;
   final VoidCallback?            onAvatarTap;
+  final bool                     canEditDelete;
 
   const _MessageBubble({
     required super.key,
@@ -36,6 +37,7 @@ class _MessageBubble extends StatefulWidget {
     required this.onPin,
     required this.onDelete,
     required this.onCopy,
+    required this.canEditDelete,
     this.onAvatarTap,
   });
 
@@ -48,8 +50,18 @@ class _MessageBubbleState extends State<_MessageBubble> {
   bool _showReplies = false;
 
   static const _avatarColors = [
-    Color(0xFF00C8F0), Color(0xFF00D98A),
-    Color(0xFF9B72CF), Color(0xFFFF8C42),
+    Color(0xFF00C8F0), // cyan
+    Color(0xFF00D98A), // green
+    Color(0xFF9B72CF), // purple
+    Color(0xFFFF8C42), // orange
+    Color(0xFFFF4D6D), // rose
+    Color(0xFFFBBF24), // amber
+    Color(0xFF34D399), // emerald
+    Color(0xFF60A5FA), // blue
+    Color(0xFFF472B6), // pink
+    Color(0xFF2DD4BF), // teal
+    Color(0xFFA78BFA), // violet
+    Color(0xFFFF6B6B), // coral
   ];
 
   Color _avatarColor(String senderKey) =>
@@ -272,10 +284,12 @@ class _MessageBubbleState extends State<_MessageBubble> {
           msg.pinned ? 'Unpin' : 'Pin',
           () => widget.onPin(msg),
           color: msg.pinned ? AppDS.yellow : null),
-        _aBtn(ctx, Icons.edit_outlined,  'Edit',   () => widget.onEdit(msg)),
+        if (widget.canEditDelete)
+          _aBtn(ctx, Icons.edit_outlined, 'Edit', () => widget.onEdit(msg)),
         _aBtn(ctx, Icons.copy_outlined,  'Copy',   () => widget.onCopy(msg)),
-        _aBtn(ctx, Icons.delete_outline, 'Delete', () => widget.onDelete(msg),
-          color: AppDS.red),
+        if (widget.canEditDelete)
+          _aBtn(ctx, Icons.delete_outline, 'Delete', () => widget.onDelete(msg),
+            color: AppDS.red),
       ]),
     );
   }
