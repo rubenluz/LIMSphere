@@ -14,7 +14,10 @@ import '../resources/reservations/reservations_page.dart';
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
 import '../admin/settings_page.dart';
+import '../admin/backups_page.dart';
+import '../admin/backup_service.dart';
 import 'package:blue_open_lims/fish_facility/lines/fish_lines_page.dart';
+import 'package:blue_open_lims/fish_facility/water_qc/water_qc_page.dart';
 import 'package:blue_open_lims/sops/sops_page.dart';
 import 'package:blue_open_lims/fish_facility/stocks/stocks_page.dart';
 import 'package:blue_open_lims/fish_facility/tanks/tanks_page.dart';
@@ -46,12 +49,14 @@ const Map<String, String> _modulePermColumn = {
   'dashboard':        'user_table_dashboard',
   'labels':           'user_table_dashboard',
   'chat':             'user_table_chat',
+  'backups':          'user_table_backups',
   'strains':          'user_table_culture_collection',
   'samples':          'user_table_culture_collection',
   'sops_inventory':   'user_table_culture_collection',
   'fish_stock':       'user_table_fish_facility',
   'fish_tankmap':     'user_table_fish_facility',
   'fish_lines':       'user_table_fish_facility',
+  'fish_water_qc':    'user_table_fish_facility',
   'sops_fish':        'user_table_fish_facility',
   'locations':        'user_table_resources',
   'reagents':         'user_table_resources',
@@ -70,6 +75,7 @@ const Map<String, String?> _moduleRequiredRole = {
   'fish_stock':       null,
   'fish_tankmap':     'technician',
   'fish_lines':       'technician',
+  'fish_water_qc':    'technician',
   'sops_fish':        'technician',
   'locations':        'technician',
   'reagents':         'technician',
@@ -77,6 +83,7 @@ const Map<String, String?> _moduleRequiredRole = {
   'reservations':     'technician',
   'audit':            'admin',
   'users':            'admin',
+  'backups':          null,
   'settings':         'admin',
 };
 
@@ -154,6 +161,13 @@ class _MenuPageState extends State<MenuPage> {
       builder: (_) => const LabChatPage(),
     ),
     _NavItem(
+      id: 'backups',
+      label: 'Backups',
+      icon: Icons.backup_outlined,
+      accent: const Color(0xFF10B981),
+      builder: (_) => const BackupsPage(),
+    ),
+    _NavItem(
       id: 'requests',
       label: 'Requests',
       icon: Icons.outbox_outlined,
@@ -182,7 +196,7 @@ class _MenuPageState extends State<MenuPage> {
           accent: const Color(0xFF3B82F6),
           builder: (_) => const SamplesPage(),
         ),
-        _NavItem(id: 'sops_inventory', label: 'SOPs / Protocols', icon: Icons.menu_book_outlined, accent: const Color(0xFF06B6D4), builder: (_) => const SopPage(sopContext: 'culture_collection')),
+        _NavItem(id: 'sops_inventory', label: 'SOPs', icon: Icons.menu_book_outlined, accent: const Color(0xFF06B6D4), builder: (_) => const SopPage(sopContext: 'culture_collection')),
       ],
     ),
     _NavGroup(
@@ -192,8 +206,9 @@ class _MenuPageState extends State<MenuPage> {
       children: [
         _NavItem(id: 'fish_stock',   label: 'Stock',            icon: Icons.set_meal_outlined,           accent: const Color(0xFF0EA5E9), builder: (_) => const FishStocksPage()),
         _NavItem(id: 'fish_tankmap', label: 'Tank Map',         icon: Icons.grid_view_outlined,          accent: const Color(0xFF38BDF8), builder: (_) => const FishTanksPage()),
-        _NavItem(id: 'fish_lines',   label: 'Fish Lines',       icon: Icons.science_outlined,            accent: const Color(0xFF7DD3FC), builder: (_) => const FishLinesPage()),
-        _NavItem(id: 'sops_fish',    label: 'SOPs / Protocols', icon: Icons.menu_book_outlined,          accent: const Color(0xFF06B6D4), builder: (_) => const SopPage(sopContext: 'fish_facility')),
+        _NavItem(id: 'fish_lines',    label: 'Fish Lines',       icon: Icons.science_outlined,            accent: const Color(0xFF7DD3FC), builder: (_) => const FishLinesPage()),
+        _NavItem(id: 'fish_water_qc', label: 'Water QC',        icon: Icons.water_drop_outlined,         accent: const Color(0xFF22D3EE), builder: (_) => const WaterQcPage()),
+        _NavItem(id: 'sops_fish',    label: 'SOPs', icon: Icons.menu_book_outlined,          accent: const Color(0xFF06B6D4), builder: (_) => const SopPage(sopContext: 'fish_facility')),
       ],
     ),
     _NavGroup(
@@ -207,11 +222,11 @@ class _MenuPageState extends State<MenuPage> {
         _NavItem(id: 'reservations', label: 'Reservations', icon: Icons.event_outlined,                   accent: const Color(0xFFEC4899), builder: (_) => const ReservationsPage()),
       ],
     ),
-    _NavGroup(
-      key: 'admin',
-      label: 'Admin',
-      icon: Icons.admin_panel_settings_outlined,
-      children: [
+        _NavGroup(
+          key: 'admin',
+          label: 'Admin',
+          icon: Icons.admin_panel_settings_outlined,
+          children: [
         _NavItem(id: 'audit',    label: 'Audit Log', icon: Icons.manage_search_outlined, accent: const Color(0xFF6B7280), builder: (_) => const AuditLogPage()),
         _NavItem(id: 'users',    label: 'Users',     icon: Icons.people_outlined,        accent: const Color(0xFF6366F1), builder: (_) => const UsersPage()),
         _NavItem(id: 'settings', label: 'Settings',  icon: Icons.settings_outlined,      accent: const Color(0xFF38BDF8), builder: (s) => SettingsPage(onSettingsChanged: s._reloadSettings)),
@@ -226,6 +241,7 @@ class _MenuPageState extends State<MenuPage> {
     _loadVisibleGroups();
     LabChatPage.startBackgroundListener();
     RequestsPage.startBackgroundListener();
+    unawaited(BackupService.instance.startForSession());
     _startConnectivityTimer();
     if (Platform.isAndroid || Platform.isIOS) _initDeepLinks();
   }
@@ -234,6 +250,7 @@ class _MenuPageState extends State<MenuPage> {
   void dispose() {
     _connectivityTimer?.cancel();
     _deepLinkSub?.cancel();
+    unawaited(BackupService.instance.stop());
     super.dispose();
   }
 
@@ -492,7 +509,10 @@ class _MenuPageState extends State<MenuPage> {
   Widget _getContentWidget() {
     final userRole = _userInfo['user_role']?.toString() ?? '';
     for (final item in _topItems) {
-      if (!_visibleGroups.contains(item.id)) continue;
+      final visible = item.id == 'backups'
+          ? _getModulePerm('backups') != 'none'
+          : _visibleGroups.contains(item.id);
+      if (!visible) continue;
       if (item.id == _selectedId && item.builder != null) {
         return _maybeWrapReadOnly(item.id, item.builder!(this));
       }
@@ -599,6 +619,9 @@ class _MenuPageState extends State<MenuPage> {
                 children: [
                   ..._topItems
                     .where((item) {
+                      if (item.id == 'backups') {
+                        return _getModulePerm('backups') != 'none';
+                      }
                       if (!_visibleGroups.contains(item.id)) return false;
                       final req = _moduleRequiredRole[item.id];
                       return req == null || _hasRole(userRole, req);

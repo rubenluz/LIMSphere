@@ -1,7 +1,7 @@
 #define MyAppName "BlueOpenLIMS"
 #define MyAppVersion "0.1.8"
 #define MyAppPublisher "Rúben Luz"
-#define MyAppExeName "culture_app.exe"
+#define MyAppExeName "culture_app"
 
 [Setup]
 ; Corrigido o fecho do AppId

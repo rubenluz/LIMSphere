@@ -95,8 +95,10 @@ class _BuilderTabState extends State<_BuilderTab> {
     final p = _activeProfile;
     if (p == null) return null;
     if (p.protocol != 'brother_ql' && p.protocol != 'brother_ql_legacy') return null;
-    final dots = _ql700PrintableDots(_tpl.labelW, p.dpi);
-    return dots / p.dpi * 25.4;
+    if (p.protocol == 'brother_ql_legacy') {
+      return _ql570PrintableWidthMm(_tpl, p.toPrinterConfig());
+    }
+    return _ql700PrintableWidthMm(_tpl.labelW, p.dpi);
   }
 
   // Brother QL die-cut labels have a ~1.5 mm non-printable zone at each end.
@@ -843,4 +845,3 @@ class _BuilderTabState extends State<_BuilderTab> {
   }
 
 }
-

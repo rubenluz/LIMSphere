@@ -18,6 +18,7 @@ import 'dashboard_widgets/fish_by_line_widget.dart';
 import 'dashboard_widgets/to_do_widget.dart';
 import 'dashboard_widgets/transfer_timeline_widget.dart';
 import 'dashboard_widgets/tank_cleaning_timeline_widget.dart';
+import 'dashboard_widgets/maintenance_overview_widget.dart';
 
 // All available widgets — add new ones here and they appear in the picker.
 const _availableWidgets = [
@@ -27,10 +28,11 @@ const _availableWidgets = [
   {'id': 'transfer_status',  'name': 'Transfer Status',   'icon': Icons.warning_amber},
   {'id': 'in_care',          'name': 'In Care',           'icon': Icons.medical_services},
   {'id': 'tank_cleaning',    'name': 'Tank Cleaning',     'icon': Icons.cleaning_services_outlined},
-  {'id': 'fish_by_line',     'name': 'Fish by Line',      'icon': Icons.biotech_outlined},
+  {'id': 'fish_by_line',     'name': 'Active Fish Lines',  'icon': Icons.biotech_outlined},
   {'id': 'to_do',            'name': 'To-Do',             'icon': Icons.checklist_rounded},
   {'id': 'transfer_timeline', 'name': 'Transfer Timeline', 'icon': Icons.timeline_rounded},
-  {'id': 'cleaning_timeline', 'name': 'Cleaning Timeline', 'icon': Icons.cleaning_services_outlined},
+  {'id': 'cleaning_timeline',       'name': 'Cleaning Timeline',      'icon': Icons.cleaning_services_outlined},
+  {'id': 'maintenance_overview',    'name': 'Fish Facility Maintenance', 'icon': Icons.build_circle_outlined},
 ];
 
 class DashboardPage extends StatefulWidget {
@@ -272,8 +274,9 @@ class _DashboardPageState extends State<DashboardPage> {
       case 'fish_by_line':      return const FishByLineWidget();
       case 'to_do':              return const ToDoWidget();
       case 'transfer_timeline':  return const TransferTimelineWidget();
-      case 'cleaning_timeline':  return const TankCleaningTimelineWidget();
-      default:                   return const SizedBox.shrink();
+      case 'cleaning_timeline':      return const TankCleaningTimelineWidget();
+      case 'maintenance_overview':   return const MaintenanceOverviewWidget();
+      default:                       return const SizedBox.shrink();
     }
   }
 

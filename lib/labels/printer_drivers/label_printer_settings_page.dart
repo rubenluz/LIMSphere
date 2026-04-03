@@ -202,18 +202,35 @@ class _TestPrintButtonState extends State<_TestPrintButton> {
   Future<void> _send() async {
     setState(() => _busy = true);
     try {
-      final testTpl = LabelTemplate(
-        id: '_test', name: 'Test', category: 'General', labelW: 62, labelH: 30,
-        fields: [
-          LabelField(id: 'f1', type: LabelFieldType.text,
-              content: 'Test Print', x: 4, y: 4, w: 120, h: 14,
-              fontSize: 12, fontWeight: FontWeight.bold),
-          LabelField(id: 'f2', type: LabelFieldType.text,
-              content: 'BlueOpenLIMS', x: 4, y: 18, w: 120, h: 10, fontSize: 9),
-        ],
-      );
-      await _sendToPrinter(
-          widget.profile.applyTo(testTpl), const [], widget.profile.toPrinterConfig());
+      final p = widget.profile;
+      if (p.protocol == 'brother_ql_legacy') {
+        // Solid-black test: bypasses Flutter rendering to isolate raster encoding.
+        // Ask user for tape width so the printable dot count is correct.
+        if (!mounted) return;
+        final pick = await showDialog<({double width, double height, bool continuous, String cutMode})>(
+          context: context,
+          builder: (ctx) => _Ql570TapePickerDialog(),
+        );
+        if (pick == null) { if (mounted) setState(() => _busy = false); return; }
+        final data = _ql570SolidBlack(pick.width, pick.height,
+            continuousRoll: pick.continuous,
+            cutMode: pick.cutMode,
+            deviceName: p.deviceName);
+        await _sendBrotherQl570(p.toPrinterConfig(), data);
+      } else {
+        final testTpl = LabelTemplate(
+          id: '_test', name: 'Test', category: 'General', labelW: 62, labelH: 30,
+          fields: [
+            LabelField(id: 'f1', type: LabelFieldType.text,
+                content: 'Test Print', x: 4, y: 4, w: 120, h: 14,
+                fontSize: 12, fontWeight: FontWeight.bold),
+            LabelField(id: 'f2', type: LabelFieldType.text,
+                content: 'BlueOpenLIMS', x: 4, y: 18, w: 120, h: 10, fontSize: 9),
+          ],
+        );
+        await _sendToPrinter(
+            p.applyTo(testTpl), const [], p.toPrinterConfig());
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: const Text('Test label sent'),
@@ -271,8 +288,8 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
 
   static const _modelsByProtocol = {
     'zpl':               ['Zebra ZD421', 'Zebra ZD421t', 'Zebra ZD620', 'Zebra ZT410', 'Zebra GK420d'],
-    'brother_ql':        ['Brother QL-820NWB', 'Brother QL-810W', 'Brother QL-800', 'Brother QL-700', 'Brother QL-570'],
-    'brother_ql_legacy': ['Brother QL-500', 'Brother QL-550', 'Brother QL-650TD'],
+    'brother_ql':        ['Brother QL-820NWB', 'Brother QL-810W', 'Brother QL-800', 'Brother QL-700'],
+    'brother_ql_legacy': ['Brother QL-570', 'Brother QL-500', 'Brother QL-550', 'Brother QL-650TD'],
   };
 
   @override
@@ -345,7 +362,11 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
               onChanged: (v) => setState(() {
                 _p.protocol = v;
                 _p.deviceName = _modelsByProtocol[v]!.first;
-                if (v == 'brother_ql_legacy') _p.connectionType = 'usb';
+                if (v == 'brother_ql_legacy') {
+                  _p.connectionType = 'usb';
+                  _p.dpi = 300;
+                  _p.halfCut = false;
+                }
               }),
             ),
             const SizedBox(height: 10),
@@ -385,7 +406,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
               value: modelValue,
               onChanged: (v) => setState(() {
                 _p.deviceName = v ?? models.first;
-                if (_p.deviceName.contains('QL-570')) {
+                if (_p.protocol == 'brother_ql_legacy') {
                   _p.dpi = 300;
                   _p.halfCut = false;
                 }
@@ -421,7 +442,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
             // Print quality
             _SectionHeader('Print Quality', Icons.tune_rounded),
             const SizedBox(height: 10),
-            if (_p.protocol != 'brother_ql_legacy' && !_p.deviceName.contains('QL-570'))
+            if (_p.protocol != 'brother_ql_legacy')
               _SegmentRow(
                 label: 'DPI',
                 options: const {'300': '300', '600': '600'},
@@ -445,7 +466,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
             const SizedBox(height: 10),
             Row(children: [
               const SizedBox(width: 80),
-              if (_p.protocol != 'brother_ql_legacy' && !_p.deviceName.contains('QL-570')) ...[
+              if (_p.protocol != 'brother_ql_legacy') ...[
                 Switch(
                   value: _p.halfCut,
                   activeThumbColor: AppDS.accent,
@@ -591,8 +612,8 @@ const _kModelKeywords = {
   'ql-570': 'Brother QL-570', 'ql-650': 'Brother QL-650TD',
 };
 
-// Only QL-500/550/650TD are truly legacy (no ESC i z).
-const _kLegacyQlPrefixes = ['ql-500', 'ql-550', 'ql-650'];
+// QL-500/550/570/650TD are all legacy (no ESC i z / ESC i M, fixed 300 DPI).
+const _kLegacyQlPrefixes = ['ql-500', 'ql-550', 'ql-570', 'ql-650'];
 
 String _inferProtocol(String combined) {
   if (combined.contains('brother') || combined.contains('ql-')) {
@@ -935,4 +956,156 @@ class _ScanDialogState extends State<_ScanDialog> {
       ],
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QL-570 tape size picker — width + height chips for solid-black test print
+// ─────────────────────────────────────────────────────────────────────────────
+class _Ql570TapePickerDialog extends StatefulWidget {
+  @override
+  State<_Ql570TapePickerDialog> createState() => _Ql570TapePickerDialogState();
+}
+
+class _Ql570TapePickerDialogState extends State<_Ql570TapePickerDialog> {
+  static const _heights = [17, 23, 29, 38, 50, 62, 100];
+
+  double _width      = 62;
+  double _height     = 29;
+  bool   _continuous = false;
+  String _cutMode    = 'end';
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = _ql570MediaSpec(
+      LabelTemplate(
+        id: '_ql570_preview',
+        name: 'QL570 Preview',
+        labelW: _width,
+        labelH: _height,
+        paperSize: '${_width.round()}x${_height.round()}',
+      ),
+      PrinterConfig(
+        protocol: 'brother_ql_legacy',
+        connectionType: 'usb',
+        deviceName: 'Brother QL-570',
+        continuousRoll: _continuous,
+      ),
+    );
+    return AlertDialog(
+      backgroundColor: AppDS.surface2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppDS.border2)),
+      title: Text('Solid Black Test Print',
+          style: GoogleFonts.spaceGrotesk(
+              fontSize: 15, fontWeight: FontWeight.w700, color: AppDS.textPrimary)),
+      content: SizedBox(
+        width: 340,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Prints a fully filled black rectangle. If this prints, '
+                  'the raster encoding is correct and the issue is in label rendering.',
+                  style: GoogleFonts.spaceGrotesk(fontSize: 11, color: AppDS.textSecondary)),
+              const SizedBox(height: 16),
+              _sectionLabel('Media type'),
+              const SizedBox(height: 8),
+              Row(children: [
+                _chip('Die-cut (pre-cut)', !_continuous,
+                    () => setState(() => _continuous = false)),
+                const SizedBox(width: 6),
+                _chip('Continuous roll', _continuous,
+                    () => setState(() => _continuous = true)),
+              ]),
+              if (_continuous) ...[
+                const SizedBox(height: 14),
+                _sectionLabel('Cut mode'),
+                const SizedBox(height: 8),
+                Row(children: [
+                  _chip('No cut (0x0C)', _cutMode == 'none',
+                      () => setState(() => _cutMode = 'none')),
+                  const SizedBox(width: 6),
+                  _chip('Cut (0x1A)', _cutMode == 'end',
+                      () => setState(() => _cutMode = 'end')),
+                ]),
+              ],
+              const SizedBox(height: 14),
+              _sectionLabel('Tape width'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6, runSpacing: 6,
+                children: _kQl570SupportedWidths.map((w) {
+                  final sel = w == _width.round();
+                  return _chip('${w}mm', sel, () => setState(() => _width = w.toDouble()));
+                }).toList(),
+              ),
+              const SizedBox(height: 14),
+              _sectionLabel('Label height'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6, runSpacing: 6,
+                children: _heights.map((h) {
+                  final sel = h == _height.round();
+                  return _chip('${h}mm', sel, () => setState(() => _height = h.toDouble()));
+                }).toList(),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppDS.accent.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppDS.accent.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  '${_width.round()} × ${_height.round()} mm  •  '
+                  '${spec.printableDots} × ${(_height * _kQl570Dpi / 25.4).floor()} dots  •  '
+                  '${_continuous ? (_cutMode == 'none' ? "feed 0x0C" : "cut 0x1A") : "die-cut 0x1A"}',
+                  style: GoogleFonts.jetBrainsMono(fontSize: 10, color: AppDS.accent),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: AppDS.textSecondary)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppDS.accent, foregroundColor: AppDS.bg),
+          onPressed: () => Navigator.pop(context, (
+            width: _width, height: _height,
+            continuous: _continuous, cutMode: _cutMode,
+          )),
+          child: const Text('Print'),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionLabel(String text) => Text(text,
+      style: GoogleFonts.spaceGrotesk(
+          fontSize: 11, fontWeight: FontWeight.w700, color: AppDS.textSecondary));
+
+  Widget _chip(String label, bool selected, VoidCallback onTap) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(6),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: selected ? AppDS.accent.withValues(alpha: 0.15) : AppDS.surface3,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: selected ? AppDS.accent : AppDS.border),
+      ),
+      child: Text(label, style: GoogleFonts.jetBrainsMono(
+          fontSize: 11,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+          color: selected ? AppDS.accent : AppDS.textSecondary)),
+    ),
+  );
 }

@@ -21,6 +21,7 @@ import 'strains_grid_widgets.dart';
 import 'strains_appbars.dart';
 import 'strains_toolbar.dart';
 import '../../requests/requests_page.dart';
+import '../../labels/label_page.dart';
 
 // ignore_for_file: use_build_context_synchronously
 
@@ -54,7 +55,7 @@ class _StrainsPageState extends State<StrainsPage> {
 
   String            _search = '';
   List<String>      _sortKeys = [];
-  Map<String, bool> _sortDirs = {};
+  final Map<String, bool> _sortDirs = {};
   final _searchController = TextEditingController();
   bool _showFilters    = false;
   bool _showColManager = false;
@@ -851,7 +852,7 @@ class _StrainsPageState extends State<StrainsPage> {
     }
     final cols = _visibleCols;
     final totalWidth = (_selectionMode ? AppDS.tableCheckW : 0.0) +
-        AppDS.tableOpenW * 2 + cols.fold(0.0, (s, c) => s + _colWidth(c));
+        AppDS.tableOpenW * 3 + cols.fold(0.0, (s, c) => s + _colWidth(c));
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
@@ -948,7 +949,7 @@ class _StrainsPageState extends State<StrainsPage> {
             activeColor: AppDS.accent, checkColor: Colors.white,
             side: BorderSide(color: context.appBorder2, width: 1.5),
           ))),
-        SizedBox(width: AppDS.tableOpenW * 2),
+        SizedBox(width: AppDS.tableOpenW * 3),
         ...List.generate(cols.length, (i) {
           final col = cols[i];
           return Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1075,7 +1076,7 @@ class _StrainsPageState extends State<StrainsPage> {
                   value: isSelected, onChanged: (_) => _toggleRowSelection(row['strain_id']),
                   visualDensity: VisualDensity.compact, activeColor: AppDS.blue800,
                 ))),
-          Container(width: AppDS.tableOpenW * 2, height: AppDS.tableRowH, color: cellBase,
+          Container(width: AppDS.tableOpenW * 3, height: AppDS.tableRowH, color: cellBase,
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 IconButton(
                   icon: Icon(Icons.launch_rounded, size: 14,
@@ -1093,6 +1094,25 @@ class _StrainsPageState extends State<StrainsPage> {
                     context,
                     type: 'strains',
                     prefillTitle: row['strain_code']?.toString() ?? '',
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.print_outlined, size: 14,
+                      color: _selectionMode ? AppDS.textSecondary : AppDS.textSecondary),
+                  tooltip: 'Quick Print', padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: _selectionMode ? null : () => showQuickPrintDialog(
+                    context,
+                    category: 'Strains',
+                    entityId: row['strain_id']?.toString(),
+                    data: {
+                      'strain_code':           row['strain_code']?.toString() ?? '',
+                      'strain_scientific_name':row['strain_scientific_name']?.toString() ?? '',
+                      'strain_status':         row['strain_status']?.toString() ?? '',
+                      'strain_origin':         row['strain_origin']?.toString() ?? '',
+                      'strain_subspecies':     row['strain_subspecies']?.toString() ?? '',
+                      'strain_variety':        row['strain_variety']?.toString() ?? '',
+                    },
                   ),
                 ),
               ])),

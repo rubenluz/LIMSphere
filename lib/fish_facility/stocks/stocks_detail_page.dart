@@ -9,6 +9,8 @@ import '../tanks/tanks_connection_model.dart';
 import '../lines/fish_lines_connection_model.dart';
 import '../lines/fish_lines_detail_page.dart';
 import '../../requests/requests_page.dart';
+import '/supabase/supabase_manager.dart';
+import '/camera/qr_scanner/qr_code_rules.dart';
 
 // ─── Design tokens (mirrors strain_detail_page light theme) ──────────────────
 class _DS {
@@ -388,7 +390,9 @@ class _TankDetailPageState extends State<TankDetailPage> {
 
   @override
   void dispose() {
-    for (final c in _ctrl.values) c.dispose();
+    for (final c in _ctrl.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -458,6 +462,14 @@ class _TankDetailPageState extends State<TankDetailPage> {
       payload['fish_stocks_row']     = _selectedRow;
       payload['fish_stocks_column']  = '$_selectedCol';
       payload['fish_stocks_line_id'] = _selectedLineId;
+      // Sync DOB from linked fish_line
+      payload['fish_stocks_dob'] = _lineDateBirth;
+      // Generate qrcode if not already stored
+      final stockId = _data['fish_stocks_id'] as int?;
+      if (stockId != null && (_data['fish_stocks_qrcode'] == null || (_data['fish_stocks_qrcode'] as String?)?.isEmpty == true)) {
+        payload['fish_stocks_qrcode'] = QrRules.build(
+            SupabaseManager.projectRef ?? 'local', 'fish_stocks', stockId);
+      }
 
       final client = Supabase.instance.client;
       if (_currentTankId != widget.tank.zebraTankId) {
@@ -637,11 +649,13 @@ class _TankDetailPageState extends State<TankDetailPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         onSelected: (v) {
           if (v == 'delete') _delete();
-          if (v == 'request') showQuickRequestDialog(
+          if (v == 'request') {
+            showQuickRequestDialog(
             context,
             type: 'fish_eggs',
             prefillTitle: widget.tank.zebraLine ?? widget.tank.zebraTankId,
           );
+          }
         },
         itemBuilder: (_) => [
           const PopupMenuItem(
@@ -988,7 +1002,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
     final otherFields = fields.where((f) =>
         f.key != 'fish_stocks_tank_id' && f.key != 'fish_stocks_line').toList();
     final rightFields = [
-      if (lineField != null) lineField,
+      ?lineField,
       ...otherFields,
     ];
     return Row(
@@ -1083,8 +1097,11 @@ class _TankDetailPageState extends State<TankDetailPage> {
     // Tank position dropdown
     if (f.key == 'fish_stocks_tank_id') return _buildTankIdField();
 
-    final ctrl = _ctrl[f.key] ??= TextEditingController(
-        text: _data[f.key]?.toString() ?? '');
+    final rawVal = _data[f.key];
+    final displayText = (f.key == 'fish_stocks_food_amount' && rawVal is double && rawVal % 1 == 0)
+        ? rawVal.toInt().toString()
+        : rawVal?.toString() ?? '';
+    final ctrl = _ctrl[f.key] ??= TextEditingController(text: displayText);
 
     // Fish line dropdown
     if (f.key == 'fish_stocks_line') {

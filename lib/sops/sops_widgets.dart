@@ -1,7 +1,7 @@
 // sops_widgets.dart - Part of sops_page.dart.
 // _SopCard: document list tile with type/status badges and action buttons.
 // _SopDialog: full add/edit dialog with file upload, tags, metadata fields.
-// Helpers: _Badge, _MetaItem, _ActionBtn, _DropFilter, _Field, _DropField,
+// Helpers: _Badge, _MetaItem, _ActionBtn, _FilterChip, _Field, _DropField,
 //          _DateField, _FileChip, _FileTypeChip.
 part of 'sops_page.dart';
 
@@ -28,9 +28,9 @@ class _SopCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reviewWarning = sop.isReviewOverdue
-        ? _DS.red
+        ? AppDS.red
         : sop.isReviewSoon
-            ? _DS.yellow
+            ? AppDS.yellow
             : null;
 
     return Container(
@@ -71,7 +71,7 @@ class _SopCard extends StatelessWidget {
                         Text(
                           sop.code!,
                           style: GoogleFonts.jetBrainsMono(
-                              fontSize: 11, color: _DS.accent),
+                              fontSize: 11, color: AppDS.accent),
                         ),
                       if (sop.version != null)
                         Text(
@@ -175,7 +175,7 @@ class _SopCard extends StatelessWidget {
                       icon: Icons.picture_as_pdf_outlined,
                       name: sop.fileName ?? 'document.pdf',
                       size: sop.pdfFileSizeLabel,
-                      color: _DS.red,
+                      color: AppDS.red,
                     ),
                   if (sop.hasTxtFile)
                     _FileTypeChip(
@@ -204,21 +204,21 @@ class _SopCard extends StatelessWidget {
                 if (onOpenPdf != null) ...[
                   const SizedBox(width: 8),
                   _ActionBtn(icon: Icons.picture_as_pdf_outlined, label: 'PDF',
-                      color: _DS.accent, onTap: onOpenPdf!),
+                      color: AppDS.accent, onTap: onOpenPdf!),
                 ],
                 if (onOpenTxt != null) ...[
                   const SizedBox(width: 8),
                   _ActionBtn(icon: Icons.text_snippet_outlined, label: 'TXT',
-                      color: _DS.accent, onTap: onOpenTxt!),
+                      color: AppDS.accent, onTap: onOpenTxt!),
                 ],
                 if (onOpenDoc != null) ...[
                   const SizedBox(width: 8),
                   _ActionBtn(icon: Icons.article_outlined, label: 'DOC',
-                      color: _DS.accent, onTap: onOpenDoc!),
+                      color: AppDS.accent, onTap: onOpenDoc!),
                 ],
                 const Spacer(),
                 _ActionBtn(icon: Icons.delete_outline, label: 'Delete',
-                    color: _DS.red, onTap: onDelete),
+                    color: AppDS.red, onTap: onDelete),
               ],
             ),
           ],
@@ -316,7 +316,7 @@ class _SopDialogState extends State<_SopDialog> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: TextStyle(color: context.appTextPrimary)),
-      backgroundColor: isError ? _DS.red : context.appSurface3,
+      backgroundColor: isError ? AppDS.red : context.appSurface3,
     ));
   }
 
@@ -384,6 +384,11 @@ class _SopDialogState extends State<_SopDialog> {
 
       final storage = Supabase.instance.client.storage.from(SopSch.bucket);
       final db      = Supabase.instance.client.from(SopSch.table);
+
+      // ── QR code ───────────────────────────────────────────────────────────
+      final qrcode = QrRules.build(
+          SupabaseManager.projectRef ?? 'local', 'sops', sopId);
+      await db.update({SopSch.qrcode: qrcode}).eq(SopSch.id, sopId);
 
       // ── PDF slot ──────────────────────────────────────────────────────────
       if (_clearPdf && widget.sop?.hasPdfFile == true) {
@@ -466,10 +471,10 @@ class _SopDialogState extends State<_SopDialog> {
               child: Row(
                 children: [
                   const Icon(Icons.menu_book_outlined,
-                      size: 18, color: _DS.accent),
+                      size: 18, color: AppDS.accent),
                   const SizedBox(width: 10),
                   Text(
-                    isEdit ? 'Edit SOP / Protocol' : 'New SOP / Protocol',
+                    isEdit ? 'Edit SOP' : 'New SOP',
                     style: GoogleFonts.spaceGrotesk(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -669,7 +674,7 @@ class _SopDialogState extends State<_SopDialog> {
                   ElevatedButton(
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _DS.accent,
+                      backgroundColor: AppDS.accent,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 10),
@@ -710,7 +715,7 @@ class _SopDialogState extends State<_SopDialog> {
             Expanded(child: _buildSlot(
               label: 'PDF',
               icon: Icons.picture_as_pdf_outlined,
-              color: _DS.red,
+              color: AppDS.red,
               existingName: widget.sop?.hasPdfFile == true && !_clearPdf
                   ? widget.sop!.fileName ?? 'document.pdf' : null,
               existingSize: widget.sop?.hasPdfFile == true && !_clearPdf
@@ -911,58 +916,35 @@ class _ActionBtn extends StatelessWidget {
   );
 }
 
-class _DropFilter extends StatelessWidget {
-  final String?  value;
-  final String   hint;
-  final List<String> options;
-  final String Function(String?) labelOf;
-  final ValueChanged<String?> onChanged;
-  const _DropFilter({
-    required this.value,
-    required this.hint,
-    required this.options,
-    required this.labelOf,
-    required this.onChanged,
-  });
+
+// ── Filter chip ───────────────────────────────────────────────────────────────
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color? color;
+  const _FilterChip({required this.label, required this.selected, required this.onTap, this.color});
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 36,
-    padding: const EdgeInsets.symmetric(horizontal: 10),
-    decoration: BoxDecoration(
-      color: context.appSurface,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(
-          color: value != null ? _DS.accent : context.appBorder),
-    ),
-    child: DropdownButtonHideUnderline(
-      child: DropdownButton<String?>(
-        value: value,
-        hint: Text(hint,
+  Widget build(BuildContext context) {
+    final c = color ?? AppDS.accent;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? c.withValues(alpha: 0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? c : AppDS.border, width: selected ? 1.5 : 1),
+        ),
+        child: Text(label,
             style: GoogleFonts.spaceGrotesk(
-                fontSize: 12, color: context.appTextMuted)),
-        dropdownColor: context.appSurface2,
-        style: GoogleFonts.spaceGrotesk(
-            fontSize: 12, color: context.appTextPrimary),
-        items: [
-          DropdownMenuItem<String?>(
-            value: null,
-            child: Text(hint,
-                style: GoogleFonts.spaceGrotesk(
-                    fontSize: 12, color: context.appTextMuted)),
-          ),
-          ...options.map((o) => DropdownMenuItem<String?>(
-            value: o,
-            child: Text(labelOf(o)),
-          )),
-        ],
-        onChanged: onChanged,
-        icon: Icon(Icons.expand_more,
-            size: 16,
-            color: value != null ? _DS.accent : context.appTextMuted),
+                color: selected ? c : AppDS.textSecondary,
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
       ),
-    ),
-  );
+    );
+  }
 }
 
 // ── Form field helpers ────────────────────────────────────────────────────────
@@ -1017,15 +999,15 @@ class _Field extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: const BorderSide(color: _DS.accent),
+            borderSide: const BorderSide(color: AppDS.accent),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: const BorderSide(color: _DS.red),
+            borderSide: const BorderSide(color: AppDS.red),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: const BorderSide(color: _DS.red),
+            borderSide: const BorderSide(color: AppDS.red),
           ),
         ),
       ),
@@ -1124,7 +1106,7 @@ class _DateField extends StatelessWidget {
             builder: (ctx, child) => Theme(
               data: ThemeData.dark().copyWith(
                 colorScheme: const ColorScheme.dark(
-                  primary: _DS.accent,
+                  primary: AppDS.accent,
                   surface: Color(0xFF1A2438),
                 ),
               ),

@@ -392,7 +392,17 @@ class _MachineFormDialogState extends State<_MachineFormDialog> {
             .update(data)
             .eq('equipment_id', widget.existing!.id);
       } else {
-        await Supabase.instance.client.from('equipment').insert(data);
+        final row = await Supabase.instance.client
+            .from('equipment')
+            .insert(data)
+            .select('equipment_id')
+            .single();
+        final newId = row['equipment_id'] as int;
+        await Supabase.instance.client
+            .from('equipment')
+            .update({'equipment_qrcode': QrRules.build(
+                SupabaseManager.projectRef ?? 'local', 'machines', newId)})
+            .eq('equipment_id', newId);
       }
 
       if (mounted) Navigator.pop(context, true);

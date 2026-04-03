@@ -1,7 +1,7 @@
 // printer_machine_driver.dart — Part of label_page.dart.
-// Shared label rendering, USB communication, connection check, and print dispatch.
-// Protocol-specific generation lives in printer_drivers/:
-//   zpl_driver.dart, brother_ql_700.dart, brother_ql_570.dart.
+// Shared label rendering, generic transport, and driver routing.
+// Protocol-specific generation and connection logic live in printer_drivers/:
+//   zpl_driver.dart, driver_brother_ql_700.dart, driver_brother_ql_570.dart.
 
 part of '../label_page.dart';
 
@@ -20,7 +20,7 @@ String _resolvePlaceholders(String content, Map<String, dynamic> data) {
     final n = int.tryParse(m.group(1) ?? '') ?? 0;
     return dateFmt.format(now.add(Duration(days: n)));
   });
-  data.forEach((k, v) => s = s.replaceAll('{$k}', v?.toString() ?? ''));
+  s = _resolveDataFields(s, data);
   return s.replaceAll(RegExp(r'\{[^}]+\}'), '');
 }
 
@@ -34,11 +34,17 @@ String _resolvePlaceholders(String content, Map<String, dynamic> data) {
 /// correct position when the printer has an inherent top-feed offset (e.g.
 /// compatible die-cut labels with a larger-than-spec gap). Content within the
 /// top `topOffsetMm` mm of the template is clipped off the label image.
+/// [printableW] — when set, renders the canvas at exactly this pixel width and
+/// scales field X coordinates proportionally. Use this to match the printer's
+/// printable dot count so no fractional-pixel scaling is needed in the raster loop.
+/// Height is always derived from [dpi] (300 DPI physical pitch for QL printers).
 Future<ui.Image> _renderLabelToImage(
-    LabelTemplate tpl, Map<String, dynamic> data, int dpi, {bool floorHeight = false}) async {
-  final pxPerMm = dpi / 25.4;
-  final w = (tpl.labelW * pxPerMm).ceil();
-  final h = floorHeight ? (tpl.labelH * pxPerMm).floor() : (tpl.labelH * pxPerMm).ceil();
+    LabelTemplate tpl, Map<String, dynamic> data, int dpi,
+    {bool floorHeight = false, int? printableW}) async {
+  final pxPerMm = printableW != null ? printableW / tpl.labelW : dpi / 25.4;
+  final w = printableW ?? (tpl.labelW * pxPerMm).ceil();
+  final hPxPerMm = dpi / 25.4;                                       // height always at real DPI
+  final h = floorHeight ? (tpl.labelH * hPxPerMm).floor() : (tpl.labelH * hPxPerMm).ceil();
 
   final recorder = ui.PictureRecorder();
   final canvas = ui.Canvas(recorder, Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()));
@@ -237,83 +243,84 @@ while ((Get-Date) -lt $deadline) {
 // Connection check
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Checks whether the configured printer is reachable.
+Future<_ConnState> _checkUsbPrinterConnection(String path) async {
+  try {
+    if (Platform.isLinux || Platform.isMacOS) {
+      return File(path).existsSync()
+          ? _ConnState.connected
+          : _ConnState.unreachable;
+    } else if (Platform.isWindows) {
+      final name = path.replaceAll("'", "''");
+      final filter = "Name='$name'";
+      final script =
+          "\$p = Get-WmiObject Win32_Printer -Filter \"$filter\" 2>\$null; "
+          "if (\$null -ne \$p) { "
+          "  if (\$p.WorkOffline -eq \$true -or \$p.PrinterStatus -eq 7) { 'driver_only' } "
+          "  else { 'ready' } "
+          "} else { 'not_found' }";
+      final r = await Process.run(
+        'powershell',
+        ['-Command', script],
+        runInShell: true,
+      );
+      final out = r.stdout.toString().trim();
+      if (out.contains('ready')) return _ConnState.connected;
+      if (out.contains('driver_only')) return _ConnState.driverOnly;
+      return _ConnState.unreachable;
+    }
+    return _ConnState.unreachable;
+  } catch (_) {
+    return _ConnState.unreachable;
+  }
+}
+
+Future<_ConnState> _checkTcpPrinterConnection(String ipAddress, int port) async {
+  try {
+    final socket = await Socket.connect(
+      ipAddress,
+      port,
+      timeout: const Duration(seconds: 3),
+    );
+    await socket.close();
+    return _ConnState.connected;
+  } catch (_) {
+    return _ConnState.unreachable;
+  }
+}
+
+/// Checks whether the configured printer is reachable through its selected driver.
 ///
 /// Returns [_ConnState.connected] if the printer is ready to receive jobs,
 /// [_ConnState.driverOnly] if the driver/port is registered but the device is
 /// offline or not physically connected (Windows USB only), and
 /// [_ConnState.unreachable] if the printer cannot be found at all.
 Future<_ConnState> _checkPrinterConnection(PrinterConfig cfg) async {
-  try {
-    if (cfg.connectionType == 'usb') {
-      if (Platform.isLinux || Platform.isMacOS) {
-        return File(cfg.usbPath).existsSync()
-            ? _ConnState.connected
-            : _ConnState.unreachable;
-      } else if (Platform.isWindows) {
-        final name = cfg.usbPath.replaceAll("'", "''");
-        final filter = "Name='$name'";
-        final script =
-            "\$p = Get-WmiObject Win32_Printer -Filter \"$filter\" 2>\$null; "
-            "if (\$null -ne \$p) { "
-            "  if (\$p.WorkOffline -eq \$true -or \$p.PrinterStatus -eq 7) { 'driver_only' } "
-            "  else { 'ready' } "
-            "} else { 'not_found' }";
-        final r = await Process.run(
-          'powershell',
-          ['-Command', script],
-          runInShell: true,
-        );
-        final out = r.stdout.toString().trim();
-        if (out.contains('ready')) return _ConnState.connected;
-        if (out.contains('driver_only')) return _ConnState.driverOnly;
-        return _ConnState.unreachable;
-      }
-      return _ConnState.unreachable;
-    } else {
-      final socket = await Socket.connect(
-          cfg.ipAddress, 9100, timeout: const Duration(seconds: 3));
-      await socket.close();
-      return _ConnState.connected;
-    }
-  } catch (_) {
-    return _ConnState.unreachable;
+  if (cfg.protocol == 'brother_ql_legacy') {
+    return _checkBrotherQl570Connection(cfg);
   }
+  if (cfg.protocol == 'brother_ql') {
+    return _checkBrotherQl700Connection(cfg);
+  }
+  return _checkZplConnection(cfg);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Print dispatch
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Dispatches to the appropriate protocol generator, then routes to USB / Wi-Fi.
+/// Routes the print job to the selected driver.
 Future<void> _sendToPrinter(
     LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) async {
   debugPrint('[PRINT] protocol=${cfg.protocol} connection=${cfg.connectionType} '
       'device="${cfg.deviceName}" usbPath="${cfg.usbPath}" ip=${cfg.ipAddress}');
-  debugPrint('[PRINT] template: ${tpl.labelW}×${tpl.labelH}mm DPI=${tpl.dpi} '
+  debugPrint('[PRINT] template: ${tpl.labelW}x${tpl.labelH}mm DPI=${tpl.dpi} '
       'continuous=${cfg.continuousRoll} cutMode=${tpl.cutMode} records=${records.length}');
 
   if (cfg.protocol == 'brother_ql_legacy') {
-    final data = await _generateBrotherQl570Data(tpl, records, cfg);
-    debugPrint('[PRINT] QL-570 legacy data: ${data.length} bytes → USB "${cfg.usbPath}"');
-    await _sendViaUsb(cfg.usbPath, data);
+    await _printBrotherQl570(tpl, records, cfg);
   } else if (cfg.protocol == 'brother_ql') {
-    final data = await _generateBrotherQl700Data(tpl, records, cfg);
-    if (cfg.connectionType == 'usb') {
-      debugPrint('[PRINT] QL-700 raster data: ${data.length} bytes → USB "${cfg.usbPath}"');
-      await _sendViaUsb(cfg.usbPath, data);
-    } else {
-      debugPrint('[PRINT] QL-700 raster data: ${data.length} bytes → TCP ${cfg.ipAddress}:9100');
-      await _sendBrotherQl700(cfg.ipAddress, data);
-    }
+    await _printBrotherQl700(tpl, records, cfg);
   } else {
-    final zpl = _generateZpl(tpl, records, cfg);
-    if (cfg.connectionType == 'usb') {
-      debugPrint('[PRINT] ZPL data: ${zpl.length} chars → USB "${cfg.usbPath}"');
-      await _sendViaUsb(cfg.usbPath, Uint8List.fromList(zpl.codeUnits));
-    } else {
-      debugPrint('[PRINT] ZPL: ${zpl.length} chars → TCP ${cfg.ipAddress}:9100');
-      await _sendZplOverWifi(cfg.ipAddress, zpl);
-    }
+    await _printZpl(tpl, records, cfg);
   }
 }

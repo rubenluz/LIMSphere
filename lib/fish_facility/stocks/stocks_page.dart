@@ -1,8 +1,11 @@
 // stocks_page.dart - Fish stock inventory with rack visualisation, status
 // filters, links to lines, add/edit/transfer workflows.
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'stocks_connection_model.dart';
 import '/core/fish_db_schema.dart';
@@ -38,6 +41,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
   String? _filterLine;
   String _sortKey = 'tankId';
   bool _sortAsc = true;
+  bool _showFilters = false;
   Map<String, dynamic>? _editingCell;
   final _editController = TextEditingController();
   List<String> _lineNames = [];
@@ -404,8 +408,9 @@ class _FishStocksPageState extends State<FishStocksPage> {
 
   void _sort(String key) {
     setState(() {
-      if (_sortKey == key) _sortAsc = !_sortAsc;
-      else { _sortKey = key; _sortAsc = true; }
+      if (_sortKey == key) {
+        _sortAsc = !_sortAsc;
+      } else { _sortKey = key; _sortAsc = true; }
     });
     _applyFilters();
   }
@@ -418,60 +423,204 @@ class _FishStocksPageState extends State<FishStocksPage> {
     if (mounted) _loadStocks();
   }
 
+  Future<void> _exportCsv() async {
+    final buf = StringBuffer();
+    buf.writeln('Tank,Line,Status,Health,Males,Females,Juveniles,Total,Mortality,Responsible,Last Cleaning,Next Cleaning,Last Breeding,Notes');
+    for (final s in _filtered) {
+      String esc(String? v) => '"${(v ?? '').replaceAll('"', '""')}"';
+      final nextClean = (s.lastCleaning != null && s.cleaningIntervalDays != null)
+          ? s.lastCleaning!.add(Duration(days: s.cleaningIntervalDays!)).toIso8601String().substring(0, 10)
+          : '';
+      buf.writeln([
+        esc(s.tankId),
+        esc(s.line),
+        esc(s.status),
+        esc(s.health),
+        s.males,
+        s.females,
+        s.juveniles,
+        s.totalFish,
+        s.mortality,
+        esc(s.responsible),
+        s.lastCleaning != null ? s.lastCleaning!.toIso8601String().substring(0, 10) : '',
+        nextClean,
+        s.lastBreeding != null ? s.lastBreeding!.toIso8601String().substring(0, 10) : '',
+        esc(s.notes),
+      ].join(','));
+    }
+    try {
+      final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/fish_stocks_${DateTime.now().millisecondsSinceEpoch}.csv');
+      await file.writeAsString(buf.toString());
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: AppDS.red));
+      }
+    }
+  }
+
+  bool get _hasActiveFilter =>
+      _filterLine != null || _filterStatus != null || _filterHealth != null;
+
+  Widget _buildToolbar() {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: [
+        const Icon(Icons.set_meal_outlined, size: 18, color: Color(0xFF0EA5E9)),
+        const SizedBox(width: 8),
+        Text('Stocks', style: GoogleFonts.spaceGrotesk(
+          fontSize: 16, fontWeight: FontWeight.w600,
+          color: context.appTextPrimary)),
+        const SizedBox(width: 16),
+        Expanded(
+          child: SizedBox(
+            height: 36,
+            child: AppSearchBar(controller: _searchCtrl, hint: 'Search stocks…', onClear: _applyFilters),
+          ),
+        ),
+        Tooltip(
+          message: _showFilters ? 'Hide filters' : 'Show filters',
+          child: Stack(children: [
+            IconButton(
+              icon: Icon(Icons.tune,
+                  color: _showFilters ? AppDS.accent : context.appTextSecondary,
+                  size: 18),
+              onPressed: () => setState(() => _showFilters = !_showFilters),
+            ),
+            if (_hasActiveFilter)
+              Positioned(
+                right: 6, top: 6,
+                child: Container(
+                  width: 7, height: 7,
+                  decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle),
+                ),
+              ),
+          ]),
+        ),
+        Tooltip(
+          message: 'Export CSV',
+          child: IconButton(
+            icon: Icon(Icons.download_outlined, color: context.appTextSecondary, size: 18),
+            onPressed: _exportCsv,
+          ),
+        ),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppDS.accent,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+            minimumSize: const Size(0, 36),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+          ),
+          onPressed: () {
+            if (!context.canEditModule) { context.warnReadOnly(); return; }
+            _showAddStockDialog();
+          },
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('New Stock'),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildFilterPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.appSurface,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            Text('Line', style: GoogleFonts.spaceGrotesk(
+                color: context.appTextMuted, fontSize: 11, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  _chip('All', _filterLine == null,
+                      () { setState(() => _filterLine = null); _applyFilters(); }),
+                  ..._lineNames.map((l) => Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: _chip(l, _filterLine == l,
+                        () { setState(() => _filterLine = l); _applyFilters(); }),
+                  )),
+                ]),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Text('Status', style: GoogleFonts.spaceGrotesk(
+                color: context.appTextMuted, fontSize: 11, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 12),
+            _chip('All', _filterStatus == null,
+                () { setState(() => _filterStatus = null); _applyFilters(); }),
+            ...const ['active', 'empty', 'quarantine', 'retired'].map((s) => Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: _chip(s, _filterStatus == s,
+                  () { setState(() => _filterStatus = s); _applyFilters(); }),
+            )),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Text('Health', style: GoogleFonts.spaceGrotesk(
+                color: context.appTextMuted, fontSize: 11, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 12),
+            _chip('All', _filterHealth == null,
+                () { setState(() => _filterHealth = null); _applyFilters(); }),
+            ...const ['healthy', 'observation', 'treatment', 'sick'].map((h) => Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: _chip(h, _filterHealth == h,
+                  () { setState(() => _filterHealth = h); _applyFilters(); }),
+            )),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? AppDS.accent.withValues(alpha: 0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? AppDS.accent : AppDS.border,
+              width: selected ? 1.5 : 1),
+        ),
+        child: Text(label,
+            style: GoogleFonts.spaceGrotesk(
+                color: selected ? AppDS.accent : AppDS.textSecondary,
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final totalFish  = _filtered.fold(0, (s, r) => s + r.totalFish);
     final tableWidth = _cols.fold(0.0, (s, c) => s + c.$3) + 84;
 
     return Column(
       children: [
-        // ── Toolbar with integrated filter pills ──────────────────────────
-        Container(
-          color: context.appBg,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Row(
-            children: [
-              AppSearchBar(controller: _searchCtrl, hint: 'Search stocks…',
-                onClear: _applyFilters),
-              const SizedBox(width: 10),
-              // Filter pills
-              AppFilterChip(
-                label: 'Line', value: _filterLine, options: _lineNames,
-                onChanged: (v) { setState(() => _filterLine = v); _applyFilters(); },
-              ),
-              const SizedBox(width: 8),
-              AppFilterChip(
-                label: 'Status', value: _filterStatus,
-                options: const ['active', 'empty', 'quarantine', 'retired'],
-                onChanged: (v) { setState(() => _filterStatus = v); _applyFilters(); },
-              ),
-              const SizedBox(width: 8),
-              AppFilterChip(
-                label: 'Health', value: _filterHealth,
-                options: const ['healthy', 'observation', 'treatment', 'sick'],
-                onChanged: (v) { setState(() => _filterHealth = v); _applyFilters(); },
-              ),
-              const Spacer(),
-              // Summary chips
-              _summaryChip('${_filtered.length}', 'stocks', AppDS.textSecondary),
-              const SizedBox(width: 8),
-              _summaryChip('$totalFish', 'fish', AppDS.green),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () {
-                  if (!context.canEditModule) { context.warnReadOnly(); return; }
-                  _showAddStockDialog();
-                },
-                icon: const Icon(Icons.add, size: 14),
-                label: const Text('New Stock'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppDS.accent,
-                  foregroundColor: AppDS.bg,
-                ),
-              ),
-            ],
-          ),
-        ),
+        _buildToolbar(),
+        if (_showFilters) _buildFilterPanel(),
         Container(height: 1, color: context.appBorder),
         // ── Table ────────────────────────────────────────────────────────
         Expanded(
@@ -587,24 +736,6 @@ class _FishStocksPageState extends State<FishStocksPage> {
     );
   }
 
-  Widget _summaryChip(String value, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Text(value, style: GoogleFonts.jetBrainsMono(
-          fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-        const SizedBox(width: 4),
-        Text(label, style: GoogleFonts.spaceGrotesk(
-          fontSize: 11, color: AppDS.textMuted)),
-      ]),
-    );
-  }
-
   Widget _buildRow(FishStock stock, int rowIndex) {
     final rowBg = rowIndex.isEven ? AppDS.tableRowEven : AppDS.tableRowOdd;
     return Container(
@@ -702,7 +833,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
       case 'mortality':   val = '${s.mortality}'; break;
       case 'responsible':    val = s.responsible.isEmpty ? null : s.responsible; break;
       case 'experiment':     val = s.experiment; break;
-      case 'feedingAmount':  val = s.feedingAmount?.toString(); break;
+      case 'feedingAmount':  val = s.feedingAmount == null ? null : (s.feedingAmount! % 1 == 0 ? s.feedingAmount!.toInt().toString() : s.feedingAmount!.toString()); break;
       case 'cleaningInt':    val = s.cleaningIntervalDays?.toString(); break;
       default: val = null;
     }

@@ -3,11 +3,98 @@
 // Pushed via Navigator with its own Scaffold + AppBar.
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '/theme/theme.dart';
 import '../theme/theme_controller.dart';
+
+TextStyle _spaceGrotesk({
+  TextStyle? textStyle,
+  Color? color,
+  Color? backgroundColor,
+  double? fontSize,
+  FontWeight? fontWeight,
+  FontStyle? fontStyle,
+  double? letterSpacing,
+  double? wordSpacing,
+  TextBaseline? textBaseline,
+  double? height,
+  Locale? locale,
+  Paint? foreground,
+  Paint? background,
+  List<Shadow>? shadows,
+  List<FontFeature>? fontFeatures,
+  TextDecoration? decoration,
+  Color? decorationColor,
+  TextDecorationStyle? decorationStyle,
+  double? decorationThickness,
+}) {
+  return (textStyle ?? const TextStyle()).copyWith(
+    color: color,
+    backgroundColor: backgroundColor,
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    fontStyle: fontStyle,
+    letterSpacing: letterSpacing,
+    wordSpacing: wordSpacing,
+    textBaseline: textBaseline,
+    height: height,
+    locale: locale,
+    foreground: foreground,
+    background: background,
+    shadows: shadows,
+    fontFeatures: fontFeatures,
+    decoration: decoration,
+    decorationColor: decorationColor,
+    decorationStyle: decorationStyle,
+    decorationThickness: decorationThickness,
+  );
+}
+
+TextStyle _jetBrainsMono({
+  TextStyle? textStyle,
+  Color? color,
+  Color? backgroundColor,
+  double? fontSize,
+  FontWeight? fontWeight,
+  FontStyle? fontStyle,
+  double? letterSpacing,
+  double? wordSpacing,
+  TextBaseline? textBaseline,
+  double? height,
+  Locale? locale,
+  Paint? foreground,
+  Paint? background,
+  List<Shadow>? shadows,
+  List<FontFeature>? fontFeatures,
+  TextDecoration? decoration,
+  Color? decorationColor,
+  TextDecorationStyle? decorationStyle,
+  double? decorationThickness,
+}) {
+  return (textStyle ?? const TextStyle()).copyWith(
+    fontFamily: 'Consolas',
+    fontFamilyFallback: const ['Courier New'],
+    color: color,
+    backgroundColor: backgroundColor,
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    fontStyle: fontStyle,
+    letterSpacing: letterSpacing,
+    wordSpacing: wordSpacing,
+    textBaseline: textBaseline,
+    height: height,
+    locale: locale,
+    foreground: foreground,
+    background: background,
+    shadows: shadows,
+    fontFeatures: fontFeatures,
+    decoration: decoration,
+    decorationColor: decorationColor,
+    decorationStyle: decorationStyle,
+    decorationThickness: decorationThickness,
+  );
+}
 
 // ignore_for_file: use_build_context_synchronously
 
@@ -51,6 +138,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
   late String _permDashboard;
   late String _permLabels;
   late String _permChat;
+  late String _permBackups;
   late String _permCulture;
   late String _permFish;
   late String _permResources;
@@ -65,7 +153,8 @@ class _UserDetailPageState extends State<UserDetailPage> {
 
   static const _roleOptions   = ['superadmin', 'admin', 'technician', 'researcher', 'viewer'];
   static const _statusOptions = ['pending', 'active', 'inactive'];
-  static const _permOptions   = ['none', 'read', 'write'];
+  static const _permOptions        = ['none', 'read', 'write'];
+  static const _backupsPermOptions = ['none', 'see'];
 
   @override
   void initState() {
@@ -84,6 +173,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
     _permDashboard = (m['user_table_dashboard']          as String?) ?? 'none';
     _permLabels    = (m['user_table_labels']             as String?) ?? 'none';
     _permChat      = (m['user_table_chat']               as String?) ?? 'none';
+    _permBackups   = (m['user_table_backups']            as String?) ?? 'none';
     _permCulture   = (m['user_table_culture_collection'] as String?) ?? 'none';
     _permFish      = (m['user_table_fish_facility']      as String?) ?? 'none';
     _permResources = (m['user_table_resources']          as String?) ?? 'none';
@@ -180,6 +270,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
         'user_table_dashboard':          _permDashboard,
         'user_table_labels':             _permLabels,
         'user_table_chat':               _permChat,
+        'user_table_backups':            _permBackups,
         'user_table_culture_collection': _permCulture,
         'user_table_fish_facility':      _permFish,
         'user_table_resources':          _permResources,
@@ -216,7 +307,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
         elevation: 0,
         title: Text(
           _displayName,
-          style: GoogleFonts.spaceGrotesk(
+          style: _spaceGrotesk(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: context.appTextPrimary),
@@ -226,7 +317,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
             TextButton(
               onPressed: _cancelEdit,
               child: Text('Cancel',
-                  style: GoogleFonts.spaceGrotesk(
+                  style: _spaceGrotesk(
                       color: context.appTextSecondary, fontSize: 13)),
             ),
             const SizedBox(width: 4),
@@ -246,7 +337,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : Text('Save',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: _spaceGrotesk(
                           fontWeight: FontWeight.w600, fontSize: 13)),
             ),
             const SizedBox(width: 12),
@@ -256,7 +347,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
               icon: const Icon(Icons.edit_outlined, size: 15,
                   color: AppDS.accent),
               label: Text('Edit',
-                  style: GoogleFonts.spaceGrotesk(
+                  style: _spaceGrotesk(
                       color: AppDS.accent, fontSize: 13)),
             ),
             const SizedBox(width: 12),
@@ -344,7 +435,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                     const SizedBox(width: 8),
                     Text(
                       'Notifications ${_notificationsEnabled ? 'enabled' : 'disabled'}',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: _spaceGrotesk(
                           fontSize: 12,
                           color: _notificationsEnabled
                               ? AppDS.textPrimary
@@ -368,7 +459,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 _buildSection('Appearance', [
                   AnimatedBuilder(
                     animation: appThemeCtrl,
-                    builder: (_, _x) => Row(
+                    builder: (_, x) => Row(
                       children: [
                         _themeBtn(context, 'Light', ThemeMode.light, Icons.light_mode_outlined),
                         const SizedBox(width: 8),
@@ -402,7 +493,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
           child: url.isEmpty
               ? Text(
                   _initials,
-                  style: GoogleFonts.spaceGrotesk(
+                  style: _spaceGrotesk(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       color: _roleColor),
@@ -416,7 +507,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
             children: [
               Text(
                 _displayName,
-                style: GoogleFonts.spaceGrotesk(
+                style: _spaceGrotesk(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: context.appTextPrimary),
@@ -424,7 +515,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
               const SizedBox(height: 4),
               Text(
                 _email.text,
-                style: GoogleFonts.jetBrainsMono(
+                style: _jetBrainsMono(
                     fontSize: 12, color: context.appTextSecondary),
               ),
               const SizedBox(height: 8),
@@ -445,12 +536,13 @@ class _UserDetailPageState extends State<UserDetailPage> {
   // ── Permission table ──────────────────────────────────────────────────────
   Widget _permTable() {
     final modules = [
-      ('Dashboard',         _permDashboard, (String v) => setState(() => _permDashboard = v)),
-      ('Labels',            _permLabels,    (String v) => setState(() => _permLabels = v)),
-      ('Chat',              _permChat,      (String v) => setState(() => _permChat = v)),
-      ('Culture Collection',_permCulture,   (String v) => setState(() => _permCulture = v)),
-      ('Fish Facility',     _permFish,      (String v) => setState(() => _permFish = v)),
-      ('Resources',         _permResources, (String v) => setState(() => _permResources = v)),
+      ('Dashboard',         _permDashboard, (String v) => setState(() => _permDashboard = v), _permOptions),
+      ('Labels',            _permLabels,    (String v) => setState(() => _permLabels = v),    _permOptions),
+      ('Chat',              _permChat,      (String v) => setState(() => _permChat = v),      _permOptions),
+      ('Backups',           _permBackups,   (String v) => setState(() => _permBackups = v),   _backupsPermOptions),
+      ('Culture Collection',_permCulture,   (String v) => setState(() => _permCulture = v),   _permOptions),
+      ('Fish Facility',     _permFish,      (String v) => setState(() => _permFish = v),      _permOptions),
+      ('Resources',         _permResources, (String v) => setState(() => _permResources = v), _permOptions),
     ];
 
     return Container(
@@ -477,13 +569,13 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 SizedBox(
                   width: 160,
                   child: Text(m.$1,
-                      style: GoogleFonts.spaceGrotesk(
+                      style: _spaceGrotesk(
                           fontSize: 13, color: context.appTextPrimary)),
                 ),
                 if (_editing)
                   Wrap(
                     spacing: 6,
-                    children: _permOptions.map((opt) {
+                    children: m.$4.map((opt) {
                       final selected = m.$2 == opt;
                       final c = _permColor(opt);
                       return GestureDetector(
@@ -503,7 +595,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                             ),
                           ),
                           child: Text(opt,
-                              style: GoogleFonts.spaceGrotesk(
+                              style: _spaceGrotesk(
                                   fontSize: 11,
                                   fontWeight: selected
                                       ? FontWeight.w700
@@ -532,7 +624,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
       children: [
         Text(
           title.toUpperCase(),
-          style: GoogleFonts.spaceGrotesk(
+          style: _spaceGrotesk(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               color: context.appTextMuted,
@@ -575,7 +667,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: GoogleFonts.spaceGrotesk(
+            style: _spaceGrotesk(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 color: context.appTextMuted,
@@ -586,12 +678,12 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 controller: ctrl,
                 maxLines: maxLines,
                 style: (mono
-                        ? GoogleFonts.jetBrainsMono(fontSize: 12)
-                        : GoogleFonts.spaceGrotesk(fontSize: 13))
+                        ? _jetBrainsMono(fontSize: 12)
+                        : _spaceGrotesk(fontSize: 13))
                     .copyWith(color: context.appTextPrimary),
                 decoration: InputDecoration(
                   hintText: hint,
-                  hintStyle: GoogleFonts.spaceGrotesk(
+                  hintStyle: _spaceGrotesk(
                       fontSize: 12, color: context.appTextMuted),
                   filled: true,
                   fillColor: context.appSurface2,
@@ -614,8 +706,8 @@ class _UserDetailPageState extends State<UserDetailPage> {
             : Text(
                 ctrl.text.isEmpty ? (hint ?? '—') : ctrl.text,
                 style: (mono
-                        ? GoogleFonts.jetBrainsMono(fontSize: 12)
-                        : GoogleFonts.spaceGrotesk(fontSize: 13))
+                        ? _jetBrainsMono(fontSize: 12)
+                        : _spaceGrotesk(fontSize: 13))
                     .copyWith(
                         color: ctrl.text.isEmpty
                             ? context.appTextMuted
@@ -636,7 +728,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: GoogleFonts.spaceGrotesk(
+            style: _spaceGrotesk(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 color: context.appTextMuted,
@@ -656,7 +748,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                     value: value,
                     isExpanded: true,
                     dropdownColor: context.appSurface2,
-                    style: GoogleFonts.spaceGrotesk(
+                    style: _spaceGrotesk(
                         fontSize: 13, color: context.appTextPrimary),
                     items: options
                         .map((o) => DropdownMenuItem(
@@ -671,7 +763,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 ),
               )
             : Text(value,
-                style: GoogleFonts.spaceGrotesk(
+                style: _spaceGrotesk(
                     fontSize: 13, color: context.appTextPrimary)),
         const SizedBox(height: 10),
       ],
@@ -703,12 +795,12 @@ class _UserDetailPageState extends State<UserDetailPage> {
           SizedBox(
             width: 120,
             child: Text(label,
-                style: GoogleFonts.spaceGrotesk(
+                style: _spaceGrotesk(
                     fontSize: 12, color: context.appTextMuted)),
           ),
           Expanded(
             child: Text(value,
-                style: GoogleFonts.jetBrainsMono(
+                style: _jetBrainsMono(
                     fontSize: 11, color: context.appTextSecondary)),
           ),
         ],
@@ -725,7 +817,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
     ),
     child: Text(
       label,
-      style: GoogleFonts.spaceGrotesk(
+      style: _spaceGrotesk(
           fontSize: 11,
           fontWeight: FontWeight.w700,
           color: color,
@@ -744,7 +836,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
       ),
       child: Text(
         perm,
-        style: GoogleFonts.spaceGrotesk(
+        style: _spaceGrotesk(
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color: c),
@@ -756,6 +848,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
     switch (p) {
       case 'write': return AppDS.green;
       case 'read':  return AppDS.accent;
+      case 'see':   return AppDS.yellow;
       default:      return AppDS.textMuted;
     }
   }

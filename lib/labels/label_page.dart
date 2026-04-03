@@ -27,8 +27,8 @@ import '../supabase/supabase_manager.dart';
 
 // printer_drivers — all PC→printer communication
 part 'printer_drivers/zpl_driver.dart';
-part 'printer_drivers/brother_ql_570.dart';
-part 'printer_drivers/brother_ql_700.dart';
+part 'printer_drivers/driver_brother_ql_570.dart';
+part 'printer_drivers/driver_brother_ql_700.dart';
 part 'printer_drivers/printer_machine_driver.dart';
 part 'printer_drivers/label_printer_settings_page.dart';
 
@@ -49,7 +49,7 @@ part 'print/label_print_filters.dart';
 part 'print/label_print_records.dart';
 part 'print/label_quick_print_dialog.dart';
 
-const _kPaperSizes = ['62x30', '62x100', '62x29', '29x62', '29x90', '38x90', '54x29'];
+const _kPaperSizes = ['62x30', '62x100', '62x29', '29x62', '29x90', '38x90', '54x29', '23x23'];
 
 /// Printer reachability states — finer-grained than a simple bool so we can
 /// distinguish "driver installed but printer offline/not connected" from
@@ -426,7 +426,7 @@ const _kAllColsByCategory = <String, List<String>>{
     'sample_substrate', 'sample_observations',
   ],
   'Reagents': [
-    '__qr__', 'reagent_name', 'reagent_brand', 'reagent_reference',
+    '__qr__', 'reagent_code', 'reagent_name', 'reagent_brand', 'reagent_reference',
     'reagent_cas_number', 'reagent_type', 'reagent_unit', 'reagent_quantity',
     'reagent_quantity_min', 'reagent_concentration', 'reagent_purity',
     'reagent_solvent', 'reagent_storage_temp', 'reagent_position',

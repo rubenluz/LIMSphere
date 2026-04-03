@@ -7,13 +7,23 @@ part of 'reagents_page.dart';
 // ─── Reagent Row ───────────────────────────────────────────────────────────────
 class _ReagentRow extends StatelessWidget {
   final ReagentModel reagent;
-  final VoidCallback onTap;
+  final int rowIndex;
+  final VoidCallback onViewMore;
   final VoidCallback onRequest;
+  final Map<String, dynamic>? editingCell;
+  final TextEditingController editController;
+  final void Function(int id, String key, String initial) onStartEdit;
+  final void Function(ReagentModel r, String key, String raw) onCommitEdit;
 
   const _ReagentRow({
     required this.reagent,
-    required this.onTap,
+    required this.rowIndex,
+    required this.onViewMore,
     required this.onRequest,
+    required this.editingCell,
+    required this.editController,
+    required this.onStartEdit,
+    required this.onCommitEdit,
   });
 
   static const _typeAccent = {
@@ -25,135 +35,255 @@ class _ReagentRow extends StatelessWidget {
     'consumable': Color(0xFFF59E0B),
   };
 
+  bool _isEditing(String key) =>
+      editingCell != null &&
+      editingCell!['id'] == reagent.id &&
+      editingCell!['key'] == key;
+
+  Widget _textField(BuildContext ctx, String key, TextStyle ts) => TextField(
+    controller: editController,
+    autofocus: true,
+    style: ts,
+    decoration: InputDecoration(
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      filled: true,
+      fillColor: ctx.appSurface2,
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+    ),
+    onSubmitted: (v) => onCommitEdit(reagent, key, v),
+    onTapOutside: (_) => onCommitEdit(reagent, key, editController.text),
+  );
+
+  Widget _editCell(BuildContext ctx, String key, String initial, Widget display, TextStyle ts) =>
+      GestureDetector(
+        onDoubleTap: () => onStartEdit(reagent.id, key, initial),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          child: _isEditing(key) ? _textField(ctx, key, ts) : display,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final r = reagent;
     final accent = _typeAccent[r.type] ?? const Color(0xFF94A3B8);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: context.appBorder)),
-            color: r.isExpired
-                ? AppDS.red.withValues(alpha: 0.04)
-                : context.appSurface,
-          ),
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(children: [
-            // ── Actions ──────────────────────────────────────────────────
-            _RowBtn(Icons.open_in_new, 'View detail', onTap),
-            _RowBtn(Icons.outbox_outlined, 'Quick Request', onRequest),
-            const SizedBox(width: 4),
-            // ── Code ─────────────────────────────────────────────────────
-            Expanded(
-              flex: 1,
-              child: r.code != null && r.code!.isNotEmpty
-                  ? Text(r.code!,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.jetBrainsMono(
-                          color: AppDS.accent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600))
-                  : const SizedBox.shrink(),
-            ),
-            // ── Name ─────────────────────────────────────────────────────
-            Expanded(
-              flex: 4,
-              child: Row(children: [
-                Flexible(
-                  child: Text(r.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
-                          color: context.appTextPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500)),
-                ),
-                if (r.isExpired) ...[
-                  const SizedBox(width: 4),
-                  _Badge(label: 'Expired', color: AppDS.red),
-                ] else if (r.isExpiringSoon) ...[
-                  const SizedBox(width: 4),
-                  _Badge(label: 'Expiring', color: AppDS.yellow),
-                ],
-                if (r.isLowStock) ...[
-                  const SizedBox(width: 4),
-                  _Badge(label: 'Low', color: AppDS.orange),
-                ],
-                if (r.hazard != null && r.hazard!.isNotEmpty) ...[
-                  const SizedBox(width: 4),
-                  Tooltip(
-                    message: 'Hazard: ${r.hazard}',
-                    child: const Icon(Icons.warning_amber_outlined,
-                        size: 13, color: AppDS.yellow),
-                  ),
-                ],
-              ]),
-            ),
-            // ── Type ─────────────────────────────────────────────────────
-            Expanded(
-              flex: 2,
-              child: _Badge(label: ReagentModel.typeLabel(r.type), color: accent),
-            ),
-            // ── Location ─────────────────────────────────────────────────
-            Expanded(
-              flex: 2,
-              child: Text(
-                r.locationName ?? '—',
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextSecondary, fontSize: 12),
-              ),
-            ),
-            // ── Brand ────────────────────────────────────────────────────
-            Expanded(
-              flex: 2,
-              child: Text(
-                r.brand ?? '—',
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextSecondary, fontSize: 12),
-              ),
-            ),
-            // ── Size (concentration) ──────────────────────────────────────
-            Expanded(
-              flex: 1,
-              child: Text(
-                r.concentration ?? '—',
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.jetBrainsMono(
-                    color: context.appTextSecondary, fontSize: 11),
-              ),
-            ),
-            // ── Unit ─────────────────────────────────────────────────────
-            Expanded(
-              flex: 1,
-              child: Text(
-                r.unit ?? '—',
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextSecondary, fontSize: 12),
-              ),
-            ),
-            // ── Amount ───────────────────────────────────────────────────
-            Expanded(
-              flex: 1,
-              child: Text(
-                r.quantity != null ? r.quantity.toString() : '—',
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.jetBrainsMono(
-                    color: r.isLowStock
-                        ? AppDS.orange
-                        : context.appTextSecondary,
-                    fontSize: 12),
-              ),
-            ),
-          ]),
-        ),
+    final primary   = context.appTextPrimary;
+    final secondary = context.appTextSecondary;
+    final muted     = context.appTextMuted;
+
+    final tsName     = GoogleFonts.spaceGrotesk(fontSize: 12.5, color: primary,   fontWeight: FontWeight.w500);
+    final tsCell     = GoogleFonts.spaceGrotesk(fontSize: 12.5, color: secondary);
+    final tsMono     = GoogleFonts.jetBrainsMono(fontSize: 12,  color: secondary);
+    final tsMuted    = GoogleFonts.spaceGrotesk(fontSize: 12.5, color: muted);
+    final tsMonoMut  = GoogleFonts.jetBrainsMono(fontSize: 12,  color: muted);
+
+    Color bg = rowIndex.isEven ? context.appBg : context.appSurface;
+    if (r.isExpired) bg = AppDS.red.withValues(alpha: 0.08);
+
+    return Container(
+      height: AppDS.tableRowH,
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
       ),
+      child: Row(children: [
+        // ── Action buttons ────────────────────────────────────────────────
+        SizedBox(
+          width: 36,
+          child: _RowBtn(Icons.open_in_new, 'View detail', onViewMore,
+              color: muted),
+        ),
+        SizedBox(
+          width: 36,
+          child: _RowBtn(Icons.outbox_outlined, 'Quick Request', onRequest,
+              color: muted),
+        ),
+
+        // ── Code ──────────────────────────────────────────────────────────
+        SizedBox(
+          width: _colCode,
+          child: _editCell(context, 'code', r.code ?? '',
+            r.code != null && r.code!.isNotEmpty
+                ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: context.appSurface2,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(r.code!,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.jetBrainsMono(
+                            color: context.appTextPrimary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700)),
+                  )
+                : const SizedBox.shrink(),
+            GoogleFonts.jetBrainsMono(fontSize: 12, color: primary),
+          ),
+        ),
+
+        // ── Name ──────────────────────────────────────────────────────────
+        SizedBox(
+          width: _colName,
+          child: _isEditing('name')
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  child: _textField(context, 'name', tsName),
+                )
+              : GestureDetector(
+                  onDoubleTap: () => onStartEdit(r.id, 'name', r.name),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    child: Row(children: [
+                      Flexible(
+                        child: Text(r.name,
+                            overflow: TextOverflow.ellipsis, style: tsName),
+                      ),
+                      if (r.isExpired) ...[
+                        const SizedBox(width: 4),
+                        _Badge(label: 'Expired', color: AppDS.red),
+                      ] else if (r.isExpiringSoon) ...[
+                        const SizedBox(width: 4),
+                        _Badge(label: 'Expiring', color: AppDS.yellow),
+                      ],
+                      if (r.isLowStock) ...[
+                        const SizedBox(width: 4),
+                        _Badge(label: 'Low', color: AppDS.orange),
+                      ],
+                      if (r.hazard != null && r.hazard!.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: 'Hazard: ${r.hazard}',
+                          child: const Icon(Icons.warning_amber_outlined,
+                              size: 13, color: AppDS.yellow),
+                        ),
+                      ],
+                    ]),
+                  ),
+                ),
+        ),
+
+        // ── Supplier ──────────────────────────────────────────────────────
+        SizedBox(
+          width: _colSupp,
+          child: _editCell(context, 'supplier', r.supplier ?? '',
+              Text(r.supplier ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.supplier != null ? tsCell : tsMuted),
+              tsCell),
+        ),
+
+        // ── Brand ─────────────────────────────────────────────────────────
+        SizedBox(
+          width: _colBrand,
+          child: _editCell(context, 'brand', r.brand ?? '',
+              Text(r.brand ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.brand != null ? tsCell : tsMuted),
+              tsCell),
+        ),
+
+        // ── Reference ─────────────────────────────────────────────────────
+        SizedBox(
+          width: _colRef,
+          child: _editCell(context, 'reference', r.reference ?? '',
+              Text(r.reference ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.reference != null ? tsCell : tsMuted),
+              tsCell),
+        ),
+
+        // ── Type ──────────────────────────────────────────────────────────
+        SizedBox(
+          width: _colType,
+          child: GestureDetector(
+            onDoubleTap: () => onStartEdit(r.id, 'type', r.type),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: _isEditing('type')
+                  ? DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: r.type,
+                        isDense: true,
+                        isExpanded: true,
+                        dropdownColor: context.appSurface,
+                        style: GoogleFonts.spaceGrotesk(color: primary, fontSize: 12),
+                        items: ReagentModel.typeOptions
+                            .map((t) => DropdownMenuItem(
+                                  value: t,
+                                  child: Text(ReagentModel.typeLabel(t),
+                                      style: GoogleFonts.spaceGrotesk(
+                                          color: primary, fontSize: 12)),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) onCommitEdit(r, 'type', v);
+                        },
+                      ),
+                    )
+                  : _Badge(label: ReagentModel.typeLabel(r.type), color: accent),
+            ),
+          ),
+        ),
+
+        // ── Location (read-only in row) ───────────────────────────────────
+        SizedBox(
+          width: _colLoc,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Text(r.locationName ?? '—',
+                overflow: TextOverflow.ellipsis,
+                style: r.locationName != null ? tsCell : tsMuted),
+          ),
+        ),
+
+        // ── Size (concentration) ──────────────────────────────────────────
+        SizedBox(
+          width: _colSize,
+          child: _editCell(context, 'concentration', r.concentration ?? '',
+              Text(r.concentration ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.concentration != null ? tsMono : tsMonoMut),
+              tsMono),
+        ),
+
+        // ── Unit ──────────────────────────────────────────────────────────
+        SizedBox(
+          width: _colUnit,
+          child: _editCell(context, 'unit', r.unit ?? '',
+              Text(r.unit ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.unit != null ? tsCell : tsMuted),
+              tsCell),
+        ),
+
+        // ── Amount ────────────────────────────────────────────────────────
+        SizedBox(
+          width: _colAmt,
+          child: _editCell(context, 'quantity', r.quantity?.toString() ?? '',
+              Text(r.quantity?.toString() ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.isLowStock
+                      ? GoogleFonts.jetBrainsMono(fontSize: 12, color: AppDS.orange)
+                      : (r.quantity != null ? tsMono : tsMonoMut)),
+              tsMono),
+        ),
+
+        // ── Min Qty ───────────────────────────────────────────────────────
+        SizedBox(
+          width: _colMin,
+          child: _editCell(context, 'quantityMin', r.quantityMin?.toString() ?? '',
+              Text(r.quantityMin?.toString() ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.quantityMin != null
+                      ? GoogleFonts.jetBrainsMono(fontSize: 12, color: context.appTextMuted)
+                      : tsMonoMut),
+              tsMonoMut),
+        ),
+      ]),
     );
   }
 }
@@ -353,7 +483,17 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
             .update(data)
             .eq('reagent_id', widget.existing!.id);
       } else {
-        await Supabase.instance.client.from('reagents').insert(data);
+        final row = await Supabase.instance.client
+            .from('reagents')
+            .insert(data)
+            .select('reagent_id')
+            .single();
+        final newId = row['reagent_id'] as int;
+        await Supabase.instance.client
+            .from('reagents')
+            .update({'reagent_qrcode': QrRules.build(
+                SupabaseManager.projectRef ?? 'local', 'reagents', newId)})
+            .eq('reagent_id', newId);
       }
 
       if (mounted) Navigator.pop(context, true);

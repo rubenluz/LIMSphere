@@ -1,21 +1,16 @@
 // locations_widgets.dart - Part of locations_page.dart.
-// _RoomCard: expandable card for a top-level room.
+// _RoomCard: expandable list card for a top-level room.
 // _ChildTile: sub-location row inside a room card.
 // _OrphanCard: card for locations with no parent.
-// _Btn: small icon button utility.
 // _LocationFormDialog: add/edit location form dialog.
 // _DarkField, _DarkDropdown: dark-themed form field helpers.
 part of 'locations_page.dart';
 
 // ─── Room Card ──────────────────────────────────────────────────────────────────
-class _RoomCard extends StatelessWidget {
+class _RoomCard extends StatefulWidget {
   final LocationModel room;
   final List<LocationModel> children;
-  final VoidCallback onDelete;
-  final VoidCallback onQr;
   final VoidCallback onTap;
-  final void Function(LocationModel) onDeleteChild;
-  final void Function(LocationModel) onQrChild;
   final void Function(LocationModel) onTapChild;
   final VoidCallback onAddChild;
 
@@ -23,14 +18,17 @@ class _RoomCard extends StatelessWidget {
     required super.key,
     required this.room,
     required this.children,
-    required this.onDelete,
-    required this.onQr,
     required this.onTap,
-    required this.onDeleteChild,
-    required this.onQrChild,
     required this.onTapChild,
     required this.onAddChild,
   });
+
+  @override
+  State<_RoomCard> createState() => _RoomCardState();
+}
+
+class _RoomCardState extends State<_RoomCard> {
+  bool _expanded = true;
 
   static const _roomAccent = Color(0xFF6366F1);
 
@@ -44,23 +42,12 @@ class _RoomCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _buildHeader(context),
-        if (children.isNotEmpty) ...[
+        if (_expanded && widget.children.isNotEmpty) ...[
           Divider(height: 1, color: context.appBorder),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: children
-                  .map((c) => _ChildTile(
-                        loc: c,
-                        onDelete: () => onDeleteChild(c),
-                        onQr: () => onQrChild(c),
-                        onTap: () => onTapChild(c),
-                      ))
-                  .toList(),
-            ),
-          ),
+          ...widget.children.map((c) => _ChildTile(
+                loc: c,
+                onTap: () => widget.onTapChild(c),
+              )),
         ],
         _buildFooter(context),
       ]),
@@ -73,9 +60,8 @@ class _RoomCard extends StatelessWidget {
         color: context.appSurface2,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       ),
-      padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+      padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
       child: Row(children: [
-        // Room icon
         Container(
           width: 32,
           height: 32,
@@ -87,62 +73,82 @@ class _RoomCard extends StatelessWidget {
               color: _roomAccent, size: 16),
         ),
         const SizedBox(width: 10),
-        // Name + meta — tappable to open detail
         Expanded(
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(room.name,
-                    style: GoogleFonts.spaceGrotesk(
-                        color: context.appTextPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600)),
-                if (room.temperature != null || room.capacity != null)
-                  Row(children: [
-                    if (room.temperature != null) ...[
-                      Icon(Icons.thermostat_outlined,
-                          size: 11, color: context.appTextMuted),
-                      const SizedBox(width: 2),
-                      Text(room.temperature!,
-                          style: GoogleFonts.spaceGrotesk(
-                              color: context.appTextMuted, fontSize: 11)),
-                      const SizedBox(width: 8),
-                    ],
-                    if (room.capacity != null) ...[
-                      Icon(Icons.storage_outlined,
-                          size: 11, color: context.appTextMuted),
-                      const SizedBox(width: 2),
-                      Text('Cap: ${room.capacity}',
-                          style: GoogleFonts.spaceGrotesk(
-                              color: context.appTextMuted, fontSize: 11)),
-                    ],
-                  ]),
-              ],
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.room.name,
+                  style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
+              if (widget.room.temperature != null ||
+                  widget.room.capacity != null)
+                Row(children: [
+                  if (widget.room.temperature != null) ...[
+                    Icon(Icons.thermostat_outlined,
+                        size: 11, color: context.appTextMuted),
+                    const SizedBox(width: 2),
+                    Text(widget.room.temperature!,
+                        style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextMuted, fontSize: 11)),
+                    const SizedBox(width: 8),
+                  ],
+                  if (widget.room.capacity != null) ...[
+                    Icon(Icons.storage_outlined,
+                        size: 11, color: context.appTextMuted),
+                    const SizedBox(width: 2),
+                    Text('Cap: ${widget.room.capacity}',
+                        style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextMuted, fontSize: 11)),
+                  ],
+                ]),
+            ],
           ),
         ),
-        // Children count badge
-        if (children.isNotEmpty) ...[
+        if (widget.children.isNotEmpty) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
               color: _roomAccent.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text('${children.length}',
+            child: Text('${widget.children.length}',
                 style: GoogleFonts.spaceGrotesk(
                     color: _roomAccent,
                     fontSize: 11,
                     fontWeight: FontWeight.w600)),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
         ],
-        _Btn(Icons.qr_code, 'QR Code', onQr),
-        _Btn(Icons.delete_outline, 'Delete', onDelete),
-        const SizedBox(width: 4),
+        OutlinedButton(
+          onPressed: widget.onTap,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _roomAccent,
+            side: BorderSide(color: _roomAccent.withValues(alpha: 0.5)),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            minimumSize: const Size(0, 28),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            textStyle: GoogleFonts.spaceGrotesk(fontSize: 12),
+          ),
+          child: const Text('View More'),
+        ),
+        if (widget.children.isNotEmpty) ...[
+          const SizedBox(width: 4),
+          IconButton(
+            icon: Icon(
+              _expanded ? Icons.expand_less : Icons.expand_more,
+              size: 18,
+              color: context.appTextSecondary,
+            ),
+            onPressed: () => setState(() => _expanded = !_expanded),
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.all(4),
+            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+          ),
+        ],
       ]),
     );
   }
@@ -151,7 +157,7 @@ class _RoomCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onAddChild,
+        onTap: widget.onAddChild,
         borderRadius:
             const BorderRadius.vertical(bottom: Radius.circular(12)),
         child: Container(
@@ -178,36 +184,31 @@ class _RoomCard extends StatelessWidget {
 // ─── Child Tile ─────────────────────────────────────────────────────────────────
 class _ChildTile extends StatelessWidget {
   final LocationModel loc;
-  final VoidCallback onDelete;
-  final VoidCallback onQr;
   final VoidCallback onTap;
 
   const _ChildTile({
     required this.loc,
-    required this.onDelete,
-    required this.onQr,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final accent = LocationModel.typeAccent(loc.type);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
-          decoration: BoxDecoration(
-            color: context.appSurface3,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: context.appBorder),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(LocationModel.typeIcon(loc.type), color: accent, size: 16),
-            const SizedBox(width: 6),
-            Column(
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        decoration: BoxDecoration(
+          border: Border(
+              bottom: BorderSide(
+                  color: context.appBorder.withValues(alpha: 0.5))),
+        ),
+        child: Row(children: [
+          const SizedBox(width: 20),
+          Icon(LocationModel.typeIcon(loc.type), color: accent, size: 15),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -222,11 +223,19 @@ class _ChildTile extends StatelessWidget {
                           color: context.appTextMuted, fontSize: 11)),
               ],
             ),
-            const SizedBox(width: 2),
-            _Btn(Icons.qr_code, 'QR', onQr, size: 14),
-            _Btn(Icons.delete_outline, 'Delete', onDelete, size: 14),
-          ]),
-        ),
+          ),
+          TextButton(
+            onPressed: onTap,
+            style: TextButton.styleFrom(
+              foregroundColor: AppDS.accent,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 28),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: GoogleFonts.spaceGrotesk(fontSize: 12),
+            ),
+            child: const Text('View More'),
+          ),
+        ]),
       ),
     );
   }
@@ -235,16 +244,12 @@ class _ChildTile extends StatelessWidget {
 // ─── Orphan Card ────────────────────────────────────────────────────────────────
 class _OrphanCard extends StatelessWidget {
   final List<LocationModel> locations;
-  final void Function(LocationModel) onDelete;
-  final void Function(LocationModel) onQr;
   final void Function(LocationModel) onTap;
   final VoidCallback onAdd;
 
   const _OrphanCard({
     required super.key,
     required this.locations,
-    required this.onDelete,
-    required this.onQr,
     required this.onTap,
     required this.onAdd,
   });
@@ -262,7 +267,8 @@ class _OrphanCard extends StatelessWidget {
         Container(
           decoration: BoxDecoration(
             color: context.appSurface2,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(12)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(children: [
@@ -281,21 +287,10 @@ class _OrphanCard extends StatelessWidget {
           ]),
         ),
         Divider(height: 1, color: context.appBorder),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: locations
-                .map((l) => _ChildTile(
-                      loc: l,
-                      onDelete: () => onDelete(l),
-                      onQr: () => onQr(l),
-                      onTap: () => onTap(l),
-                    ))
-                .toList(),
-          ),
-        ),
+        ...locations.map((l) => _ChildTile(
+              loc: l,
+              onTap: () => onTap(l),
+            )),
         Material(
           color: Colors.transparent,
           child: InkWell(
@@ -322,29 +317,6 @@ class _OrphanCard extends StatelessWidget {
           ),
         ),
       ]),
-    );
-  }
-}
-
-// ─── Small icon button ───────────────────────────────────────────────────────────
-class _Btn extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-  final double size;
-
-  const _Btn(this.icon, this.tooltip, this.onPressed, {this.size = 16});
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: Icon(icon, size: size, color: context.appTextSecondary),
-      tooltip: tooltip,
-      onPressed: onPressed,
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.all(4),
-      constraints:
-          BoxConstraints(minWidth: size + 10, minHeight: size + 10),
     );
   }
 }
@@ -420,9 +392,17 @@ class _LocationFormDialogState extends State<_LocationFormDialog> {
             .update(data)
             .eq('location_id', widget.existing!.id);
       } else {
+        final row = await Supabase.instance.client
+            .from('storage_locations')
+            .insert(data)
+            .select('location_id')
+            .single();
+        final newId = row['location_id'] as int;
         await Supabase.instance.client
             .from('storage_locations')
-            .insert(data);
+            .update({'location_qrcode': QrRules.build(
+                SupabaseManager.projectRef ?? 'local', 'locations', newId)})
+            .eq('location_id', newId);
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {

@@ -17,7 +17,7 @@ class _StatusDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: _options.contains(value) ? value : null,
+      initialValue: _options.contains(value) ? value : null,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(fontSize: 12, color: _DS.labelColor),

@@ -228,14 +228,6 @@ class _TankCleaningTimelineWidgetState
                         fontSize: 14,
                         color: context.appTextPrimary)),
               ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
             ]),
           ),
           Divider(height: 1, color: context.appBorder),

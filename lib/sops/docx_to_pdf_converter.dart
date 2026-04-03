@@ -14,6 +14,7 @@ import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:xml/xml.dart';
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -427,12 +428,25 @@ String _resolveSymbol(int code, String font) {
 Future<Uint8List> _buildPdf(
     List<_Node> nodes, _Margins m,
     List<_Run> headerRuns, List<_Run> footerRuns) async {
+  // Load Unicode-capable fonts (NotoSans covers en-dash, bullets, curly quotes,
+  // daggers, and the full Latin Extended range that DOCX files commonly use).
+  // Falls back to built-in Helvetica only if the network fetch fails.
+  pw.Font base, bold, italic, boldItalic;
+  try {
+    base       = await PdfGoogleFonts.notoSansRegular();
+    bold       = await PdfGoogleFonts.notoSansBold();
+    italic     = await PdfGoogleFonts.notoSansItalic();
+    boldItalic = await PdfGoogleFonts.notoSansBoldItalic();
+  } catch (_) {
+    base       = pw.Font.helvetica();
+    bold       = pw.Font.helveticaBold();
+    italic     = pw.Font.helveticaOblique();
+    boldItalic = pw.Font.helveticaBoldOblique();
+  }
+
   final pdf = pw.Document(
     theme: pw.ThemeData.withFont(
-      base:       pw.Font.helvetica(),
-      bold:       pw.Font.helveticaBold(),
-      italic:     pw.Font.helveticaOblique(),
-      boldItalic: pw.Font.helveticaBoldOblique(),
+      base: base, bold: bold, italic: italic, boldItalic: boldItalic,
     ),
   );
 

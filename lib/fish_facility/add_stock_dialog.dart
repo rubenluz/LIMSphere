@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'stocks/stocks_connection_model.dart';
 import '/theme/theme.dart';
+import '/supabase/supabase_manager.dart';
+import '/camera/qr_scanner/qr_code_rules.dart';
 
 // ZebTec rack constants (mirrors tanks_page / stocks_page)
 const _rowLabels  = ['A', 'B', 'C', 'D', 'E'];
@@ -95,6 +97,7 @@ class _AddStockDialogState extends State<AddStockDialog> {
   String? _selectedLine;
   List<String> _activeLineNames = [];
   Map<String, int> _lineIdByName = {};
+  Map<String, DateTime?> _lineDobByName = {};
   bool _loadingLines = true;
 
   late final TextEditingController _respCtrl;
@@ -180,7 +183,7 @@ class _AddStockDialogState extends State<AddStockDialog> {
     try {
       final rows = (await Supabase.instance.client
           .from('fish_lines')
-          .select('fish_line_id, fish_line_name')
+          .select('fish_line_id, fish_line_name, fish_line_date_birth')
           .eq('fish_line_status', 'active')
           .order('fish_line_name') as List<dynamic>)
           .cast<Map<String, dynamic>>();
@@ -188,6 +191,12 @@ class _AddStockDialogState extends State<AddStockDialog> {
         setState(() {
           _activeLineNames = rows.map((r) => r['fish_line_name'] as String).toList();
           _lineIdByName = { for (final r in rows) r['fish_line_name'] as String: r['fish_line_id'] as int };
+          _lineDobByName = {
+            for (final r in rows)
+              r['fish_line_name'] as String: r['fish_line_date_birth'] != null
+                  ? DateTime.tryParse(r['fish_line_date_birth'].toString())
+                  : null,
+          };
           _loadingLines = false;
           final prefillLine = widget.prefill?.line;
           if (prefillLine != null && _activeLineNames.contains(prefillLine)) {
@@ -246,12 +255,24 @@ class _AddStockDialogState extends State<AddStockDialog> {
       if (_notesCtrl.text.isNotEmpty) {
         payload['fish_stocks_notes'] = _notesCtrl.text.trim();
       }
+      final lineDob = _lineDobByName[_selectedLine];
+      if (lineDob != null) {
+        payload['fish_stocks_dob'] = lineDob.toIso8601String().substring(0, 10);
+      }
 
       final resp = await Supabase.instance.client
           .from('fish_stocks')
           .insert(payload)
           .select()
           .single();
+
+      final stockId = resp['fish_stocks_id'] as int;
+      final qrcode = QrRules.build(
+          SupabaseManager.projectRef ?? 'local', 'fish_stocks', stockId);
+      await Supabase.instance.client
+          .from('fish_stocks')
+          .update({'fish_stocks_qrcode': qrcode})
+          .eq('fish_stocks_id', stockId);
 
       widget.onAdd(FishStock(
         stockId:     resp['fish_stocks_id'].toString(),

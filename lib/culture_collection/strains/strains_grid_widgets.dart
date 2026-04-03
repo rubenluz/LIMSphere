@@ -298,8 +298,11 @@ class _ColPositionFieldState extends State<ColPositionField> {
 
   void _submit() {
     final val = int.tryParse(_ctrl.text);
-    if (val != null) widget.onSubmit(val);
-    else _ctrl.text = '${widget.position}';
+    if (val != null) {
+      widget.onSubmit(val);
+    } else {
+      _ctrl.text = '${widget.position}';
+    }
     setState(() => _editing = false);
   }
 

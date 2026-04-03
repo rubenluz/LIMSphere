@@ -36,7 +36,7 @@ String _generateZpl(LabelTemplate tpl, List<Map<String, dynamic>> records, Print
       for (final f in tpl.fields) {
         String value = f.content;
         if (f.isPlaceholder) {
-          record.forEach((k, v) => value = value.replaceAll('{$k}', v?.toString() ?? ''));
+          value = _resolveDataFields(value, record);
           value = value.replaceAll(RegExp(r'\{[^}]+\}'), '');
         }
         // ZPL field data must not contain ^ or ~
@@ -82,5 +82,31 @@ Future<void> _sendZplOverWifi(String ip, String zpl) async {
     await socket.flush();
   } finally {
     await socket.close();
+  }
+}
+
+Future<void> _sendZplOverUsb(PrinterConfig cfg, String zpl) async {
+  if (cfg.connectionType != 'usb') {
+    throw UnsupportedError('ZPL USB send requires a USB profile.');
+  }
+  await _sendViaUsb(cfg.usbPath, Uint8List.fromList(utf8.encode(zpl)));
+}
+
+Future<_ConnState> _checkZplConnection(PrinterConfig cfg) async {
+  if (cfg.connectionType == 'usb') {
+    return _checkUsbPrinterConnection(cfg.usbPath);
+  }
+  return _checkTcpPrinterConnection(cfg.ipAddress, _kZplPort);
+}
+
+Future<void> _printZpl(
+    LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) async {
+  final zpl = _generateZpl(tpl, records, cfg);
+  if (cfg.connectionType == 'usb') {
+    debugPrint('[PRINT] ZPL data: ${zpl.length} chars -> USB "${cfg.usbPath}"');
+    await _sendZplOverUsb(cfg, zpl);
+  } else {
+    debugPrint('[PRINT] ZPL: ${zpl.length} chars -> TCP ${cfg.ipAddress}:$_kZplPort');
+    await _sendZplOverWifi(cfg.ipAddress, zpl);
   }
 }

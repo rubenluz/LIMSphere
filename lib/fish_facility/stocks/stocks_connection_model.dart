@@ -29,10 +29,14 @@ class FishStock {
   double? feedingAmount;
   String? feedingAmountUnit;
   DateTime? lastBreeding;
+  /// Stored date of birth (denormalised from fish_line_date_birth on insert/save).
+  final DateTime? dob;
   /// Date of birth from the linked fish_line record (from the FK join).
   final DateTime? lineDateBirth;
   /// Set post-construction when the FK join returned null but a name-lookup found a date.
   DateTime? lineDateBirthOverride;
+  /// QR code string stored in fish_stocks_qrcode.
+  final String? qrcode;
   /// Editable age override (months). When 0, computed from lineDateBirth or arrivalDate.
   int _ageMonths;
 
@@ -52,10 +56,12 @@ class FishStock {
     this.experiment,
     this.notes,
     this.volumeL,
+    this.dob,
     this.arrivalDate,
     required this.created,
     this.lineDateBirth,
     int ageMonths = 0,
+    this.qrcode,
     this.lastCleaning,
     this.cleaningIntervalDays,
     this.feedingSchedule,
@@ -71,9 +77,9 @@ class FishStock {
     return lastCleaning!.add(Duration(days: cleaningIntervalDays!));
   }
 
-  /// Age in days from fish_line date_birth (preferred) or arrivalDate.
+  /// Age in days from stored dob (preferred), fish_line date_birth, or arrivalDate.
   int get ageDays {
-    final ref = lineDateBirth ?? lineDateBirthOverride ?? arrivalDate;
+    final ref = dob ?? lineDateBirth ?? lineDateBirthOverride ?? arrivalDate;
     if (ref == null) return 0;
     return DateTime.now().difference(ref).inDays;
   }
@@ -123,6 +129,9 @@ class FishStock {
       origin:         m[FishSch.stockOrigin]?.toString(),
       experiment:     m[FishSch.stockExperimentId]?.toString(),
       notes:          m[FishSch.stockNotes]?.toString(),
+      dob:            m[FishSch.stockDob] != null
+          ? DateTime.tryParse(m[FishSch.stockDob].toString())
+          : null,
       arrivalDate:    m[FishSch.stockArrivalDate] != null
           ? DateTime.tryParse(m[FishSch.stockArrivalDate].toString())
           : null,
@@ -145,6 +154,7 @@ class FishStock {
       lastBreeding:    m[FishSch.stockLastBreeding] != null
           ? DateTime.tryParse(m[FishSch.stockLastBreeding].toString())
           : null,
+      qrcode:          m[FishSch.stockQrcode]?.toString(),
     );
   }
 }

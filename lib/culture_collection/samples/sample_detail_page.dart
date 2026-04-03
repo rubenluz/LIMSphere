@@ -193,7 +193,9 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
   @override
   void dispose() {
-    for (final c in _ctrl.values) c.dispose();
+    for (final c in _ctrl.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -424,8 +426,8 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                 margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: _DS.accent.withOpacity(0.15),
-                  border: Border.all(color: _DS.accent.withOpacity(0.4)),
+                  color: _DS.accent.withValues(alpha: 0.15),
+                  border: Border.all(color: _DS.accent.withValues(alpha: 0.4)),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -482,7 +484,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
     final date    = _data['sample_date']?.toString();
 
     final parts = [country, island, date]
-        .where((v) => v != null && v!.isNotEmpty)
+        .where((v) => v != null && v.isNotEmpty)
         .join('  ·  ');
 
     return Container(
@@ -506,7 +508,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: _DS.accent.withOpacity(0.12),
+              color: _DS.accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -583,8 +585,8 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                         horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
                       color: isActive
-                          ? Colors.white.withOpacity(0.3)
-                          : const Color(0xFF16A34A).withOpacity(0.12),
+                          ? Colors.white.withValues(alpha: 0.3)
+                          : const Color(0xFF16A34A).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text('${_strains.length}',
@@ -641,7 +643,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
       itemCount: _strains.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (_, i) {
         final s       = _strains[i];
         final code    = s['strain_code']?.toString() ?? '—';
@@ -650,7 +652,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         final sciName = s['strain_scientific_name']?.toString();
         final status  = s['strain_status']?.toString();
         final taxon   = sciName ??
-            [genus, sp].where((v) => v != null && v!.isNotEmpty).join(' ');
+            [genus, sp].where((v) => v != null && v.isNotEmpty).join(' ');
 
         return GestureDetector(
           onTap: _openStrains,
@@ -661,7 +663,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: _DS.cardBorder),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.03),
+                BoxShadow(color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 4, offset: const Offset(0, 1)),
               ],
             ),
@@ -669,7 +671,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               Container(
                 width: 38, height: 38,
                 decoration: BoxDecoration(
-                  color: _DS.accent.withOpacity(0.08),
+                  color: _DS.accent.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.science_outlined, size: 18, color: _DS.accent),
@@ -696,9 +698,9 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _statusColor(status).withOpacity(0.1),
+                    color: _statusColor(status).withValues(alpha: 0.1),
                     border: Border.all(
-                        color: _statusColor(status).withOpacity(0.3)),
+                        color: _statusColor(status).withValues(alpha: 0.3)),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -757,8 +759,8 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: _DS.accent.withOpacity(0.15),
-                border: Border.all(color: _DS.accent.withOpacity(0.4)),
+                color: _DS.accent.withValues(alpha: 0.15),
+                border: Border.all(color: _DS.accent.withValues(alpha: 0.4)),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -848,12 +850,15 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                           size: 16,
                           color: isExp ? _DS.accent : const Color(0xFF94A3B8)),
                       selected: isExp,
-                      selectedTileColor: _DS.accent.withOpacity(0.06),
+                      selectedTileColor: _DS.accent.withValues(alpha: 0.06),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                       onTap: () => setState(() {
-                        if (isExp) _expanded.remove(i);
-                        else _expanded.add(i);
+                        if (isExp) {
+                          _expanded.remove(i);
+                        } else {
+                          _expanded.add(i);
+                        }
                       }),
                     );
                   },
@@ -938,7 +943,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: _DS.cardBorder),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 6, offset: const Offset(0, 2)),
           ],
         ),
@@ -955,7 +960,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                    color: _DS.accent.withOpacity(0.1),
+                    color: _DS.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8)),
                 child: Icon(_sectionIcon(iconKey), size: 16, color: _DS.accent),
               ),
@@ -964,8 +969,11 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               const Spacer(),
               GestureDetector(
                 onTap: () => setState(() {
-                  if (_expanded.contains(index)) _expanded.remove(index);
-                  else _expanded.add(index);
+                  if (_expanded.contains(index)) {
+                    _expanded.remove(index);
+                  } else {
+                    _expanded.add(index);
+                  }
                 }),
                 child: const Icon(Icons.keyboard_arrow_up_rounded,
                     size: 20, color: Color(0xFF94A3B8)),
@@ -1026,7 +1034,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _DS.cardBorder),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
@@ -1043,7 +1051,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                  color: _DS.accent.withOpacity(0.1),
+                  color: _DS.accent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8)),
               child: const Icon(Icons.science_rounded, size: 16, color: _DS.accent),
             ),
@@ -1054,7 +1062,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                    color: _DS.accent.withOpacity(0.1),
+                    color: _DS.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10)),
                 child: Text('${_strains.length}',
                     style: const TextStyle(
@@ -1119,7 +1127,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _strains.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: _DS.cardBorder),
+      separatorBuilder: (_, _) => const Divider(height: 1, color: _DS.cardBorder),
       itemBuilder: (_, i) {
         final s       = _strains[i];
         final code    = s['strain_code']?.toString() ?? '—';
@@ -1128,14 +1136,14 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         final sciName = s['strain_scientific_name']?.toString();
         final status  = s['strain_status']?.toString();
         final taxon   = sciName ??
-            [genus, sp].where((v) => v != null && v!.isNotEmpty).join(' ');
+            [genus, sp].where((v) => v != null && v.isNotEmpty).join(' ');
 
         return ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           leading: Container(
             width: 36, height: 36,
             decoration: BoxDecoration(
-                color: _DS.accent.withOpacity(0.08),
+                color: _DS.accent.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8)),
             child: const Icon(Icons.science_outlined, size: 18, color: _DS.accent),
           ),
@@ -1151,9 +1159,9 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               ? Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _statusColor(status).withOpacity(0.1),
+                    color: _statusColor(status).withValues(alpha: 0.1),
                     border: Border.all(
-                        color: _statusColor(status).withOpacity(0.3)),
+                        color: _statusColor(status).withValues(alpha: 0.3)),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [

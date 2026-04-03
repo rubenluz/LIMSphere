@@ -110,7 +110,7 @@ class _InCareWidgetState extends State<InCareWidget> {
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: _strains.length,
-      separatorBuilder: (_, __) =>
+      separatorBuilder: (_, _) =>
           const Divider(height: 1, indent: 12, endIndent: 12),
       itemBuilder: (context, i) {
         final strain  = _strains[i];

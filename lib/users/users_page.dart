@@ -3,7 +3,6 @@
 // UserModel (public) re-exported here for use by user_detail_page.
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '/core/data_cache.dart';
@@ -11,6 +10,94 @@ import '/theme/theme.dart';
 import '/theme/grid_widgets.dart';
 import '../fish_facility/shared_widgets.dart';
 import 'user_detail_page.dart';
+
+TextStyle _spaceGrotesk({
+  TextStyle? textStyle,
+  Color? color,
+  Color? backgroundColor,
+  double? fontSize,
+  FontWeight? fontWeight,
+  FontStyle? fontStyle,
+  double? letterSpacing,
+  double? wordSpacing,
+  TextBaseline? textBaseline,
+  double? height,
+  Locale? locale,
+  Paint? foreground,
+  Paint? background,
+  List<Shadow>? shadows,
+  List<FontFeature>? fontFeatures,
+  TextDecoration? decoration,
+  Color? decorationColor,
+  TextDecorationStyle? decorationStyle,
+  double? decorationThickness,
+}) {
+  return (textStyle ?? const TextStyle()).copyWith(
+    color: color,
+    backgroundColor: backgroundColor,
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    fontStyle: fontStyle,
+    letterSpacing: letterSpacing,
+    wordSpacing: wordSpacing,
+    textBaseline: textBaseline,
+    height: height,
+    locale: locale,
+    foreground: foreground,
+    background: background,
+    shadows: shadows,
+    fontFeatures: fontFeatures,
+    decoration: decoration,
+    decorationColor: decorationColor,
+    decorationStyle: decorationStyle,
+    decorationThickness: decorationThickness,
+  );
+}
+
+TextStyle _jetBrainsMono({
+  TextStyle? textStyle,
+  Color? color,
+  Color? backgroundColor,
+  double? fontSize,
+  FontWeight? fontWeight,
+  FontStyle? fontStyle,
+  double? letterSpacing,
+  double? wordSpacing,
+  TextBaseline? textBaseline,
+  double? height,
+  Locale? locale,
+  Paint? foreground,
+  Paint? background,
+  List<Shadow>? shadows,
+  List<FontFeature>? fontFeatures,
+  TextDecoration? decoration,
+  Color? decorationColor,
+  TextDecorationStyle? decorationStyle,
+  double? decorationThickness,
+}) {
+  return (textStyle ?? const TextStyle()).copyWith(
+    fontFamily: 'Consolas',
+    fontFamilyFallback: const ['Courier New'],
+    color: color,
+    backgroundColor: backgroundColor,
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    fontStyle: fontStyle,
+    letterSpacing: letterSpacing,
+    wordSpacing: wordSpacing,
+    textBaseline: textBaseline,
+    height: height,
+    locale: locale,
+    foreground: foreground,
+    background: background,
+    shadows: shadows,
+    fontFeatures: fontFeatures,
+    decoration: decoration,
+    decorationColor: decorationColor,
+    decorationStyle: decorationStyle,
+    decorationThickness: decorationThickness,
+  );
+}
 
 // ignore_for_file: use_build_context_synchronously
 
@@ -33,6 +120,7 @@ class _User {
   String?  language;
   String   permDashboard;
   String   permChat;
+  String   permBackups;
   String   permCulture;
   String   permFish;
   String   permResources;
@@ -58,6 +146,7 @@ class _User {
     this.language,
     required this.permDashboard,
     required this.permChat,
+    required this.permBackups,
     required this.permCulture,
     required this.permFish,
     required this.permResources,
@@ -84,6 +173,7 @@ class _User {
     language:            m['user_language']     as String?,
     permDashboard:       (m['user_table_dashboard']         as String?) ?? 'none',
     permChat:            (m['user_table_chat']              as String?) ?? 'none',
+    permBackups:         (m['user_table_backups']           as String?) ?? 'none',
     permCulture:         (m['user_table_culture_collection'] as String?) ?? 'none',
     permFish:            (m['user_table_fish_facility']     as String?) ?? 'none',
     permResources:       (m['user_table_resources']         as String?) ?? 'none',
@@ -116,6 +206,7 @@ class _User {
     'user_language': language,
     'user_table_dashboard': permDashboard,
     'user_table_chat': permChat,
+    'user_table_backups': permBackups,
     'user_table_culture_collection': permCulture,
     'user_table_fish_facility': permFish,
     'user_table_resources': permResources,
@@ -151,6 +242,7 @@ const _cols = [
   ('user_phone',                   'Phone',         110.0),
   ('user_table_dashboard',         'Dashboard',      80.0),
   ('user_table_chat',              'Chat',           60.0),
+  ('user_table_backups',           'Backups',        72.0),
   ('user_table_culture_collection','Culture',        72.0),
   ('user_table_fish_facility',     'Fish Fac.',      72.0),
   ('user_table_resources',         'Resources',      80.0),
@@ -158,9 +250,10 @@ const _cols = [
   ('user_created_at',              'Created',       110.0),
 ];
 
-const _roleOptions   = ['superadmin', 'admin', 'technician', 'researcher', 'viewer'];
-const _statusOptions = ['pending', 'active', 'inactive'];
-const _permOptions   = ['none', 'read', 'write'];
+const _roleOptions        = ['superadmin', 'admin', 'technician', 'researcher', 'viewer'];
+const _statusOptions      = ['pending', 'active', 'inactive'];
+const _permOptions        = ['none', 'read', 'write'];
+const _backupsPermOptions = ['none', 'see'];
 
 final _dtFmt     = DateFormat('yyyy-MM-dd');
 final _dtTimeFmt = DateFormat('yyyy-MM-dd HH:mm');
@@ -337,6 +430,7 @@ class _UsersPageState extends State<UsersPage> {
       case 'user_status':                   u.status        = v; break;
       case 'user_table_dashboard':          u.permDashboard = v; break;
       case 'user_table_chat':               u.permChat      = v; break;
+      case 'user_table_backups':            u.permBackups   = v; break;
       case 'user_table_culture_collection': u.permCulture   = v; break;
       case 'user_table_fish_facility':      u.permFish      = v; break;
       case 'user_table_resources':          u.permResources = v; break;
@@ -364,7 +458,7 @@ class _UsersPageState extends State<UsersPage> {
         value: o,
         child: Row(children: [
           Text(o,
-              style: GoogleFonts.spaceGrotesk(
+              style: _spaceGrotesk(
                   fontSize: 13,
                   color: context.appTextPrimary,
                   fontWeight:
@@ -392,6 +486,7 @@ class _UsersPageState extends State<UsersPage> {
       case 'user_phone':                    return u.phone;
       case 'user_table_dashboard':          return u.permDashboard;
       case 'user_table_chat':               return u.permChat;
+      case 'user_table_backups':            return u.permBackups;
       case 'user_table_culture_collection': return u.permCulture;
       case 'user_table_fish_facility':      return u.permFish;
       case 'user_table_resources':          return u.permResources;
@@ -438,11 +533,11 @@ class _UsersPageState extends State<UsersPage> {
             width: 240,
             child: TextField(
               controller: _searchCtrl,
-              style: GoogleFonts.spaceGrotesk(
+              style: _spaceGrotesk(
                   fontSize: 13, color: context.appTextPrimary),
               decoration: InputDecoration(
                 hintText: 'Search users…',
-                hintStyle: GoogleFonts.spaceGrotesk(
+                hintStyle: _spaceGrotesk(
                     fontSize: 12, color: context.appTextMuted),
                 prefixIcon: Icon(Icons.search,
                     size: 16, color: context.appTextMuted),
@@ -508,7 +603,7 @@ class _UsersPageState extends State<UsersPage> {
                   const SizedBox(width: 5),
                   Text(
                     '$pendingCount pending',
-                    style: GoogleFonts.spaceGrotesk(
+                    style: _spaceGrotesk(
                         fontSize: 12,
                         color: AppDS.orange,
                         fontWeight: FontWeight.w600),
@@ -518,7 +613,7 @@ class _UsersPageState extends State<UsersPage> {
             ),
           Text(
             '${_filtered.length} of ${_users.length}',
-            style: GoogleFonts.jetBrainsMono(
+            style: _jetBrainsMono(
                 fontSize: 11, color: context.appTextMuted),
           ),
         ],
@@ -535,7 +630,7 @@ class _UsersPageState extends State<UsersPage> {
       return Center(
         child: Text(_error!,
             style:
-                GoogleFonts.spaceGrotesk(color: AppDS.red, fontSize: 13)),
+                _spaceGrotesk(color: AppDS.red, fontSize: 13)),
       );
     }
     if (_filtered.isEmpty) {
@@ -548,7 +643,7 @@ class _UsersPageState extends State<UsersPage> {
             const SizedBox(height: 14),
             Text(
               _users.isEmpty ? 'No users found.' : 'No users match.',
-              style: GoogleFonts.spaceGrotesk(
+              style: _spaceGrotesk(
                   fontSize: 14, color: context.appTextSecondary),
             ),
           ],
@@ -722,6 +817,7 @@ class _UsersPageState extends State<UsersPage> {
           _textCell(u, 'user_phone',   110),
           _permCell(u, 'user_table_dashboard',          80),
           _permCell(u, 'user_table_chat',               60),
+          _permCell(u, 'user_table_backups',            72, options: _backupsPermOptions),
           _permCell(u, 'user_table_culture_collection', 72),
           _permCell(u, 'user_table_fish_facility',      72),
           _permCell(u, 'user_table_resources',          80),
@@ -770,7 +866,7 @@ class _UsersPageState extends State<UsersPage> {
               ? TextField(
                   controller: _editCtrl,
                   autofocus: true,
-                  style: GoogleFonts.spaceGrotesk(
+                  style: _spaceGrotesk(
                       fontSize: 12, color: AppDS.tableText),
                   decoration: _editDeco,
                   onSubmitted: (v) => _commitText(u, key, v),
@@ -780,8 +876,8 @@ class _UsersPageState extends State<UsersPage> {
               : Text(
                   val ?? '—',
                   style: (mono
-                          ? GoogleFonts.jetBrainsMono(fontSize: 11)
-                          : GoogleFonts.spaceGrotesk(
+                          ? _jetBrainsMono(fontSize: 11)
+                          : _spaceGrotesk(
                               fontSize: 12,
                               fontWeight: bold
                                   ? FontWeight.w600
@@ -815,7 +911,7 @@ class _UsersPageState extends State<UsersPage> {
             ),
             child: Text(
               u.role,
-              style: GoogleFonts.spaceGrotesk(
+              style: _spaceGrotesk(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: roleColor,
@@ -851,7 +947,7 @@ class _UsersPageState extends State<UsersPage> {
                   ),
                   child: Text(
                     u.status,
-                    style: GoogleFonts.spaceGrotesk(
+                    style: _spaceGrotesk(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: sc,
@@ -883,18 +979,18 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  Widget _permCell(_User u, String key, double w) {
+  Widget _permCell(_User u, String key, double w, {List<String>? options}) {
     final val = _fieldVal(u, key) ?? 'none';
     final c   = _permColor(val);
     return GestureDetector(
       onDoubleTapDown: (d) =>
-          _showMenuPicker(u, key, _permOptions.toList(), d.globalPosition),
+          _showMenuPicker(u, key, (options ?? _permOptions).toList(), d.globalPosition),
       child: SizedBox(
         width: w,
         child: Center(
           child: Text(
             _permLabel(val),
-            style: GoogleFonts.jetBrainsMono(
+            style: _jetBrainsMono(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: c),
@@ -912,8 +1008,8 @@ class _UsersPageState extends State<UsersPage> {
         child: Text(
           val ?? '—',
           style: (mono
-                  ? GoogleFonts.jetBrainsMono(fontSize: 11)
-                  : GoogleFonts.spaceGrotesk(fontSize: 12))
+                  ? _jetBrainsMono(fontSize: 11)
+                  : _spaceGrotesk(fontSize: 12))
               .copyWith(
                   color:
                       val == null ? AppDS.tableTextMute : AppDS.tableTextMute),
@@ -948,6 +1044,7 @@ class _UsersPageState extends State<UsersPage> {
     switch (p) {
       case 'write': return AppDS.green;
       case 'read':  return AppDS.accent;
+      case 'see':   return AppDS.yellow;
       default:      return AppDS.tableTextMute;
     }
   }
@@ -956,6 +1053,7 @@ class _UsersPageState extends State<UsersPage> {
     switch (p) {
       case 'write': return 'W';
       case 'read':  return 'R';
+      case 'see':   return 'S';
       default:      return '—';
     }
   }

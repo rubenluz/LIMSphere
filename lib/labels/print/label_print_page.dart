@@ -51,8 +51,10 @@ class _PrintLabelPageState extends State<_PrintLabelPage> {
     final p = _activeProfile;
     if (p == null) return null;
     if (p.protocol != 'brother_ql' && p.protocol != 'brother_ql_legacy') return null;
-    final dots = _ql700PrintableDots(widget.template.labelW, p.dpi);
-    return dots / p.dpi * 25.4;
+    if (p.protocol == 'brother_ql_legacy') {
+      return _ql570PrintableWidthMm(widget.template, p.toPrinterConfig());
+    }
+    return _ql700PrintableWidthMm(widget.template.labelW, p.dpi);
   }
 
   double? get _printableH {

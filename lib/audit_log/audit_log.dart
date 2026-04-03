@@ -6,11 +6,98 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '/theme/theme.dart';
+
+TextStyle _spaceGrotesk({
+  TextStyle? textStyle,
+  Color? color,
+  Color? backgroundColor,
+  double? fontSize,
+  FontWeight? fontWeight,
+  FontStyle? fontStyle,
+  double? letterSpacing,
+  double? wordSpacing,
+  TextBaseline? textBaseline,
+  double? height,
+  Locale? locale,
+  Paint? foreground,
+  Paint? background,
+  List<Shadow>? shadows,
+  List<FontFeature>? fontFeatures,
+  TextDecoration? decoration,
+  Color? decorationColor,
+  TextDecorationStyle? decorationStyle,
+  double? decorationThickness,
+}) {
+  return (textStyle ?? const TextStyle()).copyWith(
+    color: color,
+    backgroundColor: backgroundColor,
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    fontStyle: fontStyle,
+    letterSpacing: letterSpacing,
+    wordSpacing: wordSpacing,
+    textBaseline: textBaseline,
+    height: height,
+    locale: locale,
+    foreground: foreground,
+    background: background,
+    shadows: shadows,
+    fontFeatures: fontFeatures,
+    decoration: decoration,
+    decorationColor: decorationColor,
+    decorationStyle: decorationStyle,
+    decorationThickness: decorationThickness,
+  );
+}
+
+TextStyle _jetBrainsMono({
+  TextStyle? textStyle,
+  Color? color,
+  Color? backgroundColor,
+  double? fontSize,
+  FontWeight? fontWeight,
+  FontStyle? fontStyle,
+  double? letterSpacing,
+  double? wordSpacing,
+  TextBaseline? textBaseline,
+  double? height,
+  Locale? locale,
+  Paint? foreground,
+  Paint? background,
+  List<Shadow>? shadows,
+  List<FontFeature>? fontFeatures,
+  TextDecoration? decoration,
+  Color? decorationColor,
+  TextDecorationStyle? decorationStyle,
+  double? decorationThickness,
+}) {
+  return (textStyle ?? const TextStyle()).copyWith(
+    fontFamily: 'Consolas',
+    fontFamilyFallback: const ['Courier New'],
+    color: color,
+    backgroundColor: backgroundColor,
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    fontStyle: fontStyle,
+    letterSpacing: letterSpacing,
+    wordSpacing: wordSpacing,
+    textBaseline: textBaseline,
+    height: height,
+    locale: locale,
+    foreground: foreground,
+    background: background,
+    shadows: shadows,
+    fontFeatures: fontFeatures,
+    decoration: decoration,
+    decorationColor: decorationColor,
+    decorationStyle: decorationStyle,
+    decorationThickness: decorationThickness,
+  );
+}
 
 // ── Model ─────────────────────────────────────────────────────────────────────
 
@@ -223,7 +310,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
               color: context.appTextMuted, size: 18),
           const SizedBox(width: 8),
           Text('Audit Log',
-              style: GoogleFonts.spaceGrotesk(
+              style: _spaceGrotesk(
                   color: context.appTextPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w600)),
@@ -237,11 +324,11 @@ class _AuditLogPageState extends State<AuditLogPage> {
                   _search = v;
                   _applyFilters();
                 },
-                style: GoogleFonts.spaceGrotesk(
+                style: _spaceGrotesk(
                     color: context.appTextPrimary, fontSize: 13),
                 decoration: InputDecoration(
                   hintText: 'Search user, table, action, record ID...',
-                  hintStyle: GoogleFonts.spaceGrotesk(
+                  hintStyle: _spaceGrotesk(
                       color: context.appTextMuted, fontSize: 13),
                   prefixIcon:
                       Icon(Icons.search, color: context.appTextMuted, size: 16),
@@ -279,19 +366,19 @@ class _AuditLogPageState extends State<AuditLogPage> {
               child: DropdownButton<String>(
                 value: _tableFilter,
                 dropdownColor: context.appSurface,
-                style: GoogleFonts.spaceGrotesk(
+                style: _spaceGrotesk(
                     color: context.appTextPrimary, fontSize: 13),
                 items: [
                   DropdownMenuItem(
                     value: 'all',
                     child: Text('All Tables',
-                        style: GoogleFonts.spaceGrotesk(
+                        style: _spaceGrotesk(
                             color: context.appTextSecondary, fontSize: 13)),
                   ),
                   ..._allTables.map((t) => DropdownMenuItem(
                         value: t,
                         child: Text(t,
-                            style: GoogleFonts.spaceGrotesk(
+                            style: _spaceGrotesk(
                                 color: context.appTextPrimary, fontSize: 13)),
                       )),
                 ],
@@ -310,19 +397,19 @@ class _AuditLogPageState extends State<AuditLogPage> {
               child: DropdownButton<String>(
                 value: _actionFilter,
                 dropdownColor: context.appSurface,
-                style: GoogleFonts.spaceGrotesk(
+                style: _spaceGrotesk(
                     color: context.appTextPrimary, fontSize: 13),
                 items: [
                   DropdownMenuItem(
                     value: 'all',
                     child: Text('All Actions',
-                        style: GoogleFonts.spaceGrotesk(
+                        style: _spaceGrotesk(
                             color: context.appTextSecondary, fontSize: 13)),
                   ),
                   ..._allActions.map((a) => DropdownMenuItem(
                         value: a,
                         child: Text(a,
-                            style: GoogleFonts.spaceGrotesk(
+                            style: _spaceGrotesk(
                                 color: _actionColor(a), fontSize: 13)),
                       )),
                 ],
@@ -364,7 +451,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
                         size: 48, color: AppDS.textMuted),
                     const SizedBox(height: 12),
                     Text('No audit entries found',
-                        style: GoogleFonts.spaceGrotesk(
+                        style: _spaceGrotesk(
                             color: AppDS.textMuted, fontSize: 15)),
                   ]))
                 : Column(children: [
@@ -409,7 +496,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
                                   icon: const Icon(Icons.expand_more,
                                       size: 16),
                                   label: Text('Load more',
-                                      style: GoogleFonts.spaceGrotesk(
+                                      style: _spaceGrotesk(
                                           fontSize: 13)),
                                   style: TextButton.styleFrom(
                                       foregroundColor: AppDS.accent),
@@ -450,7 +537,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
                       child: Text(
                         '${_filtered.length} entr${_filtered.length == 1 ? 'y' : 'ies'}'
                         '${_search.isNotEmpty || _tableFilter != 'all' || _actionFilter != 'all' ? ' (filtered from ${_all.length})' : ''}',
-                        style: GoogleFonts.spaceGrotesk(
+                        style: _spaceGrotesk(
                             color: context.appTextMuted, fontSize: 11),
                       ),
                     ),
@@ -460,7 +547,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   Widget _hdr(BuildContext context, String label) => Text(label,
-      style: GoogleFonts.spaceGrotesk(
+      style: _spaceGrotesk(
           color: context.appTextMuted,
           fontSize: 10,
           letterSpacing: 0.8,
@@ -475,7 +562,7 @@ class _HdrLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(label,
-      style: GoogleFonts.spaceGrotesk(
+      style: _spaceGrotesk(
           color: context.appTextMuted,
           fontSize: 10,
           letterSpacing: 0.8,
@@ -534,7 +621,7 @@ class _AuditRow extends StatelessWidget {
             Expanded(
               flex: 3,
               child: Text(_formatTs(entry.timestamp),
-                  style: GoogleFonts.jetBrainsMono(
+                  style: _jetBrainsMono(
                       color: context.appTextSecondary, fontSize: 11),
                   overflow: TextOverflow.ellipsis),
             ),
@@ -542,7 +629,7 @@ class _AuditRow extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Text(entry.userDisplay,
-                  style: GoogleFonts.spaceGrotesk(
+                  style: _spaceGrotesk(
                       color: context.appTextPrimary, fontSize: 12),
                   overflow: TextOverflow.ellipsis),
             ),
@@ -550,7 +637,7 @@ class _AuditRow extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Text(entry.table,
-                  style: GoogleFonts.jetBrainsMono(
+                  style: _jetBrainsMono(
                       color: context.appTextSecondary, fontSize: 11),
                   overflow: TextOverflow.ellipsis),
             ),
@@ -565,7 +652,7 @@ class _AuditRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(entry.action.toUpperCase(),
-                    style: GoogleFonts.spaceGrotesk(
+                    style: _spaceGrotesk(
                         color: ac,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -578,7 +665,7 @@ class _AuditRow extends StatelessWidget {
               width: 72,
               child: entry.recordId != null
                   ? Text('#${entry.recordId}',
-                      style: GoogleFonts.jetBrainsMono(
+                      style: _jetBrainsMono(
                           color: context.appTextMuted, fontSize: 11))
                   : const SizedBox(),
             ),
@@ -586,7 +673,7 @@ class _AuditRow extends StatelessWidget {
             Expanded(
               flex: 3,
               child: Text(entry.notes ?? '',
-                  style: GoogleFonts.spaceGrotesk(
+                  style: _spaceGrotesk(
                       color: context.appTextSecondary, fontSize: 12),
                   overflow: TextOverflow.ellipsis),
             ),
@@ -612,7 +699,7 @@ class _AuditRow extends StatelessWidget {
                       _detailLabel('BEFORE', AppDS.red),
                       const SizedBox(height: 4),
                       SelectableText(entry.oldValues!,
-                          style: GoogleFonts.jetBrainsMono(
+                          style: _jetBrainsMono(
                               color: AppDS.red.withValues(alpha: 0.85),
                               fontSize: 11)),
                     ]),
@@ -628,7 +715,7 @@ class _AuditRow extends StatelessWidget {
                       _detailLabel('AFTER', AppDS.green),
                       const SizedBox(height: 4),
                       SelectableText(entry.newValues!,
-                          style: GoogleFonts.jetBrainsMono(
+                          style: _jetBrainsMono(
                               color: AppDS.green.withValues(alpha: 0.85),
                               fontSize: 11)),
                     ]),
@@ -646,7 +733,7 @@ class _AuditRow extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         Text(text,
-            style: GoogleFonts.spaceGrotesk(
+            style: _spaceGrotesk(
                 color: color,
                 fontSize: 9,
                 fontWeight: FontWeight.w700,

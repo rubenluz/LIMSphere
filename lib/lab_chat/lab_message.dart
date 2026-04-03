@@ -70,9 +70,9 @@ class LabMessage {
       {
         'message_body': body,
         'message_channel': channel,
-        if (contextType != null) 'message_context_type': contextType,
-        if (contextId != null) 'message_context_id': contextId,
-        if (parentId != null) 'message_parent_id': parentId,
+        'message_context_type': ?contextType,
+        'message_context_id': ?contextId,
+        'message_parent_id': ?parentId,
       };
 
   LabMessage copyWith({

@@ -68,6 +68,7 @@ abstract class FishSch {
   static const stockJuveniles        = 'fish_stocks_juveniles';
   static const stockMortality        = 'fish_stocks_mortality';
   static const stockArrivalDate      = 'fish_stocks_arrival_date';
+  static const stockDob              = 'fish_stocks_dob';
   static const stockOrigin           = 'fish_stocks_origin';
   static const stockResponsible      = 'fish_stocks_responsible';
   static const stockResponsibleId    = 'fish_stocks_responsible_id';
@@ -94,6 +95,7 @@ abstract class FishSch {
   static const stockExperimentId     = 'fish_stocks_experiment_id';
   static const stockEthicsApproval   = 'fish_stocks_ethics_approval';
   static const stockNotes            = 'fish_stocks_notes';
+  static const stockQrcode           = 'fish_stocks_qrcode';
   static const stockCreatedAt        = 'fish_stocks_created_at';
   static const stockUpdatedAt        = 'fish_stocks_updated_at';
 }

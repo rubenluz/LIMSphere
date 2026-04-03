@@ -84,9 +84,13 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
         int? timeDays;
         if (daysRaw is int) {
           timeDays = daysRaw;
-        } else if (daysRaw is double) timeDays = daysRaw.toInt();
-        else if (daysRaw is String) timeDays = int.tryParse(daysRaw);
-        else if (daysRaw is num)    timeDays = daysRaw.toInt();
+        } else if (daysRaw is double) {
+          timeDays = daysRaw.toInt();
+        } else if (daysRaw is String) {
+          timeDays = int.tryParse(daysRaw);
+        } else if (daysRaw is num) {
+          timeDays = daysRaw.toInt();
+        }
 
         if (timeDays == null || timeDays <= 0) continue;
 

@@ -10,6 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'fish_lines_connection_model.dart';
 import '/core/fish_db_schema.dart';
+import '/supabase/supabase_manager.dart';
+import '../../camera/qr_scanner/qr_code_rules.dart';
 import '/core/data_cache.dart';
 import '../shared_widgets.dart';
 import 'fish_lines_detail_page.dart';
@@ -39,6 +41,7 @@ class _FishLinesPageState extends State<FishLinesPage> {
   String? _filterReporter;
   String _sortKey = 'fishlineName';
   bool _sortAsc = true;
+  bool _showFilters = false;
   Map<String, dynamic>? _editingCell;
   final _editController = TextEditingController();
 
@@ -193,8 +196,9 @@ class _FishLinesPageState extends State<FishLinesPage> {
 
   void _sort(String key) {
     setState(() {
-      if (_sortKey == key) _sortAsc = !_sortAsc;
-      else { _sortKey = key; _sortAsc = true; }
+      if (_sortKey == key) {
+        _sortAsc = !_sortAsc;
+      } else { _sortKey = key; _sortAsc = true; }
     });
     _applyFilters();
   }
@@ -248,60 +252,172 @@ class _FishLinesPageState extends State<FishLinesPage> {
     }
   }
 
+  bool get _hasActiveFilter =>
+      _filterType != null || _filterStatus != null || _filterReporter != null;
+
+  Widget _buildToolbar() {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: [
+        const Icon(Icons.science_outlined, size: 18, color: Color(0xFF7DD3FC)),
+        const SizedBox(width: 8),
+        Text('Fish Lines', style: GoogleFonts.spaceGrotesk(
+          fontSize: 16, fontWeight: FontWeight.w600,
+          color: context.appTextPrimary)),
+        const SizedBox(width: 16),
+        Expanded(
+          child: SizedBox(
+            height: 36,
+            child: AppSearchBar(controller: _searchCtrl, hint: 'Search lines…', onClear: _applyFilters),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            '${_filtered.length} of ${_lines.length}',
+            style: GoogleFonts.spaceGrotesk(fontSize: 12, color: context.appTextMuted),
+          ),
+        ),
+        Tooltip(
+          message: _showFilters ? 'Hide filters' : 'Show filters',
+          child: Stack(children: [
+            IconButton(
+              icon: Icon(Icons.tune,
+                  color: _showFilters ? AppDS.accent : context.appTextSecondary,
+                  size: 18),
+              onPressed: () => setState(() => _showFilters = !_showFilters),
+            ),
+            if (_hasActiveFilter)
+              Positioned(
+                right: 6, top: 6,
+                child: Container(
+                  width: 7, height: 7,
+                  decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle),
+                ),
+              ),
+          ]),
+        ),
+        Tooltip(
+          message: 'Export CSV',
+          child: IconButton(
+            icon: Icon(Icons.download_outlined, color: context.appTextSecondary, size: 18),
+            onPressed: _exportCsv,
+          ),
+        ),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppDS.accent,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+            minimumSize: const Size(0, 36),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+          ),
+          onPressed: () {
+            if (!context.canEditModule) { context.warnReadOnly(); return; }
+            _showAddLineDialog();
+          },
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('New Line'),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildFilterPanel() {
+    final reporters = _lines
+        .where((l) => l.fishlineReporter != null)
+        .map((l) => l.fishlineReporter!)
+        .toSet().toList()..sort();
+    return Container(
+      decoration: BoxDecoration(
+        color: context.appSurface,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            Text('Type', style: GoogleFonts.spaceGrotesk(
+                color: context.appTextMuted, fontSize: 11, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 12),
+            _chip('All', _filterType == null,
+                () { setState(() => _filterType = null); _applyFilters(); }),
+            ...const ['WT', 'transgenic', 'mutant', 'CRISPR', 'KO'].map((t) => Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: _chip(t, _filterType == t,
+                  () { setState(() => _filterType = t); _applyFilters(); }),
+            )),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Text('Status', style: GoogleFonts.spaceGrotesk(
+                color: context.appTextMuted, fontSize: 11, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 12),
+            _chip('All', _filterStatus == null,
+                () { setState(() => _filterStatus = null); _applyFilters(); }),
+            ...const ['active', 'archived', 'cryopreserved', 'lost'].map((s) => Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: _chip(s, _filterStatus == s,
+                  () { setState(() => _filterStatus = s); _applyFilters(); }),
+            )),
+          ]),
+          if (reporters.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              Text('Reporter', style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextMuted, fontSize: 11, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 12),
+              _chip('All', _filterReporter == null,
+                  () { setState(() => _filterReporter = null); _applyFilters(); }),
+              ...reporters.map((r) => Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: _chip(r, _filterReporter == r,
+                    () { setState(() => _filterReporter = r); _applyFilters(); }),
+              )),
+            ]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? AppDS.accent.withValues(alpha: 0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? AppDS.accent : AppDS.border,
+              width: selected ? 1.5 : 1),
+        ),
+        child: Text(label,
+            style: GoogleFonts.spaceGrotesk(
+                color: selected ? AppDS.accent : AppDS.textSecondary,
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final reporters = _lines.where((l) => l.fishlineReporter != null)
-        .map((l) => l.fishlineReporter!).toSet().toList()..sort();
     final tableWidth = _cols.fold(0.0, (s, c) => s + c.$3) + 36;
 
     return Column(
       children: [
-        // ── Toolbar ──────────────────────────────────────────────────────
-        Container(
-          color: context.appBg,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Row(children: [
-            AppSearchBar(controller: _searchCtrl, hint: 'Search lines…',
-              onClear: _applyFilters),
-            const SizedBox(width: 10),
-            AppFilterChip(label: 'Type', value: _filterType,
-              options: const ['WT', 'transgenic', 'mutant', 'CRISPR', 'KO'],
-              onChanged: (v) { setState(() => _filterType = v); _applyFilters(); }),
-            const SizedBox(width: 8),
-            AppFilterChip(label: 'Status', value: _filterStatus,
-              options: const ['active', 'archived', 'cryopreserved', 'lost'],
-              onChanged: (v) { setState(() => _filterStatus = v); _applyFilters(); }),
-            const SizedBox(width: 8),
-            AppFilterChip(label: 'Reporter', value: _filterReporter,
-              options: reporters,
-              onChanged: (v) { setState(() => _filterReporter = v); _applyFilters(); }),
-            const Spacer(),
-            Text('${_filtered.length} of ${_lines.length}',
-              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppDS.textMuted)),
-            const SizedBox(width: 8),
-            Tooltip(
-              message: 'Export CSV',
-              child: IconButton(
-                icon: const Icon(Icons.download_outlined, size: 18),
-                color: AppDS.textSecondary,
-                onPressed: _exportCsv,
-              ),
-            ),
-            const SizedBox(width: 4),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.add, size: 14),
-              label: const Text('New Line'),
-              onPressed: () {
-                if (!context.canEditModule) { context.warnReadOnly(); return; }
-                _showAddLineDialog();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppDS.accent,
-                foregroundColor: AppDS.bg,
-              ),
-            ),
-          ]),
-        ),
+        _buildToolbar(),
+        if (_showFilters) _buildFilterPanel(),
         Divider(height: 1, color: context.appBorder),
         // ── Table ────────────────────────────────────────────────────────
         Expanded(

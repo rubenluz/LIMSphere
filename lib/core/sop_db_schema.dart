@@ -43,5 +43,6 @@ class SopSch {
   static const revisionNotes = 'sop_revision_notes';
   static const context       = 'sop_context';    // 'fish_facility' | 'culture_collection'
   static const createdAt     = 'sop_created_at';
+  static const qrcode        = 'sop_qrcode';
   static const updatedAt     = 'sop_updated_at';
 }

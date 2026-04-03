@@ -368,7 +368,9 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
 
   @override
   void dispose() {
-    for (final c in _ctrl.values) c.dispose();
+    for (final c in _ctrl.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -606,11 +608,13 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             onSelected: (v) {
               if (v == 'delete') _delete();
-              if (v == 'request') showQuickRequestDialog(
+              if (v == 'request') {
+                showQuickRequestDialog(
                 context,
                 type: 'strains',
                 prefillTitle: _data['strain_code']?.toString() ?? '',
               );
+              }
             },
             itemBuilder: (_) => [
               const PopupMenuItem(
@@ -849,8 +853,11 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
                           size: 16,
                           color: isExp ? _DS.accent : const Color(0xFF94A3B8)),
                       onTap: () => setState(() {
-                        if (isExp) _expanded.remove(i);
-                        else _expanded.add(i);
+                        if (isExp) {
+                          _expanded.remove(i);
+                        } else {
+                          _expanded.add(i);
+                        }
                       }),
                       selected: isExp,
                       selectedTileColor: _DS.accent.withValues(alpha:0.06),
@@ -969,8 +976,11 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
               const Spacer(),
               GestureDetector(
                 onTap: () => setState(() {
-                  if (_expanded.contains(index)) _expanded.remove(index);
-                  else _expanded.add(index);
+                  if (_expanded.contains(index)) {
+                    _expanded.remove(index);
+                  } else {
+                    _expanded.add(index);
+                  }
                 }),
                 child: Icon(Icons.keyboard_arrow_up_rounded, size: 20, color: const Color(0xFF94A3B8)),
               ),

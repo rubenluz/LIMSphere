@@ -213,7 +213,7 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
               const Icon(Icons.biotech_outlined, size: 20, color: _accent),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('Fish by Line',
+                child: Text('Active Fish Lines',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
               if (!_loading && lineCount > 0)

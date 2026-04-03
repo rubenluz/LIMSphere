@@ -18,8 +18,15 @@ import '../stocks/stocks_detail_page.dart';
 import '/theme/theme.dart';
 import '../add_stock_dialog.dart';
 import '../../labels/label_page.dart';
+import 'tanks_widgets/tanks_widget_active_stocks.dart';
+import 'tanks_widgets/tanks_widget_active_fish_lines.dart';
+import 'tanks_widgets/tanks_widget_cleaning_timeline.dart';
 
 part 'tanks_dialogs.dart';
+part 'tanks_edit_dialog_desktop.dart';
+part 'tanks_edit_dialog_mobile.dart';
+part 'tanks_mobile_view.dart';
+
 
 // ─── ZebTec rack geometry ─────────────────────────────────────────────────────
 //
@@ -93,6 +100,9 @@ class _FishTanksPageState extends State<FishTanksPage> {
   bool    _loading      = true;
   String? _error;
 
+  List<({String label, DateTime date})> _cleaningEvents = [];
+  bool _cleaningLoading = false;
+
   final Map<String, List<ZebrafishTank>> _racks = {
     'R1': _buildDefaultRack('R1'),
   };
@@ -104,6 +114,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
   void initState() {
     super.initState();
     _loadFromSupabase();
+    _loadCleaningTimeline();
   }
 
   String? _canonicalTankId(Map<String, dynamic> row) {
@@ -169,6 +180,42 @@ class _FishTanksPageState extends State<FishTanksPage> {
       setState(() => _loading = false);
     } catch (e) {
       if (cached == null && mounted) setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  Future<void> _loadCleaningTimeline() async {
+    if (mounted) setState(() => _cleaningLoading = true);
+    try {
+      final rows = await Supabase.instance.client
+          .from('fish_stocks')
+          .select('fish_stocks_tank_id, fish_stocks_line, fish_stocks_last_tank_cleaning, fish_stocks_cleaning_interval_days')
+          .eq('fish_stocks_status', 'active');
+
+      final now    = DateTime.now();
+      final cutoff = now.add(const Duration(days: 30));
+      final events = <({String label, DateTime date})>[];
+
+      for (final row in rows as List) {
+        final lastRaw     = row['fish_stocks_last_tank_cleaning'];
+        final intervalRaw = row['fish_stocks_cleaning_interval_days'];
+        if (lastRaw == null || intervalRaw == null) continue;
+        final last     = DateTime.tryParse(lastRaw.toString());
+        final interval = int.tryParse(intervalRaw.toString());
+        if (last == null || interval == null || interval <= 0) continue;
+        final next = last.add(Duration(days: interval));
+        if (next.isAfter(cutoff)) continue;
+        final tankId = (row['fish_stocks_tank_id'] ?? '').toString();
+        final line   = (row['fish_stocks_line'] ?? '').toString();
+        final label  = tankId.isNotEmpty
+            ? (line.isNotEmpty ? '$tankId · $line' : tankId)
+            : line;
+        events.add((label: label, date: next));
+      }
+
+      events.sort((a, b) => a.date.compareTo(b.date));
+      if (mounted) setState(() { _cleaningEvents = events; _cleaningLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _cleaningLoading = false);
     }
   }
 
@@ -346,10 +393,12 @@ class _FishTanksPageState extends State<FishTanksPage> {
   // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.of(context).size.width < 600) return _buildMobileLayout();
     final tanks     = _rackTanks;
     final occupied  = tanks.where(_isOccupied).length;
     final empties   = tanks.where((t) => t.zebraStatus == 'empty').length;
     final sentinels = tanks.where(_isSentinel).length;
+    final totalFish = tanks.fold(0, (s, t) => s + (t.zebraMales ?? 0) + (t.zebraFemales ?? 0) + (t.zebraJuveniles ?? 0));
 
     return GestureDetector(
       onTap: () => setState(() => _menuTank = null),
@@ -357,9 +406,19 @@ class _FishTanksPageState extends State<FishTanksPage> {
         Column(children: [
           // ── Toolbar ──────────────────────────────────────────────────
           Container(
-            color: context.appBg,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            height: 56,
+            decoration: BoxDecoration(
+              color: context.appSurface2,
+              border: Border(bottom: BorderSide(color: context.appBorder)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(children: [
+              const Icon(Icons.grid_view_outlined, size: 18, color: AppDS.accent),
+              const SizedBox(width: 8),
+              Text('Tank Map', style: GoogleFonts.spaceGrotesk(
+                fontSize: 16, fontWeight: FontWeight.w600,
+                color: context.appTextPrimary)),
+              const SizedBox(width: 16),
               // Rack selector: dropdown if >1 rack, plain label if only one
               if (_racks.length > 1) ...[
                 Text('Rack:', style: GoogleFonts.spaceGrotesk(
@@ -390,12 +449,13 @@ class _FishTanksPageState extends State<FishTanksPage> {
                 const SizedBox(width: 6),
                 _chip('$sentinels sentinel',  AppDS.pink),
               ],
+              const SizedBox(width: 6),
+              _chip('$totalFish fish',        AppDS.green),
               const Spacer(),
               Tooltip(
                 message: 'Export CSV',
                 child: IconButton(
-                  icon: const Icon(Icons.download_outlined, size: 18),
-                  color: AppDS.textSecondary,
+                  icon: Icon(Icons.download_outlined, color: context.appTextSecondary, size: 18),
                   onPressed: _exportCsv,
                 ),
               ),
@@ -450,8 +510,6 @@ class _FishTanksPageState extends State<FishTanksPage> {
               ),
             ]),
           ),
-          Container(height: 1, color: context.appBorder),
-
           // ── Body ─────────────────────────────────────────────────────
           if (_loading)
             const Expanded(child: Center(
@@ -477,11 +535,14 @@ class _FishTanksPageState extends State<FishTanksPage> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(child: _buildStocksWidget()),
+                          Expanded(child: TanksWidgetActiveStocks(rackTanks: _rackTanks)),
                           const SizedBox(width: 12),
-                          Expanded(child: _buildFishByLineWidget()),
+                          Expanded(child: TanksWidgetActiveFishLines(rackTanks: _rackTanks)),
                           const SizedBox(width: 12),
-                          Expanded(child: _buildFoodAmountWidget()),
+                          Expanded(child: TanksWidgetCleaningTimeline(
+                            events: _cleaningEvents,
+                            loading: _cleaningLoading,
+                          )),
                         ],
                       ),
                     ),
@@ -713,7 +774,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
                               if (tank.zebraFeedingSchedule?.isNotEmpty == true)
                                 tank.zebraFeedingSchedule!,
                               if (tank.zebraFoodAmount != null)
-                                '(${tank.zebraFoodAmount}${tank.zebraFeedingAmountUnit != null ? ' ${tank.zebraFeedingAmountUnit}' : ''})',
+                                '(${tank.zebraFoodAmount! % 1 == 0 ? tank.zebraFoodAmount!.toInt() : tank.zebraFoodAmount}${tank.zebraFeedingAmountUnit != null ? ' ${tank.zebraFeedingAmountUnit}' : ''})',
                             ].join(' '),
                             style: GoogleFonts.spaceGrotesk(
                               fontSize: 8.0, color: const Color(0xFF9B6B1A)),
@@ -993,25 +1054,49 @@ class _FishTanksPageState extends State<FishTanksPage> {
 
   // ── Edit dialog ───────────────────────────────────────────────────────────
   void _showEditDialog(ZebrafishTank tank) {
-    showDialog(context: context, builder: (_) => _EditTankDialog(
-      tank: tank,
-      // exclude the tank being edited so its current slot isn't shown as occupied
-      occupiedTankIds: _occupiedTankIds.difference({tank.zebraTankId}),
-      availableRacks: _racks.keys.toList()..sort(),
-      onSave: (u) {
-        setState(() {
-          // if position changed, clear the old slot first
-          if (u.zebraTankId != tank.zebraTankId) {
-            _patch(tank.copyWith(
-              zebraStatus: 'empty', zebraLine: null,
-              zebraMales: 0, zebraFemales: 0, zebraJuveniles: 0,
-            ));
-          }
-          _patch(u);
-        });
-        _persist(u);
-      },
-    ));
+    final occupied = _occupiedTankIds.difference({tank.zebraTankId});
+    final racks    = _racks.keys.toList()..sort();
+    void onSave(ZebrafishTank u) {
+      setState(() {
+        // if position changed, clear the old slot first
+        if (u.zebraTankId != tank.zebraTankId) {
+          _patch(tank.copyWith(
+            zebraStatus: 'empty', zebraLine: null,
+            zebraMales: 0, zebraFemales: 0, zebraJuveniles: 0,
+          ));
+        }
+        _patch(u);
+      });
+      _persist(u);
+    }
+
+    if (MediaQuery.of(context).size.width < 600) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: _EditTankDialogMobile(
+            tank: tank,
+            occupiedTankIds: occupied,
+            availableRacks: racks,
+            onSave: onSave,
+          ),
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (_) => _EditTankDialog(
+          tank: tank,
+          occupiedTankIds: occupied,
+          availableRacks: racks,
+          onSave: onSave,
+        ),
+      );
+    }
   }
 
   Set<String> get _occupiedTankIds =>
@@ -1248,245 +1333,5 @@ class _FishTanksPageState extends State<FishTanksPage> {
     ));
   }
 
-  // ── Info widgets ──────────────────────────────────────────────────────────
-  Widget _infoCard(String title, IconData icon, List<Widget> rows) =>
-    Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.appSurface2,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: context.appBorder2)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(icon, size: 14, color: AppDS.accent),
-          const SizedBox(width: 6),
-          Text(title, style: GoogleFonts.spaceGrotesk(
-            fontSize: 13, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
-        ]),
-        const SizedBox(height: 10),
-        Divider(height: 1, color: context.appBorder),
-        const SizedBox(height: 8),
-        ...rows,
-      ]),
-    );
-
-  /// Natural sort for IDs like "R1-A2" vs "R10-A2" vs "R1-A10".
-  static int _compareTankId(String a, String b) {
-    final re = RegExp(r'^([^-]+)-([A-Za-z]+)(\d+)$');
-    final ma = re.firstMatch(a);
-    final mb = re.firstMatch(b);
-    if (ma == null || mb == null) return _naturalStr(a, b);
-    final rack = _naturalStr(ma.group(1)!, mb.group(1)!);
-    if (rack != 0) return rack;
-    final row = ma.group(2)!.compareTo(mb.group(2)!);
-    if (row != 0) return row;
-    return int.parse(ma.group(3)!).compareTo(int.parse(mb.group(3)!));
-  }
-
-  static int _naturalStr(String a, String b) {
-    final re = RegExp(r'(\d+)|(\D+)');
-    final ta = re.allMatches(a).toList();
-    final tb = re.allMatches(b).toList();
-    for (var i = 0; i < ta.length && i < tb.length; i++) {
-      final sa = ta[i].group(0)!;
-      final sb = tb[i].group(0)!;
-      final na = int.tryParse(sa);
-      final nb = int.tryParse(sb);
-      final c = (na != null && nb != null) ? na.compareTo(nb) : sa.compareTo(sb);
-      if (c != 0) return c;
-    }
-    return a.length.compareTo(b.length);
-  }
-
-  Widget _buildStocksWidget() {
-    final stockTanks = _rackTanks.where(_hasFish).toList()
-      ..sort((a, b) => _compareTankId(a.zebraTankId, b.zebraTankId));
-
-    final header = Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(children: [
-        SizedBox(width: 56, child: Text('Tank', style: GoogleFonts.spaceGrotesk(
-          fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
-        Expanded(child: Text('Line', style: GoogleFonts.spaceGrotesk(
-          fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
-        SizedBox(width: 28, child: Text('♂', textAlign: TextAlign.center,
-          style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
-        SizedBox(width: 28, child: Text('♀', textAlign: TextAlign.center,
-          style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
-        SizedBox(width: 32, child: Text('Juv', textAlign: TextAlign.center,
-          style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
-        SizedBox(width: 36, child: Text('Total', textAlign: TextAlign.right,
-          style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w700, color: context.appTextMuted))),
-      ]),
-    );
-
-    final rows = stockTanks.isEmpty
-      ? [Text('No active stocks in this rack.',
-          style: GoogleFonts.spaceGrotesk(fontSize: 12, color: context.appTextMuted))]
-      : stockTanks.map((t) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: Row(children: [
-            SizedBox(width: 56, child: Text(t.zebraTankId.split('-').last,
-              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppDS.accent))),
-            Expanded(child: Text(t.zebraLine ?? '—',
-              style: GoogleFonts.spaceGrotesk(fontSize: 11, color: context.appTextPrimary),
-              overflow: TextOverflow.ellipsis)),
-            SizedBox(width: 28, child: Text('${t.zebraMales ?? 0}', textAlign: TextAlign.center,
-              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: context.appTextSecondary))),
-            SizedBox(width: 28, child: Text('${t.zebraFemales ?? 0}', textAlign: TextAlign.center,
-              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: context.appTextSecondary))),
-            SizedBox(width: 32, child: Text('${t.zebraJuveniles ?? 0}', textAlign: TextAlign.center,
-              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: context.appTextSecondary))),
-            SizedBox(width: 36, child: Text('${t.totalFish}', textAlign: TextAlign.right,
-              style: GoogleFonts.jetBrainsMono(fontSize: 11,
-                fontWeight: FontWeight.w700, color: AppDS.green))),
-          ]),
-        )).toList();
-
-    return _infoCard('Stocks', Icons.water, [header, ...rows]);
-  }
-
-  Widget _buildFishByLineWidget() {
-    // (males, females, juveniles, total) per line name
-    final byLine = <String, (int, int, int, int)>{};
-    for (final t in _rackTanks.where(_hasFish)) {
-      final name = t.zebraLine?.trim().isNotEmpty == true ? t.zebraLine! : 'Unknown';
-      final m = t.zebraMales     ?? 0;
-      final f = t.zebraFemales   ?? 0;
-      final j = t.zebraJuveniles ?? 0;
-      final p = byLine[name] ?? (0, 0, 0, 0);
-      byLine[name] = (p.$1 + m, p.$2 + f, p.$3 + j, p.$4 + m + f + j);
-    }
-    final sorted = byLine.entries.toList()
-        ..sort((a, b) => a.key.compareTo(b.key));
-
-    if (sorted.isEmpty) {
-      return _infoCard('Fish by Line', Icons.biotech_outlined, [
-        Text('No fish in this rack.', style: GoogleFonts.spaceGrotesk(
-            fontSize: 12, color: context.appTextMuted)),
-      ]);
-    }
-
-    const colM = 36.0;
-    const colF = 36.0;
-    const colJ = 36.0;
-    const colT = 44.0;
-
-    colHdr(String label, Color color) => SizedBox(
-      width: label == 'Total' ? colT : colM,
-      child: Text(label,
-        textAlign: TextAlign.center,
-        style: GoogleFonts.spaceGrotesk(
-          fontSize: 10, fontWeight: FontWeight.w700, color: color)),
-    );
-
-    cell(int v, double w, Color color, {bool bold = false}) => SizedBox(
-      width: w,
-      child: Text(v > 0 ? '$v' : '—',
-        textAlign: TextAlign.center,
-        style: GoogleFonts.jetBrainsMono(
-          fontSize: 11,
-          fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
-          color: v > 0 ? color : context.appTextMuted)),
-    );
-
-    final header = Padding(
-      padding: const EdgeInsets.only(bottom: 5),
-      child: Row(children: [
-        const Expanded(child: SizedBox()),
-        colHdr('♂',     AppDS.accent),
-        colHdr('♀',     AppDS.pink),
-        colHdr('Juv',   context.appTextMuted),
-        colHdr('Total', context.appTextSecondary),
-      ]),
-    );
-
-    final dataRows = sorted.map((e) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(children: [
-        Expanded(child: Text(e.key,
-          style: GoogleFonts.spaceGrotesk(fontSize: 12, color: context.appTextPrimary),
-          overflow: TextOverflow.ellipsis)),
-        cell(e.value.$1, colM, AppDS.accent),
-        cell(e.value.$2, colF, AppDS.pink),
-        cell(e.value.$3, colJ, context.appTextMuted),
-        cell(e.value.$4, colT, context.appTextPrimary, bold: true),
-      ]),
-    )).toList();
-
-    return _infoCard('Fish by Line', Icons.biotech_outlined, [header, ...dataRows]);
-  }
-
-  static bool _isGemma(String ft) => ft.startsWith('GEMMA');
-
-  Widget _buildFoodAmountWidget() {
-    // Use stored food_amount per tank when available.
-    // Fallback: GEMMA types → 0.02 g/fish/day formula.
-    final amounts  = <String, double>{};
-    final fishCount = <String, int>{};
-    for (final t in _rackTanks.where(_hasFish)) {
-      final ft   = t.zebraFoodType?.trim().isNotEmpty == true
-          ? t.zebraFoodType! : 'Not set';
-      final fish = t.totalFish;
-      fishCount[ft] = (fishCount[ft] ?? 0) + fish;
-      if (t.zebraFoodAmount != null) {
-        // Explicit amount (even 0) — blocks GEMMA fallback.
-        amounts[ft] = (amounts[ft] ?? 0) + t.zebraFoodAmount!;
-      } else if (_isGemma(ft)) {
-        // Amount not set → use GEMMA formula.
-        amounts[ft] = (amounts[ft] ?? 0) + fish * 0.02;
-      }
-    }
-
-    final rows = fishCount.isEmpty
-      ? [Text('No fish in this rack.', style: GoogleFonts.spaceGrotesk(
-          fontSize: 12, color: context.appTextMuted))]
-      : (fishCount.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
-          .map((e) {
-            final hasAmount = amounts.containsKey(e.key);
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(e.key, style: GoogleFonts.spaceGrotesk(
-                      fontSize: 12, color: context.appTextPrimary)),
-                    Text('${e.value} fish total', style: GoogleFonts.jetBrainsMono(
-                      fontSize: 10, color: context.appTextMuted)),
-                  ])),
-                hasAmount
-                  ? Text('${amounts[e.key]!.toStringAsFixed(2)} g/day',
-                      style: GoogleFonts.jetBrainsMono(fontSize: 12,
-                        fontWeight: FontWeight.w700, color: AppDS.accent))
-                  : Text('—', style: GoogleFonts.jetBrainsMono(
-                      fontSize: 12, color: context.appTextMuted)),
-              ]),
-            );
-          }).toList();
-
-    final total   = amounts.values.fold(0.0, (a, b) => a + b);
-    final summary = total > 0
-      ? Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppDS.accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppDS.accent.withValues(alpha: 0.25))),
-            child: Row(children: [
-              const Icon(Icons.calculate_outlined, size: 13, color: AppDS.accent),
-              const SizedBox(width: 6),
-              Text('Total daily food: ', style: GoogleFonts.spaceGrotesk(
-                fontSize: 11, color: context.appTextSecondary)),
-              Text('${total.toStringAsFixed(2)} g/day',
-                style: GoogleFonts.jetBrainsMono(fontSize: 12,
-                  fontWeight: FontWeight.w700, color: AppDS.accent)),
-            ]),
-          ))
-      : const SizedBox.shrink();
-
-    return _infoCard('Daily Food', Icons.calculate_outlined, [...rows, summary]);
-  }
 }
 

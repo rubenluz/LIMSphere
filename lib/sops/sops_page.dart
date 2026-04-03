@@ -1,15 +1,21 @@
-// sops_page.dart - SOP/protocol library: list with type/status/tag filters,
+// sops_page.dart - SOP library: list with type/status/tag filters,
 // file upload to Supabase storage, PDF/DOCX viewer integration.
 // Widget and dialog classes extracted to sops_widgets.dart (part).
 
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:archive/archive_io.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '/core/data_cache.dart';
 import '/core/sop_db_schema.dart';
+import '/supabase/supabase_manager.dart';
+import '../camera/qr_scanner/qr_code_rules.dart';
 import '/theme/theme.dart';
 import '../fish_facility/shared_widgets.dart';
 import 'sop_model.dart';
@@ -19,10 +25,6 @@ part 'sops_widgets.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 class _DS {
-  static const accent        = Color(0xFF06B6D4); // cyan — matches nav item
-  static const yellow        = AppDS.yellow;
-  static const red           = AppDS.red;
-
   static Color typeColor(String? t) {
     switch (t) {
       case 'sop':       return const Color(0xFF06B6D4);
@@ -85,8 +87,9 @@ class _SopPageState extends State<SopPage> {
   final _search = TextEditingController();
   bool    _loading = true;
   String? _error;
-  String? _filterType;
-  String? _filterStatus;
+  String  _filterType   = 'all';
+  String  _filterStatus = 'all';
+  bool    _showFilters  = false;
 
   @override
   void initState() {
@@ -101,8 +104,8 @@ class _SopPageState extends State<SopPage> {
     if (oldWidget.sopContext != widget.sopContext) {
       _sops     = [];
       _filtered = [];
-      _filterType   = null;
-      _filterStatus = null;
+      _filterType   = 'all';
+      _filterStatus = 'all';
       _search.clear();
       _load();
     }
@@ -156,8 +159,8 @@ class _SopPageState extends State<SopPage> {
         (s.tags?.toLowerCase().contains(q)        ?? false)
       ).toList();
     }
-    if (_filterType   != null) d = d.where((s) => s.type   == _filterType).toList();
-    if (_filterStatus != null) d = d.where((s) => s.status == _filterStatus).toList();
+    if (_filterType   != 'all') d = d.where((s) => s.type   == _filterType).toList();
+    if (_filterStatus != 'all') d = d.where((s) => s.status == _filterStatus).toList();
     setState(() => _filtered = d);
   }
 
@@ -166,7 +169,7 @@ class _SopPageState extends State<SopPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: TextStyle(color: context.appTextPrimary)),
-      backgroundColor: isError ? _DS.red : context.appSurface3,
+      backgroundColor: isError ? AppDS.red : context.appSurface3,
     ));
   }
 
@@ -190,7 +193,7 @@ class _SopPageState extends State<SopPage> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text('Delete',
-                style: GoogleFonts.spaceGrotesk(color: _DS.red)),
+                style: GoogleFonts.spaceGrotesk(color: AppDS.red)),
           ),
         ],
       ),
@@ -245,6 +248,59 @@ class _SopPageState extends State<SopPage> {
     if (saved == true) _load();
   }
 
+  bool get _hasActiveFilter => _filterType != 'all' || _filterStatus != 'all';
+
+  Future<void> _exportCsv() async {
+    final buf = StringBuffer();
+    buf.writeln('Code,Name,Type,Status,Category,Responsible,Version,Review Date,Tags,Description');
+    for (final s in _filtered) {
+      buf.writeln(
+        '"${s.code ?? ''}","${s.name}","${FacilitySop.typeLabel(s.type)}","${FacilitySop.statusLabel(s.status)}","${s.category ?? ''}","${s.responsible ?? ''}","${s.version ?? ''}","${s.reviewDate != null ? _dateFmt.format(s.reviewDate!) : ''}","${s.tags ?? ''}","${(s.description ?? '').replaceAll('"', "'")}"',
+      );
+    }
+    try {
+      final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/sops_${DateTime.now().millisecondsSinceEpoch}.csv');
+      await file.writeAsString(buf.toString());
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      _snack('Export failed: $e', isError: true);
+    }
+  }
+
+  Future<void> _downloadAllFiles() async {
+    final toDownload = _filtered.where((s) => s.hasAnyFile).toList();
+    if (toDownload.isEmpty) {
+      _snack('No files to download in the current selection.');
+      return;
+    }
+    _snack('Preparing ${toDownload.length} file(s)…');
+    try {
+      final encoder = ZipEncoder();
+      final archive = Archive();
+      for (final sop in toDownload) {
+        for (final (path, name) in [
+          if (sop.hasPdfFile) (sop.filePath!,    sop.fileName    ?? 'file.pdf'),
+          if (sop.hasTxtFile) (sop.txtFilePath!, sop.txtFileName ?? 'file.txt'),
+          if (sop.hasDocFile) (sop.docFilePath!, sop.docFileName ?? 'file.docx'),
+        ]) {
+          final bytes = await Supabase.instance.client.storage
+              .from(SopSch.bucket)
+              .download(path);
+          archive.addFile(ArchiveFile(name, bytes.length, bytes));
+        }
+      }
+      final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/sops_files_${DateTime.now().millisecondsSinceEpoch}.zip');
+      final encoded = encoder.encode(archive);
+      await file.writeAsBytes(encoded);
+      if (!mounted) return;
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      if (mounted) _snack('Download failed: $e', isError: true);
+    }
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -252,93 +308,164 @@ class _SopPageState extends State<SopPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildToolbar(),
+        if (_showFilters) _buildFilterPanel(),
         Expanded(child: _buildBody()),
       ],
     );
   }
 
-  Widget _buildToolbar() {
+  Widget _buildFilterPanel() {
     return Container(
       decoration: BoxDecoration(
-        color: context.appSurface2,
+        color: context.appSurface,
         border: Border(bottom: BorderSide(color: context.appBorder)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Title row ────────────────────────────────────────────────────
           Row(children: [
-            const Icon(Icons.menu_book_outlined, color: _DS.accent, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text('SOPs / Protocols',
-                  style: GoogleFonts.spaceGrotesk(
-                      color: context.appTextPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600)),
+            Text('Type',
+                style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(width: 12),
+            _FilterChip(
+              label: 'All',
+              selected: _filterType == 'all',
+              onTap: () { setState(() => _filterType = 'all'); _applyFilter(); },
             ),
-            ElevatedButton.icon(
-              onPressed: () => _showDialog(),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add SOP'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _DS.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                textStyle: GoogleFonts.spaceGrotesk(
-                    fontSize: 13, fontWeight: FontWeight.w600),
+            ...FacilitySop.types.map((t) => Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: _FilterChip(
+                label: FacilitySop.typeLabel(t),
+                selected: _filterType == t,
+                color: _DS.typeColor(t),
+                onTap: () { setState(() => _filterType = t); _applyFilter(); },
               ),
-            ),
+            )),
           ]),
           const SizedBox(height: 8),
-          // ── Filter row ───────────────────────────────────────────────────
-          Wrap(
-            spacing: 10,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: 240,
-                child: AppSearchBar(
-                  controller: _search,
-                  hint: 'Search SOPs…',
-                  onClear: _applyFilter,
-                ),
+          Row(children: [
+            Text('Status',
+                style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(width: 12),
+            _FilterChip(
+              label: 'All',
+              selected: _filterStatus == 'all',
+              onTap: () { setState(() => _filterStatus = 'all'); _applyFilter(); },
+            ),
+            ...FacilitySop.statuses.map((s) => Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: _FilterChip(
+                label: FacilitySop.statusLabel(s),
+                selected: _filterStatus == s,
+                color: _DS.statusColor(s),
+                onTap: () { setState(() => _filterStatus = s); _applyFilter(); },
               ),
-              _DropFilter(
-                value: _filterType,
-                hint: 'All Types',
-                options: FacilitySop.types,
-                labelOf: FacilitySop.typeLabel,
-                onChanged: (v) { setState(() => _filterType = v); _applyFilter(); },
-              ),
-              _DropFilter(
-                value: _filterStatus,
-                hint: 'All Statuses',
-                options: FacilitySop.statuses,
-                labelOf: FacilitySop.statusLabel,
-                onChanged: (v) { setState(() => _filterStatus = v); _applyFilter(); },
-              ),
-              Text(
-                '${_filtered.length} record${_filtered.length == 1 ? '' : 's'}',
-                style: GoogleFonts.spaceGrotesk(fontSize: 12, color: context.appTextMuted),
-              ),
-            ],
-          ),
+            )),
+          ]),
         ],
       ),
     );
   }
 
+  Widget _buildToolbar() {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: [
+        const Icon(Icons.menu_book_outlined, color: AppDS.accent, size: 18),
+        const SizedBox(width: 8),
+        Text('SOPs',
+            style: GoogleFonts.spaceGrotesk(
+                color: context.appTextPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(width: 16),
+        Expanded(
+          child: SizedBox(
+            height: 36,
+            child: AppSearchBar(
+              controller: _search,
+              hint: 'Search SOPs…',
+              onClear: _applyFilter,
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            '${_filtered.length} record${_filtered.length == 1 ? '' : 's'}',
+            style: GoogleFonts.spaceGrotesk(fontSize: 12, color: context.appTextMuted),
+          ),
+        ),
+        Tooltip(
+          message: _showFilters ? 'Hide filters' : 'Show filters',
+          child: Stack(children: [
+            IconButton(
+              icon: Icon(Icons.tune,
+                  color: _showFilters ? AppDS.accent : context.appTextSecondary,
+                  size: 18),
+              onPressed: () => setState(() => _showFilters = !_showFilters),
+            ),
+            if (_hasActiveFilter)
+              Positioned(
+                right: 6, top: 6,
+                child: Container(
+                  width: 7, height: 7,
+                  decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle),
+                ),
+              ),
+          ]),
+        ),
+        Tooltip(
+          message: 'Download files as ZIP',
+          child: IconButton(
+            icon: Icon(Icons.folder_zip_outlined, color: context.appTextSecondary, size: 18),
+            onPressed: _downloadAllFiles,
+          ),
+        ),
+        Tooltip(
+          message: 'Export CSV',
+          child: IconButton(
+            icon: Icon(Icons.download_outlined, color: context.appTextSecondary, size: 18),
+            onPressed: _exportCsv,
+          ),
+        ),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppDS.accent,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+            minimumSize: const Size(0, 36),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+          ),
+          onPressed: () => _showDialog(),
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('New SOP'),
+        ),
+      ]),
+    );
+  }
+
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _DS.accent));
+      return const Center(child: CircularProgressIndicator(color: AppDS.accent));
     }
     if (_error != null) {
-      return Center(child: Text(_error!, style: const TextStyle(color: _DS.red)));
+      return Center(child: Text(_error!, style: const TextStyle(color: AppDS.red)));
     }
     if (_filtered.isEmpty) {
       return Center(

@@ -565,6 +565,7 @@ CREATE TABLE IF NOT EXISTS fish_stocks (
     fish_stocks_mortality              INT DEFAULT 0 CHECK (fish_stocks_mortality >= 0),
 
     fish_stocks_arrival_date           DATE,
+    fish_stocks_dob                    DATE,   -- denormalised from fish_line_date_birth
     fish_stocks_origin                 TEXT CHECK (fish_stocks_origin IN ('internal','imported','vendor')),
 
     fish_stocks_responsible            TEXT,
@@ -694,6 +695,9 @@ CREATE TABLE IF NOT EXISTS facility_sops (
     sop_context          TEXT DEFAULT 'fish_facility'
                          CHECK (sop_context IN ('fish_facility','culture_collection')),
 
+    -- Digital
+    sop_qrcode           TEXT,
+
     -- Metadata
     sop_created_at       TIMESTAMP DEFAULT NOW(),
     sop_updated_at       TIMESTAMP DEFAULT NOW()
@@ -813,26 +817,123 @@ CREATE INDEX IF NOT EXISTS idx_audit_action            ON audit_log(audit_action
 CREATE INDEX IF NOT EXISTS idx_audit_session           ON audit_log(audit_session_id);
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Row-Level Security — disable for all app tables (access controlled by app)
+-- Row-Level Security
+--
+-- Design
+-- ──────
+-- app_meta      RLS DISABLED — readable by anon before any auth session exists
+--               (startup check, connection test, version gate).  No user data.
+--
+-- users         RLS ENABLED.
+--   SELECT  → all roles (anon needs it for adminExists() check in setup flow
+--             and to resolve display names before a session is fully restored).
+--   INSERT  → authenticated always; anon only while users table is empty
+--             (first-run wizard creates the initial superadmin before Supabase
+--             Auth session is established).
+--   UPDATE / DELETE → authenticated only.
+--
+-- All other tables  RLS ENABLED, authenticated role only.
+--   App-layer ModulePermission governs what each role may do within a session;
+--   RLS here simply blocks any unauthenticated API access to all data tables.
+--
+-- Safe to re-run: DROP POLICY IF EXISTS before every CREATE POLICY.
 -- ═══════════════════════════════════════════════════════════════════════════════
 
+-- Bootstrap helper — true while the users table is still empty.
+-- SECURITY DEFINER lets it count rows even after users.RLS is active.
+CREATE OR REPLACE FUNCTION app_is_bootstrap()
+  RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS
+  \$\$ SELECT (SELECT COUNT(*) FROM users) = 0; \$\$;
+
+-- ── app_meta — intentionally left DISABLED ────────────────────────────────────
 ALTER TABLE app_meta            DISABLE ROW LEVEL SECURITY;
-ALTER TABLE users               DISABLE ROW LEVEL SECURITY;
-ALTER TABLE strains             DISABLE ROW LEVEL SECURITY;
-ALTER TABLE samples             DISABLE ROW LEVEL SECURITY;
-ALTER TABLE requested_strains   DISABLE ROW LEVEL SECURITY;
-ALTER TABLE storage_locations   DISABLE ROW LEVEL SECURITY;
-ALTER TABLE protocols           DISABLE ROW LEVEL SECURITY;
-ALTER TABLE reagents            DISABLE ROW LEVEL SECURITY;
-ALTER TABLE equipment           DISABLE ROW LEVEL SECURITY;
-ALTER TABLE reservations        DISABLE ROW LEVEL SECURITY;
-ALTER TABLE fish_lines          DISABLE ROW LEVEL SECURITY;
-ALTER TABLE fish_stocks         DISABLE ROW LEVEL SECURITY;
-ALTER TABLE messages            DISABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_log           DISABLE ROW LEVEL SECURITY;
-ALTER TABLE facility_sops       DISABLE ROW LEVEL SECURITY;
-ALTER TABLE todo_items          DISABLE ROW LEVEL SECURITY;
-ALTER TABLE label_templates     DISABLE ROW LEVEL SECURITY;
+
+-- ── users ─────────────────────────────────────────────────────────────────────
+ALTER TABLE users               ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS users_select           ON users;
+DROP POLICY IF EXISTS users_write_auth       ON users;
+DROP POLICY IF EXISTS users_bootstrap_insert ON users;
+-- Anon + authenticated may SELECT (adminExists check, display names, setup flow)
+CREATE POLICY users_select           ON users FOR SELECT                 USING (true);
+-- Authenticated may INSERT / UPDATE / DELETE
+CREATE POLICY users_write_auth       ON users FOR ALL    TO authenticated USING (true) WITH CHECK (true);
+-- Anon may INSERT only while no users exist yet (first superadmin creation)
+CREATE POLICY users_bootstrap_insert ON users FOR INSERT TO anon          WITH CHECK (app_is_bootstrap());
+
+-- ── strains ───────────────────────────────────────────────────────────────────
+ALTER TABLE strains             ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS strains_auth ON strains;
+CREATE POLICY strains_auth ON strains FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── samples ───────────────────────────────────────────────────────────────────
+ALTER TABLE samples             ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS samples_auth ON samples;
+CREATE POLICY samples_auth ON samples FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── requested_strains ─────────────────────────────────────────────────────────
+ALTER TABLE requested_strains   ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS req_strains_auth ON requested_strains;
+CREATE POLICY req_strains_auth ON requested_strains FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── storage_locations ─────────────────────────────────────────────────────────
+ALTER TABLE storage_locations   ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS locations_auth ON storage_locations;
+CREATE POLICY locations_auth ON storage_locations FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── protocols ─────────────────────────────────────────────────────────────────
+ALTER TABLE protocols           ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS protocols_auth ON protocols;
+CREATE POLICY protocols_auth ON protocols FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── reagents ──────────────────────────────────────────────────────────────────
+ALTER TABLE reagents            ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS reagents_auth ON reagents;
+CREATE POLICY reagents_auth ON reagents FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── equipment ─────────────────────────────────────────────────────────────────
+ALTER TABLE equipment           ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS equipment_auth ON equipment;
+CREATE POLICY equipment_auth ON equipment FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── reservations ──────────────────────────────────────────────────────────────
+ALTER TABLE reservations        ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS reservations_auth ON reservations;
+CREATE POLICY reservations_auth ON reservations FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── fish_lines ────────────────────────────────────────────────────────────────
+ALTER TABLE fish_lines          ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS fish_lines_auth ON fish_lines;
+CREATE POLICY fish_lines_auth ON fish_lines FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── fish_stocks ───────────────────────────────────────────────────────────────
+ALTER TABLE fish_stocks         ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS fish_stocks_auth ON fish_stocks;
+CREATE POLICY fish_stocks_auth ON fish_stocks FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── messages ──────────────────────────────────────────────────────────────────
+ALTER TABLE messages            ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS messages_auth ON messages;
+CREATE POLICY messages_auth ON messages FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── audit_log ─────────────────────────────────────────────────────────────────
+ALTER TABLE audit_log           ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS audit_log_auth ON audit_log;
+CREATE POLICY audit_log_auth ON audit_log FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── facility_sops ─────────────────────────────────────────────────────────────
+ALTER TABLE facility_sops       ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS facility_sops_auth ON facility_sops;
+CREATE POLICY facility_sops_auth ON facility_sops FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── todo_items ────────────────────────────────────────────────────────────────
+ALTER TABLE todo_items          ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS todo_items_auth ON todo_items;
+CREATE POLICY todo_items_auth ON todo_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ── label_templates ───────────────────────────────────────────────────────────
+ALTER TABLE label_templates     ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS label_templates_auth ON label_templates;
+CREATE POLICY label_templates_auth ON label_templates FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Storage — facility-sops bucket + access policy
@@ -850,26 +951,31 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Allow authenticated users full CRUD on their bucket objects
-CREATE POLICY IF NOT EXISTS "facility_sops_authenticated_all"
-  ON storage.objects FOR ALL
-  TO authenticated
-  USING  (bucket_id = 'facility-sops')
-  WITH CHECK (bucket_id = 'facility-sops');
+CREATE POLICY "facility_sops_authenticated_all"
+ON storage.objects
+FOR ALL
+TO authenticated
+USING (bucket_id = 'facility-sops')
+WITH CHECK (bucket_id = 'facility-sops');
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Resources: add columns for hierarchy and QR codes
+-- Migrations — add columns introduced after initial schema
 -- ═══════════════════════════════════════════════════════════════════════════════
-ALTER TABLE storage_locations ADD COLUMN IF NOT EXISTS location_parent_id BIGINT REFERENCES storage_locations(location_id);
-ALTER TABLE reagents          ADD COLUMN IF NOT EXISTS reagent_qrcode TEXT;
-ALTER TABLE reagents          ADD COLUMN IF NOT EXISTS reagent_code   TEXT UNIQUE;
-ALTER TABLE equipment         ADD COLUMN IF NOT EXISTS equipment_qrcode TEXT;
-ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_context       TEXT DEFAULT 'fish_facility' CHECK (sop_context IN ('fish_facility','culture_collection'));
-ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_txt_file_path TEXT;
-ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_txt_file_name TEXT;
-ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_txt_file_size BIGINT;
-ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_path TEXT;
-ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_name TEXT;
-ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_size BIGINT;
+ALTER TABLE storage_locations ADD COLUMN IF NOT EXISTS location_parent_id  BIGINT REFERENCES storage_locations(location_id);
+ALTER TABLE reagents          ADD COLUMN IF NOT EXISTS reagent_qrcode       TEXT;
+ALTER TABLE reagents          ADD COLUMN IF NOT EXISTS reagent_code         TEXT UNIQUE;
+ALTER TABLE equipment         ADD COLUMN IF NOT EXISTS equipment_qrcode     TEXT;
+ALTER TABLE fish_stocks       ADD COLUMN IF NOT EXISTS fish_stocks_dob      DATE;
+ALTER TABLE fish_stocks       ADD COLUMN IF NOT EXISTS fish_stocks_qrcode   TEXT;
+ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_qrcode           TEXT;
+ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_context          TEXT DEFAULT 'fish_facility' CHECK (sop_context IN ('fish_facility','culture_collection'));
+ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_txt_file_path    TEXT;
+ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_txt_file_name    TEXT;
+ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_txt_file_size    BIGINT;
+ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_path    TEXT;
+ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_name    TEXT;
+ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_size    BIGINT;
+ALTER TABLE users             ADD COLUMN IF NOT EXISTS user_table_backups   TEXT DEFAULT 'none';
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Shared To-Do list (dashboard widget)
@@ -909,13 +1015,6 @@ CREATE TABLE IF NOT EXISTS label_templates (
     tpl_created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     tpl_updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
--- Migrations: add/remove columns introduced after initial schema
-ALTER TABLE label_templates ADD COLUMN IF NOT EXISTS tpl_top_offset_mm   FLOAT   NOT NULL DEFAULT 0.0;
-ALTER TABLE label_templates DROP COLUMN IF EXISTS tpl_continuous_roll;
--- Backfill tpl_cut_mode from legacy tpl_auto_cut where still null, then lock down the default
-UPDATE label_templates SET tpl_cut_mode = CASE WHEN tpl_auto_cut THEN 'between' ELSE 'none' END WHERE tpl_cut_mode IS NULL;
-ALTER TABLE label_templates ALTER COLUMN tpl_cut_mode SET DEFAULT 'between';
-ALTER TABLE label_templates ALTER COLUMN tpl_cut_mode SET NOT NULL;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Seed

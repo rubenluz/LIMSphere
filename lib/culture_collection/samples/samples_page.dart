@@ -2,6 +2,8 @@
 // collection metadata, links to strains, CSV export.
 // Widget classes in samples_widgets.dart (part).
 
+//TODO: remove the QR code button
+
 import 'package:flutter/material.dart';
 import '/theme/module_permission.dart';
 import 'package:flutter/services.dart';
@@ -50,7 +52,7 @@ class _SamplesPageState extends State<SamplesPage> {
   // Search / sort
   String _search = '';
   List<String>      _sortKeys = [];
-  Map<String, bool> _sortDirs = {};
+  final Map<String, bool> _sortDirs = {};
   final _searchController = TextEditingController();
 
   // Column visibility
@@ -193,8 +195,11 @@ class _SamplesPageState extends State<SamplesPage> {
     }
     if (anchorKey == null) {
       final lv = visible.isNotEmpty ? visible.last.key : null;
-      if (lv != null) mutable.insert((mutable.indexOf(lv) + 1).clamp(0, mutable.length), colKey);
-      else mutable.add(colKey);
+      if (lv != null) {
+        mutable.insert((mutable.indexOf(lv) + 1).clamp(0, mutable.length), colKey);
+      } else {
+        mutable.add(colKey);
+      }
     } else {
       mutable.insert(mutable.indexOf(anchorKey).clamp(0, mutable.length), colKey);
     }
@@ -331,7 +336,18 @@ class _SamplesPageState extends State<SamplesPage> {
           .insert({'sample_code': nextNum})
           .select()
           .single();
-      _rows.add(Map<String, dynamic>.from(res));
+      final newRow = Map<String, dynamic>.from(res);
+      final newId = newRow['sample_id'] as int?;
+      if (newId != null) {
+        final qrcode = QrRules.build(
+            SupabaseManager.projectRef ?? 'local', 'samples', newId);
+        await Supabase.instance.client
+            .from('samples')
+            .update({'sample_qrcode': qrcode})
+            .eq('sample_id', newId);
+        newRow['sample_qrcode'] = qrcode;
+      }
+      _rows.add(newRow);
       _detectEmptyCols();
       _applyFilter();
     } catch (e) {
@@ -407,24 +423,36 @@ class _SamplesPageState extends State<SamplesPage> {
   }
 
   void _toggleRowSelection(dynamic id) => setState(() {
-        if (_selectedRowIds.contains(id)) _selectedRowIds.remove(id);
-        else _selectedRowIds.add(id);
+        if (_selectedRowIds.contains(id)) {
+          _selectedRowIds.remove(id);
+        } else {
+          _selectedRowIds.add(id);
+        }
       });
 
   void _toggleColSelection(String key) => setState(() {
-        if (_selectedColKeys.contains(key)) _selectedColKeys.remove(key);
-        else _selectedColKeys.add(key);
+        if (_selectedColKeys.contains(key)) {
+          _selectedColKeys.remove(key);
+        } else {
+          _selectedColKeys.add(key);
+        }
       });
 
   void _selectAllRows() => setState(() {
-        if (_selectedRowIds.length == _filtered.length) _selectedRowIds.clear();
-        else _selectedRowIds.addAll(_filtered.map((r) => r['sample_id'])); // Assuming 'sample_code' is the unique identifier
+        if (_selectedRowIds.length == _filtered.length) {
+          _selectedRowIds.clear();
+        } else {
+          _selectedRowIds.addAll(_filtered.map((r) => r['sample_id'])); // Assuming 'sample_code' is the unique identifier
+        }
       });
 
   void _selectAllCols() => setState(() {
         final visible = _visibleCols.map((c) => c.key).toSet();
-        if (_selectedColKeys.containsAll(visible)) _selectedColKeys.clear();
-        else _selectedColKeys.addAll(visible);
+        if (_selectedColKeys.containsAll(visible)) {
+          _selectedColKeys.clear();
+        } else {
+          _selectedColKeys.addAll(visible);
+        }
       });
 
   // ── Export ────────────────────────────────────────────────────────────────
@@ -433,7 +461,9 @@ class _SamplesPageState extends State<SamplesPage> {
     final cols = _exportCols;
     if (rows.isEmpty) { _snack('Select at least one row'); return; }
     final buf = StringBuffer()..writeln(cols.map((c) => c.label).join('\t'));
-    for (final row in rows) buf.writeln(cols.map((c) => row[c.key]?.toString() ?? '').join('\t'));
+    for (final row in rows) {
+      buf.writeln(cols.map((c) => row[c.key]?.toString() ?? '').join('\t'));
+    }
     await Clipboard.setData(ClipboardData(text: buf.toString()));
     _snack('Copied ${rows.length} row(s) × ${cols.length} col(s)');
   }
@@ -754,7 +784,11 @@ class _SamplesPageState extends State<SamplesPage> {
                   side: BorderSide(color: context.appBorder),
                   checkmarkColor: AppDS.accent,
                   onSelected: empty ? null : (v) {
-                    setState(() { if (v) _hiddenCols.remove(col.key); else _hiddenCols.add(col.key); });
+                    setState(() { if (v) {
+                      _hiddenCols.remove(col.key);
+                    } else {
+                      _hiddenCols.add(col.key);
+                    } });
                   },
                   avatar: empty ? Icon(Icons.remove_circle_outline, size: 11, color: context.appTextMuted) : null,
                   tooltip: empty ? 'No data' : null,
@@ -810,9 +844,9 @@ class _SamplesPageState extends State<SamplesPage> {
                 child: NotificationListener<ScrollNotification>(
                   onNotification: (n) {
                     if (n is ScrollUpdateNotification) {
-                      if (n.metrics.axis == Axis.horizontal)
+                      if (n.metrics.axis == Axis.horizontal) {
                         _hOffset.value = _hScroll.hasClients ? _hScroll.offset : 0.0;
-                      else if (n.metrics.axis == Axis.vertical)
+                      } else if (n.metrics.axis == Axis.vertical)
                         _vOffset.value = _vScroll.hasClients ? _vScroll.offset : 0.0;
                     }
                     return false;

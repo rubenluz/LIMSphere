@@ -52,7 +52,18 @@ class _AddLineDialogState extends State<_AddLineDialog> {
           })
           .select()
           .single();
-      widget.onAdd(FishLine.fromMap(resp));
+      final newId = resp[FishSch.lineId] as int?;
+      final respWithQr = Map<String, dynamic>.from(resp);
+      if (newId != null) {
+        final qrcode = QrRules.build(
+            SupabaseManager.projectRef ?? 'local', 'fish_lines', newId);
+        await Supabase.instance.client
+            .from('fish_lines')
+            .update({FishSch.lineQrcode: qrcode})
+            .eq(FishSch.lineId, newId);
+        respWithQr[FishSch.lineQrcode] = qrcode;
+      }
+      widget.onAdd(FishLine.fromMap(respWithQr));
       if (mounted) { Navigator.pop(context); }
     } catch (e) {
       setState(() { _saving = false; _error = e.toString(); });

@@ -6,16 +6,15 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
-import '../supabase/supabase_manager.dart';
 import '/core/data_cache.dart';
+import '/supabase/supabase_manager.dart';
 import '/theme/theme.dart';
+import '../camera/qr_scanner/qr_code_rules.dart';
 import 'location_model.dart';
 import 'location_detail_page.dart';
 
@@ -157,96 +156,6 @@ class _LocationsPageState extends State<LocationsPage> {
       ),
     );
     if (ok == true) _load();
-  }
-
-  Future<void> _delete(LocationModel loc) async {
-    final kids = _childMap[loc.id]?.length ?? 0;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Delete "${loc.name}"?',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary)),
-        content: Text(
-          kids > 0
-              ? 'This room has $kids child location(s) that will become unassigned.'
-              : 'This cannot be undone.',
-          style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel',
-                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Delete',
-                style: GoogleFonts.spaceGrotesk(color: AppDS.red)),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    try {
-      await Supabase.instance.client
-          .from('storage_locations')
-          .delete()
-          .eq('location_id', loc.id);
-      _load();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
-      }
-    }
-  }
-
-  void _showQr(LocationModel loc) {
-    final ref = SupabaseManager.projectRef ?? 'local';
-    final data = 'bluelims://$ref/locations/${loc.id}';
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('QR — ${loc.name}',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary)),
-        content: SizedBox(
-          width: 260,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-                color: Colors.white,
-                padding: const EdgeInsets.all(12),
-                child: QrImageView(data: data, size: 200)),
-            const SizedBox(height: 12),
-            Text(data,
-                style:
-                    GoogleFonts.spaceGrotesk(color: ctx.appTextMuted, fontSize: 11)),
-          ]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: data));
-              if (context.mounted) Navigator.pop(ctx);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Link copied')));
-              }
-            },
-            child:
-                Text('Copy Link', style: GoogleFonts.spaceGrotesk(color: AppDS.accent)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Close',
-                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _exportCsv() async {
@@ -405,66 +314,37 @@ class _LocationsPageState extends State<LocationsPage> {
       );
     }
 
-    // Group rooms into rows of 3 (see _buildRoomCard below)
-    const cols = 3;
     const hPad = 16.0;
     const spacing = 12.0;
-    final rows = <List<LocationModel>>[];
-    for (var i = 0; i < visibleRooms.length; i += cols) {
-      rows.add(visibleRooms.sublist(
-          i, (i + cols).clamp(0, visibleRooms.length)));
-    }
-
-    Widget buildRoomCard(LocationModel room) {
-      final kids = (_childMap[room.id] ?? []).where((c) {
-        if (q.isEmpty) return true;
-        return c.name.toLowerCase().contains(q) ||
-            (c.temperature?.toLowerCase().contains(q) ?? false);
-      }).toList();
-      return _RoomCard(
-        key: ValueKey(room.id),
-        room: room,
-        children: kids,
-        onDelete: () => _delete(room),
-        onQr: () => _showQr(room),
-        onTap: () => _navigate(room),
-        onDeleteChild: _delete,
-        onQrChild: _showQr,
-        onTapChild: _navigate,
-        onAddChild: () =>
-            _showDialog(defaultParentId: room.id, defaultType: 'freezer'),
-      );
-    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(hPad),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...rows.map((rowRooms) => Padding(
-            padding: const EdgeInsets.only(bottom: spacing),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (int j = 0; j < cols; j++) ...[
-                    if (j > 0) const SizedBox(width: spacing),
-                    Expanded(
-                      child: j < rowRooms.length
-                          ? buildRoomCard(rowRooms[j])
-                          : const SizedBox(),
-                    ),
-                  ],
-                ],
+          ...visibleRooms.map((room) {
+            final kids = (_childMap[room.id] ?? []).where((c) {
+              if (q.isEmpty) return true;
+              return c.name.toLowerCase().contains(q) ||
+                  (c.temperature?.toLowerCase().contains(q) ?? false);
+            }).toList();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: spacing),
+              child: _RoomCard(
+                key: ValueKey(room.id),
+                room: room,
+                children: kids,
+                onTap: () => _navigate(room),
+                onTapChild: _navigate,
+                onAddChild: () =>
+                    _showDialog(defaultParentId: room.id, defaultType: 'freezer'),
               ),
-            ),
-          )),
+            );
+          }),
           if (visibleOrphans.isNotEmpty)
             _OrphanCard(
               key: const ValueKey('__orphans__'),
               locations: visibleOrphans,
-              onDelete: _delete,
-              onQr: _showQr,
               onTap: _navigate,
               onAdd: () => _showDialog(defaultType: 'shelf'),
             ),

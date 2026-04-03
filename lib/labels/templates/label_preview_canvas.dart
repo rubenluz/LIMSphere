@@ -7,6 +7,50 @@
 part of '../label_page.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Smart field resolver
+// Tokenises template into [static, field-value, static, field-value, …] then
+// drops any static separator whose immediately adjacent field(s) resolved to
+// empty — so "{a} - {b}" with b="" renders "a", not "a - ".
+// ─────────────────────────────────────────────────────────────────────────────
+String _resolveDataFields(String template, Map<String, dynamic> data) {
+  final fieldRe = RegExp(r'\{([^}]+)\}');
+  if (!fieldRe.hasMatch(template)) return template;
+
+  // Build parts list: [static, value, static, value, …, static]
+  // Even indices → static text; odd indices → resolved field value.
+  final parts = <String>[];
+  int last = 0;
+  for (final m in fieldRe.allMatches(template)) {
+    parts.add(template.substring(last, m.start));
+    parts.add(data[m.group(1)!]?.toString() ?? '');
+    last = m.end;
+  }
+  parts.add(template.substring(last));
+
+  final buf = StringBuffer();
+  for (int i = 0; i < parts.length; i++) {
+    if (i.isOdd) {
+      // Field value — always write (may be empty string).
+      buf.write(parts[i]);
+    } else {
+      // Static text — only write if surrounded by non-empty field values.
+      final before = i > 0 ? parts[i - 1] : null;   // field to the left
+      final after  = i < parts.length - 1 ? parts[i + 1] : null; // field to the right
+      if (before == null && after == null) {
+        buf.write(parts[i]); // no fields at all — pure static
+      } else if (before == null) {
+        if (after!.isNotEmpty) buf.write(parts[i]); // leading prefix
+      } else if (after == null) {
+        if (before.isNotEmpty) buf.write(parts[i]); // trailing suffix
+      } else {
+        if (before.isNotEmpty && after.isNotEmpty) buf.write(parts[i]); // separator
+      }
+    }
+  }
+  return buf.toString();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Field renderer — used in both builder canvas and preview
 // ─────────────────────────────────────────────────────────────────────────────
 class _FieldRenderer extends StatelessWidget {
@@ -20,6 +64,7 @@ class _FieldRenderer extends StatelessWidget {
     final now = DateTime.now();
     final dateFmt = DateFormat('yyyy-MM-dd');
     final timeFmt = DateFormat('HH:mm');
+    // Pre-substitute time/date specials (always non-empty — no cleanup needed).
     String s = field.content
         .replaceAll('{current_time}', timeFmt.format(now))
         .replaceAll('{current_date}', dateFmt.format(now));
@@ -27,10 +72,10 @@ class _FieldRenderer extends StatelessWidget {
       final n = int.tryParse(m.group(1) ?? '') ?? 0;
       return dateFmt.format(now.add(Duration(days: n)));
     });
-    if (data != null) {
-      data!.forEach((k, v) => s = s.replaceAll('{$k}', v?.toString() ?? ''));
-    }
-    return s;
+    if (data == null) return s;
+    // Smart substitution: strip separator text adjacent to empty data fields
+    // so "{a} - {b}" with b="" renders as "a", not "a - ".
+    return _resolveDataFields(s, data!);
   }
 
   @override
