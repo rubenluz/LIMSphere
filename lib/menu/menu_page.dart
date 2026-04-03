@@ -5,8 +5,11 @@ import 'dart:async';
 import 'dart:io';
 import 'package:app_links/app_links.dart';
 import '../camera/qr_scanner/qr_code_rules.dart';
-import 'package:blue_open_lims/lab_chat/lab_chat_page.dart';
-import 'package:blue_open_lims/labels/label_page.dart';
+import '../camera/qr_scanner/qr_scanner_page.dart';
+import '../camera/camera_page.dart';
+import 'app_nav.dart';
+import 'package:lims_sphere/lab_chat/lab_chat_page.dart';
+import 'package:lims_sphere/labels/label_page.dart';
 import '../locations/locations_page.dart';
 import '../resources/reagents/reagents_page.dart';
 import '../resources/machines/machines_page.dart';
@@ -16,11 +19,11 @@ import '/theme/module_permission.dart';
 import '../admin/settings_page.dart';
 import '../admin/backups_page.dart';
 import '../admin/backup_service.dart';
-import 'package:blue_open_lims/fish_facility/lines/fish_lines_page.dart';
-import 'package:blue_open_lims/fish_facility/water_qc/water_qc_page.dart';
-import 'package:blue_open_lims/sops/sops_page.dart';
-import 'package:blue_open_lims/fish_facility/stocks/stocks_page.dart';
-import 'package:blue_open_lims/fish_facility/tanks/tanks_page.dart';
+import 'package:lims_sphere/fish_facility/lines/fish_lines_page.dart';
+import 'package:lims_sphere/fish_facility/water_qc/water_qc_page.dart';
+import 'package:lims_sphere/sops/sops_page.dart';
+import 'package:lims_sphere/fish_facility/stocks/stocks_page.dart';
+import 'package:lims_sphere/fish_facility/tanks/tanks_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '../culture_collection/samples/samples_page.dart';
@@ -29,7 +32,6 @@ import '../dashboard/dashboard_page.dart';
 import '../users/users_page.dart';
 import '../users/user_detail_page.dart';
 import '../admin/app_settings.dart';
-import '../camera/qr_scanner/qr_scanner_page.dart';
 import '../audit_log/audit_log.dart';
 import '../requests/requests_page.dart';
 
@@ -93,6 +95,9 @@ class _NavItem {
   final IconData icon;
   final Color accent;
   final Widget Function(_MenuPageState state)? builder;
+  /// When true, the item is hidden in the desktop sidebar and only appears
+  /// in the mobile drawer.
+  final bool mobileOnly;
 
   const _NavItem({
     required this.id,
@@ -100,6 +105,7 @@ class _NavItem {
     required this.icon,
     required this.accent,
     this.builder,
+    this.mobileOnly = false,
   });
 }
 
@@ -173,6 +179,14 @@ class _MenuPageState extends State<MenuPage> {
       icon: Icons.outbox_outlined,
       accent: const Color(0xFF8B5CF6),
       builder: (_) => const RequestsPage(),
+    ),
+    _NavItem(
+      id: 'camera',
+      label: 'Camera',
+      icon: Icons.camera_alt_outlined,
+      accent: const Color(0xFF38BDF8),
+      mobileOnly: true,
+      builder: (_) => const CameraPage(),
     ),
   ];
 
@@ -601,7 +615,7 @@ class _MenuPageState extends State<MenuPage> {
                   if (!collapsed) ...[
                     const SizedBox(width: 10),
                     const Expanded(
-                      child: Text('BlueOpenLIMS',
+                      child: Text('LIMS Sphere',
                         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold,
                             fontSize: 14, overflow: TextOverflow.ellipsis)),
                     ),
@@ -619,6 +633,7 @@ class _MenuPageState extends State<MenuPage> {
                 children: [
                   ..._topItems
                     .where((item) {
+                      if (item.mobileOnly) return isDrawer;
                       if (item.id == 'backups') {
                         return _getModulePerm('backups') != 'none';
                       }
@@ -991,29 +1006,11 @@ class _MenuPageState extends State<MenuPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // ── Mobile: use a proper Scaffold with AppBar so the drawer hamburger
-    //    is in the AppBar and never overlaps page content.
+    // ── Mobile: Scaffold with drawer only — each page toolbar handles its own
+    //    header and embeds a hamburger to open this drawer.
     if (isMobile) {
       return Scaffold(
-        appBar: AppBar(
-          backgroundColor: AppDS.bg,
-          iconTheme: const IconThemeData(color: Colors.white),
-          title: Text(
-            _currentLabel(),
-            style: const TextStyle(color: Colors.white, fontSize: 16,
-                fontWeight: FontWeight.w600),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.qr_code_scanner, color: Colors.white70),
-              tooltip: 'Scan QR Code',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const QrScannerPage()),
-              ),
-            ),
-          ],
-        ),
+        key: menuScaffoldKey,
         drawer: Drawer(child: _buildSidebar(isDrawer: true)),
         body: SafeArea(child: _buildContent(true)),
       );
@@ -1028,21 +1025,5 @@ class _MenuPageState extends State<MenuPage> {
         ]),
       ),
     );
-  }
-
-  /// Returns the label of the currently selected nav item for the mobile AppBar.
-  String _currentLabel() {
-    final userRole = _userInfo['user_role']?.toString() ?? '';
-    for (final item in _topItems) {
-      if (!_visibleGroups.contains(item.id)) continue;
-      if (item.id == _selectedId) return item.label;
-    }
-    for (final g in _groups) {
-      if (g.key == 'admin' ? !_hasRole(userRole, 'admin') : !_visibleGroups.contains(g.key)) continue;
-      for (final item in g.children) {
-        if (item.id == _selectedId) return item.label;
-      }
-    }
-    return 'Menu';
   }
 }

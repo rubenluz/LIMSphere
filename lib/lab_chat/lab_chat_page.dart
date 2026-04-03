@@ -7,8 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:blue_open_lims/lab_chat/lab_message.dart';
+import 'package:lims_sphere/lab_chat/lab_message.dart';
 import '/theme/theme.dart';
+import '/menu/app_nav.dart';
 
 part 'lab_chat_widgets.dart';
 
@@ -686,6 +687,14 @@ class _LabChatPageState extends State<LabChatPage> {
         border: Border(bottom: BorderSide(color: context.appBorder)),
       ),
       child: Row(children: [
+        if (MediaQuery.of(context).size.width < 700) ...[
+          IconButton(
+            icon: const Icon(Icons.menu_rounded, size: 20),
+            color: context.appTextSecondary,
+            tooltip: 'Menu',
+            onPressed: openAppDrawer,
+          ),
+        ],
         Icon(ch.icon, size: 16, color: ch.color),
         const SizedBox(width: 10),
         Text(ch.label, style: _body(size: 15, weight: FontWeight.w700)),

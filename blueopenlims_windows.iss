@@ -1,7 +1,8 @@
-#define MyAppName "BlueOpenLIMS"
-#define MyAppVersion "0.1.8"
+#define MyAppName "LIMS Sphere"
+#define MyAppFileName "LIMSSphere"
+#define MyAppVersion "0.1.9"
 #define MyAppPublisher "Rúben Luz"
-#define MyAppExeName "culture_app"
+#define MyAppExeName "limsphere"
 
 [Setup]
 ; Corrigido o fecho do AppId
@@ -24,11 +25,10 @@ WizardStyle=modern
 
 ; Usar userdesktop simplifica se mudares de computador
 OutputDir=desktop_release
-OutputBaseFilename={#MyAppName}_installer_v{#MyAppVersion}
+OutputBaseFilename={#MyAppFileName}_installer_v{#MyAppVersion}
 SetupIconFile=C:\Users\ruben\Documents\blue_open_lims\windows\runner\resources\app_icon.ico
 
 [Languages]
-Name: "portuguese"; MessagesFile: "compiler:Languages\Portuguese.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]

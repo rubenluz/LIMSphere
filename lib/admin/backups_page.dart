@@ -363,6 +363,14 @@ class _BackupsPageState extends State<BackupsPage> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
+                if (MediaQuery.of(context).size.width < 700) ...[
+                  IconButton(
+                    icon: const Icon(Icons.menu_rounded, size: 20),
+                    color: context.appTextSecondary,
+                    tooltip: 'Menu',
+                    onPressed: () => Scaffold.of(context).openDrawer(),
+                  ),
+                ],
                 const Icon(Icons.backup_outlined, color: BackupsPage.accent, size: 20),
                 const SizedBox(width: 10),
                 Text(
@@ -587,7 +595,7 @@ class _BackupsPageState extends State<BackupsPage> {
           _PathBlock(
             title: 'Suggested path',
             value: _recommendedPath,
-            hint: 'Documents/BlueOpenLIMS',
+            hint: 'Documents/LIMSSphere',
           ),
           const SizedBox(height: 12),
           _PathBlock(

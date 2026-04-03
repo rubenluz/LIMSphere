@@ -529,6 +529,15 @@ class _UsersPageState extends State<UsersPage> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Row(
         children: [
+          if (MediaQuery.of(context).size.width < 700) ...[
+            IconButton(
+              icon: const Icon(Icons.menu_rounded, size: 20),
+              color: context.appTextSecondary,
+              tooltip: 'Menu',
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+            const SizedBox(width: 4),
+          ],
           SizedBox(
             width: 240,
             child: TextField(

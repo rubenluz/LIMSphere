@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '/theme/theme.dart';
+import '/menu/app_nav.dart';
 
 // ── Model ─────────────────────────────────────────────────────────────────────
 
@@ -612,6 +613,11 @@ class _RequestsPageState extends State<RequestsPage> {
         elevation: 0,
         titleSpacing: 16,
         automaticallyImplyLeading: false,
+        leading: MediaQuery.of(context).size.width < 700 ? IconButton(
+          icon: const Icon(Icons.menu_rounded, color: AppDS.textSecondary),
+          tooltip: 'Menu',
+          onPressed: openAppDrawer,
+        ) : null,
         title: Text('Requests',
             style: GoogleFonts.spaceGrotesk(
                 color: AppDS.textPrimary,

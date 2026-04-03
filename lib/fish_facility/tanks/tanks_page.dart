@@ -413,6 +413,14 @@ class _FishTanksPageState extends State<FishTanksPage> {
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(children: [
+              if (MediaQuery.of(context).size.width < 700) ...[
+                IconButton(
+                  icon: const Icon(Icons.menu_rounded, size: 20),
+                  color: context.appTextSecondary,
+                  tooltip: 'Menu',
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ],
               const Icon(Icons.grid_view_outlined, size: 18, color: AppDS.accent),
               const SizedBox(width: 8),
               Text('Tank Map', style: GoogleFonts.spaceGrotesk(

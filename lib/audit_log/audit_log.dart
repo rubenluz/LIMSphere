@@ -306,6 +306,14 @@ class _AuditLogPageState extends State<AuditLogPage> {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
+          if (MediaQuery.of(context).size.width < 700) ...[
+            IconButton(
+              icon: const Icon(Icons.menu_rounded, size: 20),
+              color: context.appTextSecondary,
+              tooltip: 'Menu',
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ],
           Icon(Icons.manage_search_outlined,
               color: context.appTextMuted, size: 18),
           const SizedBox(width: 8),

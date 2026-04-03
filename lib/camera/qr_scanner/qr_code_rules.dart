@@ -1,4 +1,4 @@
-// qr_code_rules.dart - Canonical format for all BlueOpenLIMS QR codes.
+// qr_code_rules.dart - Canonical format for all LIMS Sphere QR codes.
 //
 // Format:  bluelims://<projectRef>/<type>/<id>
 //
@@ -51,7 +51,7 @@ class QrRules {
   /// Parse and validate a raw scanned string.
   ///
   /// Returns a [QrPayload] on success, or [null] if the string does not conform
-  /// to the BlueOpenLIMS QR format (wrong scheme, unknown type, non-integer id).
+  /// to the LIMS Sphere QR format (wrong scheme, unknown type, non-integer id).
   static QrPayload? parse(String raw) {
     final uri = Uri.tryParse(raw);
     if (uri == null) return null;
@@ -69,7 +69,7 @@ class QrRules {
     return QrPayload(projectRef: uri.host, type: type, id: id);
   }
 
-  /// Returns true if [raw] is a valid BlueOpenLIMS QR code string.
+  /// Returns true if [raw] is a valid LIMS Sphere QR code string.
   static bool isValid(String raw) => parse(raw) != null;
 }
 

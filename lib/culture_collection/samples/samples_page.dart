@@ -5,6 +5,7 @@
 //TODO: remove the QR code button
 
 import 'package:flutter/material.dart';
+import '/menu/app_nav.dart';
 import '/theme/module_permission.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -555,6 +556,12 @@ class _SamplesPageState extends State<SamplesPage> {
       backgroundColor: context.appSurface,
       foregroundColor: context.appTextPrimary,
       elevation: 0,
+      leading: desktop ? null : IconButton(
+        icon: const Icon(Icons.menu_rounded),
+        color: context.appTextSecondary,
+        tooltip: 'Menu',
+        onPressed: openAppDrawer,
+      ),
       title: Text('Samples', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600, fontSize: 16)),
       actions: [
         // ── Add Sample ───────────────────────────────────────────────────
@@ -846,8 +853,10 @@ class _SamplesPageState extends State<SamplesPage> {
                     if (n is ScrollUpdateNotification) {
                       if (n.metrics.axis == Axis.horizontal) {
                         _hOffset.value = _hScroll.hasClients ? _hScroll.offset : 0.0;
-                      } else if (n.metrics.axis == Axis.vertical)
-                        _vOffset.value = _vScroll.hasClients ? _vScroll.offset : 0.0;
+                      } else if (n.metrics.axis == Axis.vertical) {
+
+                                              _vOffset.value = _vScroll.hasClients ? _vScroll.offset : 0.0;
+                      }
                     }
                     return false;
                   },

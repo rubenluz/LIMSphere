@@ -142,6 +142,14 @@ class _SettingsPageState extends State<SettingsPage> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
+                if (MediaQuery.of(context).size.width < 700) ...[
+                  IconButton(
+                    icon: const Icon(Icons.menu_rounded, size: 20),
+                    color: context.appTextSecondary,
+                    tooltip: 'Menu',
+                    onPressed: () => Scaffold.of(context).openDrawer(),
+                  ),
+                ],
                 const Icon(Icons.settings_outlined, color: _accent, size: 20),
                 const SizedBox(width: 10),
                 Text(

@@ -855,7 +855,7 @@ class _StrainsPageState extends State<StrainsPage> {
         AppDS.tableOpenW * 3 + cols.fold(0.0, (s, c) => s + _colWidth(c));
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Column(children: [
         Expanded(
           child: Row(children: [
@@ -873,8 +873,9 @@ class _StrainsPageState extends State<StrainsPage> {
                     if (n is ScrollUpdateNotification) {
                       if (n.metrics.axis == Axis.horizontal) {
                         _hOffset.value = _hScroll.hasClients ? _hScroll.offset : 0.0;
-                      } else if (n.metrics.axis == Axis.vertical)
+                      } else if (n.metrics.axis == Axis.vertical) {
                         _vOffset.value = _vScroll.hasClients ? _vScroll.offset : 0.0;
+                      }
                     }
                     return false;
                   },

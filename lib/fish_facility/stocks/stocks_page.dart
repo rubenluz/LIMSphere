@@ -63,7 +63,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
   static final _tsMonoMut   = GoogleFonts.jetBrainsMono(fontSize: 12,   color: AppDS.tableTextMute);
 
   static const _cols = [
-    ('tankId',            'Tank',        110.0, true),
+    ('tankId',            'Tank',         72.0, true),
     ('line',              'Line',        140.0, false),
     ('status',            'Status',      110.0, false),
     ('feedingAmount',     'Feed Amt.',    80.0, false),
@@ -473,6 +473,14 @@ class _FishStocksPageState extends State<FishStocksPage> {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(children: [
+        if (MediaQuery.of(context).size.width < 700) ...[
+          IconButton(
+            icon: const Icon(Icons.menu_rounded, size: 20),
+            color: context.appTextSecondary,
+            tooltip: 'Menu',
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ],
         const Icon(Icons.set_meal_outlined, size: 18, color: Color(0xFF0EA5E9)),
         const SizedBox(width: 8),
         Text('Stocks', style: GoogleFonts.spaceGrotesk(
@@ -485,48 +493,100 @@ class _FishStocksPageState extends State<FishStocksPage> {
             child: AppSearchBar(controller: _searchCtrl, hint: 'Search stocks…', onClear: _applyFilters),
           ),
         ),
-        Tooltip(
-          message: _showFilters ? 'Hide filters' : 'Show filters',
-          child: Stack(children: [
-            IconButton(
-              icon: Icon(Icons.tune,
-                  color: _showFilters ? AppDS.accent : context.appTextSecondary,
-                  size: 18),
-              onPressed: () => setState(() => _showFilters = !_showFilters),
-            ),
-            if (_hasActiveFilter)
-              Positioned(
-                right: 6, top: 6,
-                child: Container(
-                  width: 7, height: 7,
-                  decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle),
-                ),
+        if (MediaQuery.of(context).size.width < 700)
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: context.appTextSecondary, size: 20),
+            tooltip: 'More options',
+            offset: const Offset(0, 36),
+            color: context.appSurface2,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: context.appBorder2)),
+            onSelected: (v) {
+              if (v == 'filter') setState(() => _showFilters = !_showFilters);
+              if (v == 'export') _exportCsv();
+              if (v == 'add') {
+                if (!context.canEditModule) { context.warnReadOnly(); return; }
+                _showAddStockDialog();
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'filter',
+                child: Row(children: [
+                  Icon(Icons.tune, size: 16,
+                      color: _showFilters ? AppDS.accent : context.appTextSecondary),
+                  const SizedBox(width: 10),
+                  Text(_showFilters ? 'Hide Filters' : 'Show Filters',
+                      style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary)),
+                  if (_hasActiveFilter) ...[
+                    const Spacer(),
+                    Container(width: 7, height: 7,
+                        decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle)),
+                  ],
+                ])),
+              PopupMenuItem(
+                value: 'export',
+                child: Row(children: [
+                  Icon(Icons.download_outlined, size: 16, color: context.appTextSecondary),
+                  const SizedBox(width: 10),
+                  Text('Export CSV', style: GoogleFonts.spaceGrotesk(
+                      fontSize: 13, color: context.appTextPrimary)),
+                ])),
+              PopupMenuItem(
+                value: 'add',
+                child: Row(children: [
+                  const Icon(Icons.add, size: 16, color: AppDS.accent),
+                  const SizedBox(width: 10),
+                  Text('New Stock', style: GoogleFonts.spaceGrotesk(
+                      fontSize: 13, color: AppDS.accent)),
+                ])),
+            ],
+          )
+        else ...[
+          Tooltip(
+            message: _showFilters ? 'Hide filters' : 'Show filters',
+            child: Stack(children: [
+              IconButton(
+                icon: Icon(Icons.tune,
+                    color: _showFilters ? AppDS.accent : context.appTextSecondary,
+                    size: 18),
+                onPressed: () => setState(() => _showFilters = !_showFilters),
               ),
-          ]),
-        ),
-        Tooltip(
-          message: 'Export CSV',
-          child: IconButton(
-            icon: Icon(Icons.download_outlined, color: context.appTextSecondary, size: 18),
-            onPressed: _exportCsv,
+              if (_hasActiveFilter)
+                Positioned(
+                  right: 6, top: 6,
+                  child: Container(
+                    width: 7, height: 7,
+                    decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle),
+                  ),
+                ),
+            ]),
           ),
-        ),
-        FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: AppDS.accent,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-            minimumSize: const Size(0, 36),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+          Tooltip(
+            message: 'Export CSV',
+            child: IconButton(
+              icon: Icon(Icons.download_outlined, color: context.appTextSecondary, size: 18),
+              onPressed: _exportCsv,
+            ),
           ),
-          onPressed: () {
-            if (!context.canEditModule) { context.warnReadOnly(); return; }
-            _showAddStockDialog();
-          },
-          icon: const Icon(Icons.add, size: 16),
-          label: const Text('New Stock'),
-        ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppDS.accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+            ),
+            onPressed: () {
+              if (!context.canEditModule) { context.warnReadOnly(); return; }
+              _showAddStockDialog();
+            },
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('New Stock'),
+          ),
+        ],
       ]),
     );
   }
@@ -634,7 +694,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
                       ),
                     )
                   : Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
                       child: Column(children: [
                         Expanded(
                           child: Row(children: [
@@ -787,7 +847,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
                   },
                 )),
             ),
-            _cell(stock, 'tankId',      110, mono: true),
+            _cell(stock, 'tankId',       72, mono: true),
             _cell(stock, 'line',        140),
             _statusCell(stock, 'status', 110,
               ['active', 'empty', 'quarantine', 'retired']),

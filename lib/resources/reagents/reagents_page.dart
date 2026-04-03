@@ -308,6 +308,14 @@ class _ReagentsPageState extends State<ReagentsPage> {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
+          if (MediaQuery.of(context).size.width < 700) ...[
+            IconButton(
+              icon: const Icon(Icons.menu_rounded, size: 20),
+              color: context.appTextSecondary,
+              tooltip: 'Menu',
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ],
           const Icon(Icons.water_drop_outlined,
               color: Color(0xFFF59E0B), size: 18),
           const SizedBox(width: 8),

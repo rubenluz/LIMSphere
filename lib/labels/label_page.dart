@@ -22,6 +22,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '/theme/theme.dart';
+import '/menu/app_nav.dart';
 import '../camera/qr_scanner/qr_code_rules.dart';
 import '../supabase/supabase_manager.dart';
 
@@ -995,6 +996,12 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
       ),
       child: Scaffold(
         appBar: AppBar(
+          leading: MediaQuery.of(context).size.width < 700 ? IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            color: context.appTextSecondary,
+            tooltip: 'Menu',
+            onPressed: openAppDrawer,
+          ) : null,
           title: Row(children: [
             const Icon(Icons.print_rounded, size: 18, color: AppDS.accent),
             const SizedBox(width: 10),

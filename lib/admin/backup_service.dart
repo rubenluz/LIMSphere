@@ -318,8 +318,19 @@ class BackupService extends ChangeNotifier {
   bool _busy = false;
   String? _statusMessage;
   RealtimeChannel? _offlineChannel;
-  Timer? _offlineDebounce;
+  final Map<String, Timer> _offlineTableDebounces = {};
   bool _offlineQueued = false;
+
+  // Priority tables get a shorter debounce; others are less time-sensitive.
+  static const _priorityTables = <String>{
+    'strains',
+    'fish_stocks',
+    'reagents',
+    'equipment',
+    'storage_locations',
+  };
+  static const _priorityDebounce = Duration(seconds: 3);
+  static const _standardDebounce = Duration(seconds: 6);
 
   BackupSettings get settings => _settings;
   List<BackupErrorEntry> get errors => List<BackupErrorEntry>.unmodifiable(_errors);
@@ -399,8 +410,10 @@ class BackupService extends ChangeNotifier {
   }
 
   Future<void> stop() async {
-    _offlineDebounce?.cancel();
-    _offlineDebounce = null;
+    for (final t in _offlineTableDebounces.values) {
+      t.cancel();
+    }
+    _offlineTableDebounces.clear();
     final channel = _offlineChannel;
     _offlineChannel = null;
     if (channel != null) {
@@ -411,10 +424,10 @@ class BackupService extends ChangeNotifier {
   Future<String> recommendedRootPath() async {
     final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
     if (home != null && home.isNotEmpty) {
-      return _joinPath(home, 'Documents', 'BlueOpenLIMS');
+      return _joinPath(home, 'Documents', 'LIMSSphere');
     }
     final docs = await getApplicationDocumentsDirectory();
-    return _joinPath(docs.path, 'BlueOpenLIMS');
+    return _joinPath(docs.path, 'LIMSSphere');
   }
 
   Future<String> appFolderPath() async {
@@ -642,19 +655,19 @@ class BackupService extends ChangeNotifier {
             event: PostgresChangeEvent.insert,
             schema: 'public',
             table: table,
-            callback: (_) => _scheduleOfflineRefresh('insert:$table'),
+            callback: (_) => _scheduleTableRefresh(table),
           )
           .onPostgresChanges(
             event: PostgresChangeEvent.update,
             schema: 'public',
             table: table,
-            callback: (_) => _scheduleOfflineRefresh('update:$table'),
+            callback: (_) => _scheduleTableRefresh(table),
           )
           .onPostgresChanges(
             event: PostgresChangeEvent.delete,
             schema: 'public',
             table: table,
-            callback: (_) => _scheduleOfflineRefresh('delete:$table'),
+            callback: (_) => _scheduleTableRefresh(table),
           );
     }
     _offlineChannel = channel.subscribe();
@@ -662,13 +675,35 @@ class BackupService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _scheduleOfflineRefresh(String reason) {
+  void _scheduleTableRefresh(String table) {
     if (!_settings.localMirrorEnabled) return;
-    _offlineDebounce?.cancel();
-    _offlineDebounce = Timer(
-      const Duration(seconds: 4),
-      () => unawaited(refreshLocalMirror(reason: reason)),
+    _offlineTableDebounces[table]?.cancel();
+    final delay = _priorityTables.contains(table) ? _priorityDebounce : _standardDebounce;
+    _offlineTableDebounces[table] = Timer(
+      delay,
+      () => unawaited(_refreshSingleTable(table)),
     );
+  }
+
+  Future<void> _refreshSingleTable(String table) async {
+    if (!_settings.localMirrorEnabled) return;
+    if (!_settings.offlineTables.contains(table)) return;
+    if (_busy) {
+      _offlineQueued = true;
+      return;
+    }
+    try {
+      final root = await resolveBackupsRootPath();
+      final dir = Directory(_joinPath(root, 'local_mirror'));
+      if (!await dir.exists()) {
+        unawaited(refreshLocalMirror(reason: 'init:$table'));
+        return;
+      }
+      final rows = await _fetchTableRows(table);
+      await _writeCsvFile(_joinPath(dir.path, '$table.csv'), _rowsToCsv(rows));
+      _statusMessage = 'Local mirror: $table updated (${rows.length} rows).';
+      notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> _runQueuedOfflineIfNeeded() async {

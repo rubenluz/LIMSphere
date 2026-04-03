@@ -68,13 +68,19 @@ class _InCareWidgetState extends State<InCareWidget> {
     DateTime? last;
     if (lastRaw is DateTime) {
       last = lastRaw;
-    } else if (lastRaw is String && lastRaw.isNotEmpty) last = DateTime.tryParse(lastRaw);
+    } else if (lastRaw is String && lastRaw.isNotEmpty) {
+      last = DateTime.tryParse(lastRaw);
+    }
     int? days;
     if (daysRaw is int) {
       days = daysRaw;
-    } else if (daysRaw is double) days = daysRaw.toInt();
-    else if (daysRaw is String) days = int.tryParse(daysRaw);
-    else if (daysRaw is num)    days = daysRaw.toInt();
+    } else if (daysRaw is double) {
+      days = daysRaw.toInt();
+    } else if (daysRaw is String) {
+      days = int.tryParse(daysRaw);
+    } else if (daysRaw is num) {
+      days = daysRaw.toInt();
+    }
     if (last != null && days != null && days > 0) return last.add(Duration(days: days));
     return null;
   }

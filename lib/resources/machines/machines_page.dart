@@ -154,6 +154,14 @@ class _MachinesPageState extends State<MachinesPage> {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
+          if (MediaQuery.of(context).size.width < 700) ...[
+            IconButton(
+              icon: const Icon(Icons.menu_rounded, size: 20),
+              color: context.appTextSecondary,
+              tooltip: 'Menu',
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ],
           const Icon(Icons.precision_manufacturing_outlined,
               color: Color(0xFF14B8A6), size: 18),
           const SizedBox(width: 8),

@@ -52,7 +52,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
   Future<void> _handleQr(String raw) async {
     final payload = QrRules.parse(raw);
     if (payload == null) {
-      _showError('Not a valid BlueOpenLIMS QR code.');
+      _showError('Not a valid LIMS Sphere QR code.');
       return;
     }
 

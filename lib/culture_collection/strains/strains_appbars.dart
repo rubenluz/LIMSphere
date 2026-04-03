@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '/theme/theme.dart';
+import '/menu/app_nav.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Normal AppBar
@@ -52,6 +53,12 @@ PreferredSizeWidget buildStrainsNormalAppBar({
     foregroundColor: context.appTextPrimary,
     elevation: 0,
     titleSpacing: 12,
+    leading: desktop ? null : IconButton(
+      icon: const Icon(Icons.menu_rounded),
+      color: context.appTextSecondary,
+      tooltip: 'Menu',
+      onPressed: openAppDrawer,
+    ),
     title: Text(
         filterSampleId != null
             ? 'Strains — Sample $filterSampleId'

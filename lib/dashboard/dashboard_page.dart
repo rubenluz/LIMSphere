@@ -6,6 +6,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '/menu/app_nav.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard_widgets/next_transfer_widget.dart';
@@ -105,7 +107,7 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final client = HttpClient();
       final req = await client.getUrl(Uri.parse(api));
-      req.headers.set('User-Agent', 'BlueOpenLIMS');
+      req.headers.set('User-Agent', 'LIMSSphere');
       final res = await req.close().timeout(const Duration(seconds: 10));
       final body = await res.transform(const Utf8Decoder()).join();
       client.close();
@@ -121,7 +123,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       for (final file in files) {
         final name = (file as Map<String, dynamic>)['name'] as String? ?? '';
-        final m = RegExp(r'BlueOpenLIMS_installer_v(\d+\.\d+\.\d+)').firstMatch(name);
+        final m = RegExp(r'LIMSSphere_installer_v(\d+\.\d+\.\d+)').firstMatch(name);
         if (m != null) {
           final ver = m.group(1)!;
           if (latestVer == null || _cmpVer(ver, latestVer) > 0) {
@@ -718,14 +720,44 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildHeader() {
     final name = widget.userInfo['user_name'] as String? ??
         widget.userInfo['user_username'] as String? ?? '';
+    final isMobile = MediaQuery.of(context).size.width < 700;
     return Row(
       children: [
+        if (isMobile) ...[
+          IconButton(
+            icon: const Icon(Icons.menu_rounded, size: 20),
+            tooltip: 'Menu',
+            onPressed: openAppDrawer,
+          ),
+          const SizedBox(width: 4),
+        ],
         Text(
           'Welcome back${name.isNotEmpty ? ", $name" : ''}!',
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const Spacer(),
         if (_isDesktop) _buildUpdateButton(),
+        const SizedBox(width: 12),
+        Tooltip(
+          message: 'View on GitHub',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: () {
+              const url = 'https://github.com/rubenluz/blue_open_lims';
+              if (Platform.isWindows) {
+                Process.run('cmd', ['/c', 'start', '', url], runInShell: true);
+              } else if (Platform.isMacOS) {
+                Process.run('open', [url]);
+              } else {
+                Process.run('xdg-open', [url]);
+              }
+            },
+            child: const Padding(
+              padding: EdgeInsets.all(6),
+              child: FaIcon(FontAwesomeIcons.github, size: 18),
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -946,6 +946,14 @@ class _WaterQcPageState extends State<WaterQcPage> {
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
+            if (MediaQuery.of(context).size.width < 700) ...[
+              IconButton(
+                icon: const Icon(Icons.menu_rounded, size: 20),
+                color: context.appTextSecondary,
+                tooltip: 'Menu',
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ],
             const Icon(Icons.water_drop_outlined, size: 18, color: _pageAccent),
             const SizedBox(width: 8),
             Text('Water QC',
@@ -990,6 +998,54 @@ class _WaterQcPageState extends State<WaterQcPage> {
                 ),
               ),
             ),
+            if (MediaQuery.of(context).size.width < 700)
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: context.appTextSecondary, size: 20),
+                tooltip: 'More options',
+                offset: const Offset(0, 36),
+                color: context.appSurface2,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: context.appBorder2)),
+                onSelected: (v) {
+                  if (v == 'filter') setState(() => _showFilters = !_showFilters);
+                  if (v == 'export') _exportCsv();
+                  if (v == 'add') _addRowForDate();
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'filter',
+                    child: Row(children: [
+                      Icon(Icons.tune, size: 16,
+                          color: _showFilters ? _pageAccent : context.appTextSecondary),
+                      const SizedBox(width: 10),
+                      Text(_showFilters ? 'Hide Filters' : 'Show Filters',
+                          style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary)),
+                      if (_hasActiveFilter) ...[
+                        const Spacer(),
+                        Container(width: 7, height: 7,
+                            decoration: const BoxDecoration(color: _pageAccent, shape: BoxShape.circle)),
+                      ],
+                    ])),
+                  PopupMenuItem(
+                    value: 'export',
+                    child: Row(children: [
+                      Icon(Icons.download_outlined, size: 16, color: context.appTextSecondary),
+                      const SizedBox(width: 10),
+                      Text('Export CSV', style: GoogleFonts.spaceGrotesk(
+                          fontSize: 13, color: context.appTextPrimary)),
+                    ])),
+                  PopupMenuItem(
+                    value: 'add',
+                    child: Row(children: [
+                      const Icon(Icons.add, size: 16, color: AppDS.accent),
+                      const SizedBox(width: 10),
+                      Text('Add QC Record', style: GoogleFonts.spaceGrotesk(
+                          fontSize: 13, color: AppDS.accent)),
+                    ])),
+                ],
+              )
+            else ...[
             const SizedBox(width: 4),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1041,6 +1097,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Add QC record'),
             ),
+            ],
           ]),
         ),
         // ── Filter panel ─────────────────────────────────────────────────────

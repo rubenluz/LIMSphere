@@ -182,7 +182,7 @@ class _LoginPageState extends State<LoginPage> {
                             color: Theme.of(context).colorScheme.primary),
                         const SizedBox(height: 16),
                         const Text(
-                          'BlueOpenLIMS',
+                          'LIMS Sphere',
                           style: TextStyle(
                               fontSize: 20, fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,

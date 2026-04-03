@@ -225,7 +225,7 @@ class _TestPrintButtonState extends State<_TestPrintButton> {
                 content: 'Test Print', x: 4, y: 4, w: 120, h: 14,
                 fontSize: 12, fontWeight: FontWeight.bold),
             LabelField(id: 'f2', type: LabelFieldType.text,
-                content: 'BlueOpenLIMS', x: 4, y: 18, w: 120, h: 10, fontSize: 9),
+                content: 'LIMS Sphere', x: 4, y: 18, w: 120, h: 10, fontSize: 9),
           ],
         );
         await _sendToPrinter(

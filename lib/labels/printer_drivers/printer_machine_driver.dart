@@ -180,7 +180,7 @@ if (-not [WinSpool]::OpenPrinter($printerName, [ref]$ph, [IntPtr]::Zero)) {
 }
 try {
   $di = New-Object DOCINFOA
-  $di.pDocName  = 'BlueOpenLIMS'
+  $di.pDocName  = 'LIMS Sphere'
   $di.pDataType = 'RAW'
   $job = [WinSpool]::StartDocPrinter($ph, 1, $di)
   if ($job -le 0) { throw "StartDocPrinter failed (job=$job)" }
