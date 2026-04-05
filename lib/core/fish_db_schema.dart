@@ -1,11 +1,6 @@
-/// Single source of truth for fish facility DB table names and column names.
-///
-/// Usage: reference these constants in models (fromMap/toMap) and in page
-/// queries, so that renaming a column in core_tables_sql.dart only requires
-/// updating the matching constant here — all models and queries update
-/// automatically via the Dart constant reference.
-///
-/// Always keep in sync with core_tables_sql.dart.
+// fish_db_schema.dart - FishSch: compile-time constants for fish_lines and
+// fish_stocks table/column names (single source of truth for query strings).
+
 abstract class FishSch {
   // ── Table names ────────────────────────────────────────────────────────────
   static const linesTable  = 'fish_lines';
@@ -73,6 +68,7 @@ abstract class FishSch {
   static const stockJuveniles        = 'fish_stocks_juveniles';
   static const stockMortality        = 'fish_stocks_mortality';
   static const stockArrivalDate      = 'fish_stocks_arrival_date';
+  static const stockDob              = 'fish_stocks_dob';
   static const stockOrigin           = 'fish_stocks_origin';
   static const stockResponsible      = 'fish_stocks_responsible';
   static const stockResponsibleId    = 'fish_stocks_responsible_id';
@@ -86,8 +82,9 @@ abstract class FishSch {
   static const stockCleaningInterval = 'fish_stocks_cleaning_interval_days';
   static const stockFoodType         = 'fish_stocks_food_type';
   static const stockFoodSource       = 'fish_stocks_food_source';
-  static const stockFoodAmount       = 'fish_stocks_food_amount';
-  static const stockFeedingSchedule  = 'fish_stocks_feeding_schedule';
+  static const stockFoodAmount          = 'fish_stocks_food_amount';
+  static const stockFeedingAmountUnit   = 'fish_stocks_feeding_amount_unit';
+  static const stockFeedingSchedule     = 'fish_stocks_feeding_schedule';
   static const stockLastHealthCheck  = 'fish_stocks_last_health_check';
   static const stockHealthStatus     = 'fish_stocks_health_status';
   static const stockTreatment        = 'fish_stocks_treatment';
@@ -98,6 +95,7 @@ abstract class FishSch {
   static const stockExperimentId     = 'fish_stocks_experiment_id';
   static const stockEthicsApproval   = 'fish_stocks_ethics_approval';
   static const stockNotes            = 'fish_stocks_notes';
+  static const stockQrcode           = 'fish_stocks_qrcode';
   static const stockCreatedAt        = 'fish_stocks_created_at';
   static const stockUpdatedAt        = 'fish_stocks_updated_at';
 }

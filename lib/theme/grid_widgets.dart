@@ -1,3 +1,6 @@
+// grid_widgets.dart - Shared data-table cell and column header widgets used
+// across culture-collection and other grid pages.
+
 import 'package:flutter/material.dart';
 import 'theme.dart';
 

@@ -1,17 +1,24 @@
-# BlueOpenLIMS
+# LIMSphere
 
-A new Flutter project.
+LIMSphere is a Flutter-based application designed as a modern Laboratory Information Management System (LIMS). It aims to streamline sample tracking, data management, and workflow automation in research and laboratory environments.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 📦 Project Structure
 
-A few resources to get you started if this is your first Flutter project:
+```
+lib/            # Main Dart source code
+android/        # Android-specific files
+ios/            # iOS-specific files
+windows/        # Windows desktop support
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🧪 Purpose
+
+Limsphere is intended for:
+
+* Laboratory data management
+* Sample tracking workflows
+* Research and experimental data organization

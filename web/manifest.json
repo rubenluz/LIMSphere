@@ -1,11 +1,11 @@
 {
-    "name": "culture_app",
-    "short_name": "culture_app",
+    "name": "LIMSphere",
+    "short_name": "LIMSphere",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#000000",
-    "description": "A new Flutter project.",
+    "description": "LIMSphere Platform",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

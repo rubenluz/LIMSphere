@@ -5,18 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "culture_app",
+            "name": "LIMSphere",
             "request": "launch",
-            "type": "dart"
+            "type": "dart",
+            "flutterMode": "debug"
         },
         {
-            "name": "culture_app (profile mode)",
+            "name": "LIMSphere (profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
         },
         {
-            "name": "culture_app (release mode)",
+            "name": "LIMSphere (release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"
