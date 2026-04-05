@@ -106,7 +106,7 @@ class _DashboardPageState extends State<DashboardPage> {
       setState(() => _updateStatus = _UpdateStatus.upToDate);
       return;
     }
-    const api = 'https://api.github.com/repos/rubenluz/blue_open_lims/contents/desktop_release';
+    const api = 'https://api.github.com/repos/rubenluz/limsphere/contents/desktop_release';
     try {
       final client = HttpClient();
       final req = await client.getUrl(Uri.parse(api));
@@ -756,7 +756,7 @@ class _DashboardPageState extends State<DashboardPage> {
           child: InkWell(
             borderRadius: BorderRadius.circular(6),
             onTap: () => launchUrl(
-              Uri.parse('https://github.com/rubenluz/blue_open_lims'),
+              Uri.parse('https://github.com/rubenluz/limsphere'),
               mode: LaunchMode.externalApplication,
             ),
             child: Padding(
