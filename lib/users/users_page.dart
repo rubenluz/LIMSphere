@@ -670,19 +670,16 @@ class _UsersPageState extends State<UsersPage> {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: context.appSurface,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppDS.tableBorder),
-                      boxShadow: const [
-                        BoxShadow(
-                            color: AppDS.shadow,
-                            blurRadius: 4,
-                            offset: Offset(0, 2))
-                      ],
+                      border: Border.all(color: context.appBorder),
+                      boxShadow: [BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2))],
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: NotificationListener<ScrollNotification>(
+                    clipBehavior: Clip.antiAlias,
+                    child: NotificationListener<ScrollNotification>(
                         onNotification: (n) {
                           if (n is ScrollUpdateNotification) {
                             if (n.metrics.axis == Axis.horizontal) {
@@ -705,7 +702,7 @@ class _UsersPageState extends State<UsersPage> {
                             child: Column(children: [
                               _buildHeader(),
                               Container(
-                                  height: 1, color: AppDS.tableBorder),
+                                  height: 1, color: context.appBorder),
                               Expanded(
                                 child: ListView.builder(
                                   controller: _vertCtrl,
@@ -721,7 +718,6 @@ class _UsersPageState extends State<UsersPage> {
                       ),
                     ),
                   ),
-                ),
                 const SizedBox(width: 4),
                 AppVerticalThumb(
                   contentLength: _filtered.length * AppDS.tableRowH,
@@ -782,24 +778,23 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Widget _buildRow(_User u, int i) {
-    final isPending  = u.status == 'pending';
-    final isInactive = u.status == 'inactive';
+    final isPending = u.status == 'pending';
+    final baseEven = context.appSurface;
+    final baseOdd  = context.appSurface2;
     Color rowBg;
     if (isPending) {
       rowBg = AppDS.orange.withValues(alpha: 0.06);
-    } else if (isInactive) {
-      rowBg = i.isEven ? AppDS.tableRowEven : AppDS.tableRowOdd;
     } else {
-      rowBg = i.isEven ? AppDS.tableRowEven : AppDS.tableRowOdd;
+      rowBg = i.isEven ? baseEven : baseOdd;
     }
     final borderColor = isPending
         ? AppDS.orange.withValues(alpha: 0.25)
-        : AppDS.tableBorder;
+        : context.appBorder;
 
     return Container(
       decoration: BoxDecoration(
         color: rowBg,
-        border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
       ),
       child: Row(
         children: [
@@ -838,20 +833,20 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   // ── Cell builders ─────────────────────────────────────────────────────────
-  static const _editDeco = InputDecoration(
+  InputDecoration get _editDeco => InputDecoration(
     isDense: true,
-    contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
     filled: true,
-    fillColor: Colors.white,
-    border: OutlineInputBorder(
+    fillColor: context.appSurface,
+    border: const OutlineInputBorder(
       borderRadius: BorderRadius.all(Radius.circular(4)),
       borderSide: BorderSide(color: AppDS.accent, width: 1.5),
     ),
-    enabledBorder: OutlineInputBorder(
+    enabledBorder: const OutlineInputBorder(
       borderRadius: BorderRadius.all(Radius.circular(4)),
       borderSide: BorderSide(color: AppDS.accent, width: 1.5),
     ),
-    focusedBorder: OutlineInputBorder(
+    focusedBorder: const OutlineInputBorder(
       borderRadius: BorderRadius.all(Radius.circular(4)),
       borderSide: BorderSide(color: AppDS.accent, width: 1.5),
     ),
@@ -876,7 +871,7 @@ class _UsersPageState extends State<UsersPage> {
                   controller: _editCtrl,
                   autofocus: true,
                   style: _spaceGrotesk(
-                      fontSize: 12, color: AppDS.tableText),
+                      fontSize: 12, color: context.appTextPrimary),
                   decoration: _editDeco,
                   onSubmitted: (v) => _commitText(u, key, v),
                   onTapOutside: (_) =>
@@ -893,8 +888,8 @@ class _UsersPageState extends State<UsersPage> {
                                   : FontWeight.normal))
                       .copyWith(
                           color: val == null
-                              ? AppDS.tableTextMute
-                              : AppDS.tableText),
+                              ? context.appTextMuted
+                              : context.appTextPrimary),
                   overflow: TextOverflow.ellipsis,
                 ),
         ),
@@ -1020,8 +1015,7 @@ class _UsersPageState extends State<UsersPage> {
                   ? _jetBrainsMono(fontSize: 11)
                   : _spaceGrotesk(fontSize: 12))
               .copyWith(
-                  color:
-                      val == null ? AppDS.tableTextMute : AppDS.tableTextMute),
+                  color: context.appTextMuted),
           overflow: TextOverflow.ellipsis,
         ),
       ),

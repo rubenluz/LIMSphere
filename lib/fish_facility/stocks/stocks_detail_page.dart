@@ -11,26 +11,16 @@ import '../lines/fish_lines_detail_page.dart';
 import '../../requests/requests_page.dart';
 import '/supabase/supabase_manager.dart';
 import '/camera/qr_scanner/qr_code_rules.dart';
+import '/theme/theme.dart';
 
-// ─── Design tokens (mirrors strain_detail_page light theme) ──────────────────
+// ─── Design tokens ────────────────────────────────────────────────────────────
 class _DS {
-  static const Color headerBg   = Color(0xFF1E293B);
-  static const Color accent     = Color(0xFF3B82F6);
-  static const Color sectionBg  = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color labelColor = Color(0xFF64748B);
-  static const Color titleColor = Color(0xFF0F172A);
-  static const Color scaffoldBg = Color(0xFFF1F5F9);
-  static const Color green      = Color(0xFF16A34A);
-  static const Color yellow     = Color(0xFFD97706);
-  static const Color red        = Color(0xFFDC2626);
-  static const Color orange     = Color(0xFFEA580C);
-  static const Color pink       = Color(0xFFDB2777);
-
-  static const TextStyle sectionTitle = TextStyle(
-    fontSize: 12, fontWeight: FontWeight.w700,
-    color: Color(0xFF64748B), letterSpacing: 0.8,
-  );
+  static const Color accent = Color(0xFF3B82F6);
+  static const Color green  = Color(0xFF16A34A);
+  static const Color yellow = Color(0xFFD97706);
+  static const Color red    = Color(0xFFDC2626);
+  static const Color orange = Color(0xFFEA580C);
+  static const Color pink   = Color(0xFFDB2777);
 }
 
 // ─── Field & group definitions ────────────────────────────────────────────────
@@ -186,7 +176,7 @@ Color _statusColor(String? s) => switch (s?.toLowerCase()) {
   'sick'        => _DS.red,
   'treatment'   => _DS.orange,
   'sentinel'    => _DS.pink,
-  _             => _DS.labelColor,
+  _             => AppDS.textMuted,
 };
 
 bool _isMobile(BuildContext context) => MediaQuery.of(context).size.width < 720;
@@ -503,7 +493,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
         content: RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
-            style: const TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.5),
+            style: TextStyle(fontSize: 14, color: context.appTextSecondary, height: 1.5),
             children: [
               const TextSpan(text: 'This will permanently remove all data for\n'),
               TextSpan(text: tankId,
@@ -597,7 +587,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
   // MOBILE
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildMobile() => Scaffold(
-    backgroundColor: _DS.scaffoldBg,
+    backgroundColor: context.appBg,
     appBar: _buildMobileAppBar(),
     body: _loading
         ? const Center(child: CircularProgressIndicator())
@@ -627,8 +617,8 @@ class _TankDetailPageState extends State<TankDetailPage> {
   );
 
   PreferredSizeWidget _buildMobileAppBar() => AppBar(
-    backgroundColor: _DS.headerBg,
-    foregroundColor: Colors.white,
+    backgroundColor: context.appSurface,
+    foregroundColor: context.appTextPrimary,
     elevation: 0,
     title: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -638,14 +628,14 @@ class _TankDetailPageState extends State<TankDetailPage> {
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
         if (widget.tank.zebraLine != null)
           Text(widget.tank.zebraLine!,
-              style: const TextStyle(
-                  fontSize: 11, color: Colors.white60,
+              style: TextStyle(
+                  fontSize: 11, color: context.appTextMuted,
                   fontStyle: FontStyle.italic)),
       ],
     ),
     actions: [
       PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert, color: Colors.white70),
+        icon: Icon(Icons.more_vert, color: context.appTextSecondary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         onSelected: (v) {
           if (v == 'delete') _delete();
@@ -682,7 +672,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
   // DESKTOP
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildDesktop() => Scaffold(
-    backgroundColor: _DS.scaffoldBg,
+    backgroundColor: context.appBg,
     appBar: _buildDesktopAppBar(),
     body: _loading
         ? const Center(child: CircularProgressIndicator())
@@ -693,11 +683,11 @@ class _TankDetailPageState extends State<TankDetailPage> {
     final status = _ctrl['fish_stocks_status']?.text
         ?? widget.tank.zebraStatus ?? '';
     return AppBar(
-      backgroundColor: _DS.headerBg,
-      foregroundColor: Colors.white,
+      backgroundColor: context.appSurface,
+      foregroundColor: context.appTextPrimary,
       elevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios, size: 16, color: Colors.white70),
+        icon: const Icon(Icons.arrow_back_ios, size: 16),
         onPressed: () => Navigator.pop(context)),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -710,18 +700,18 @@ class _TankDetailPageState extends State<TankDetailPage> {
             if (status.isNotEmpty) _statusPill(status),
             const SizedBox(width: 6),
             Text(widget.tank.volumeLabel,
-                style: const TextStyle(fontSize: 10, color: Colors.white38)),
+                style: TextStyle(fontSize: 10, color: context.appTextMuted)),
           ]),
           if (widget.tank.zebraLine != null)
             Text(widget.tank.zebraLine!,
-                style: const TextStyle(
-                    fontSize: 11, color: Colors.white60,
+                style: TextStyle(
+                    fontSize: 11, color: context.appTextMuted,
                     fontStyle: FontStyle.italic)),
         ],
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.outbox_outlined, size: 20, color: Colors.white70),
+          icon: Icon(Icons.outbox_outlined, size: 20, color: context.appTextSecondary),
           tooltip: 'Quick Request',
           onPressed: () => showQuickRequestDialog(
             context,
@@ -748,7 +738,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: Colors.white12)),
+        child: Container(height: 1, color: context.appBorder)),
     );
   }
 
@@ -759,12 +749,12 @@ class _TankDetailPageState extends State<TankDetailPage> {
       SizedBox(
         width: 240,
         child: Container(
-          color: Colors.white,
+          color: context.appSurface,
           child: Column(children: [
-            const Divider(height: 1),
+            Divider(height: 1, color: context.appBorder),
             if (_selectedLineName != null) _buildLineLink(),
             _buildSidebarStats(),
-            const Divider(height: 1),
+            Divider(height: 1, color: context.appBorder),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -776,18 +766,18 @@ class _TankDetailPageState extends State<TankDetailPage> {
                     dense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                     leading: Icon(_sectionIcon(g.icon), size: 18,
-                        color: isExp ? _DS.accent : const Color(0xFF94A3B8)),
+                        color: isExp ? _DS.accent : context.appTextSecondary),
                     title: Text(g.title,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: isExp ? FontWeight.w600 : FontWeight.normal,
-                          color: isExp ? _DS.accent : const Color(0xFF475569))),
+                          color: isExp ? _DS.accent : context.appTextSecondary)),
                     trailing: Icon(
                         isExp
                             ? Icons.keyboard_arrow_down_rounded
                             : Icons.keyboard_arrow_right_rounded,
                         size: 16,
-                        color: isExp ? _DS.accent : const Color(0xFF94A3B8)),
+                        color: isExp ? _DS.accent : context.appTextSecondary),
                     onTap: () => setState(() {
                       if (isExp) { _expanded.remove(i); } else { _expanded.add(i); }
                     }),
@@ -841,9 +831,9 @@ class _TankDetailPageState extends State<TankDetailPage> {
     child: Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
-        color: Color(0xFFEFF6FF),
-        border: Border(bottom: BorderSide(color: Color(0xFFBFDBFE)))),
+      decoration: BoxDecoration(
+        color: _DS.accent.withValues(alpha: 0.08),
+        border: Border(bottom: BorderSide(color: _DS.accent.withValues(alpha: 0.3)))),
       child: Row(children: [
         const Icon(Icons.biotech_outlined, size: 14, color: _DS.accent),
         const SizedBox(width: 8),
@@ -860,11 +850,11 @@ class _TankDetailPageState extends State<TankDetailPage> {
 
   Widget _buildSidebarStats() => Container(
     padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-    color: _DS.sectionBg,
+    color: context.appSurface2,
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('OVERVIEW',
           style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
-              color: _DS.labelColor, letterSpacing: 0.8)),
+              color: context.appTextMuted, letterSpacing: 0.8)),
       const SizedBox(height: 8),
       Row(children: [
         Expanded(child: _sidebarStat('\u2642', '$_males', _DS.accent)),
@@ -877,7 +867,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
       Row(children: [
         Expanded(child: _sidebarStat('TOTAL', '$_total', _DS.green)),
         const SizedBox(width: 6),
-        Expanded(child: _sidebarStat('VOL', widget.tank.volumeLabel, _DS.labelColor)),
+        Expanded(child: _sidebarStat('VOL', widget.tank.volumeLabel, context.appTextMuted)),
       ]),
       if (_ageDays >= 0) ...[
         const SizedBox(height: 6),
@@ -918,20 +908,20 @@ class _TankDetailPageState extends State<TankDetailPage> {
       const SizedBox(height: 2),
       Text(value,
           style: GoogleFonts.jetBrainsMono(
-              fontSize: 12, fontWeight: FontWeight.w700, color: _DS.titleColor)),
+              fontSize: 12, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
     ]),
   );
 
   // ── Stat strip (mobile only) ──────────────────────────────────────────────
   Widget _buildStatStrip() => Container(
-    color: Colors.white,
+    color: context.appSurface,
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
     child: Wrap(spacing: 10, runSpacing: 8, children: [
       _statChip('MALES',     '$_males',   _DS.accent),
       _statChip('FEMALES',   '$_females', _DS.accent),
       _statChip('JUVENILES', '$_juvs',    _DS.yellow),
       _statChip('TOTAL',     '$_total',   _DS.green),
-      _statChip('VOLUME',    widget.tank.volumeLabel, _DS.labelColor),
+      _statChip('VOLUME',    widget.tank.volumeLabel, context.appTextMuted),
       if (_ageDays >= 0) _statChip('AGE', '$_ageDays d', _DS.orange),
       if ((_ctrl['fish_stocks_temperature_c']?.text ?? '').isNotEmpty)
         _statChip('TEMP',
@@ -954,13 +944,13 @@ class _TankDetailPageState extends State<TankDetailPage> {
       const SizedBox(width: 6),
       Text(value,
           style: GoogleFonts.jetBrainsMono(
-              fontSize: 13, fontWeight: FontWeight.w700, color: _DS.titleColor)),
+              fontSize: 13, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
     ]),
   );
 
   // ── Mobile section tab bar ────────────────────────────────────────────────
   Widget _buildMobileSectionBar() => Container(
-    color: Colors.white,
+    color: context.appSurface,
     height: 48,
     child: ListView.builder(
       scrollDirection: Axis.horizontal,
@@ -975,18 +965,18 @@ class _TankDetailPageState extends State<TankDetailPage> {
             margin: const EdgeInsets.only(right: 6),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: isActive ? _DS.accent : const Color(0xFFF1F5F9),
+              color: isActive ? _DS.accent : context.appSurface2,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                  color: isActive ? _DS.accent : const Color(0xFFE2E8F0))),
+                  color: isActive ? _DS.accent : context.appBorder)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(_sectionIcon(_groups[i].icon), size: 13,
-                  color: isActive ? Colors.white : const Color(0xFF64748B)),
+                  color: isActive ? Colors.white : context.appTextMuted),
               const SizedBox(width: 5),
               Text(_groups[i].title,
                   style: TextStyle(
                     fontSize: 11, fontWeight: FontWeight.w600,
-                    color: isActive ? Colors.white : const Color(0xFF475569))),
+                    color: isActive ? Colors.white : context.appTextSecondary)),
             ]),
           ),
         );
@@ -1029,9 +1019,9 @@ class _TankDetailPageState extends State<TankDetailPage> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.appSurface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _DS.cardBorder),
+          border: Border.all(color: context.appBorder),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 6, offset: const Offset(0, 2)),
@@ -1041,10 +1031,10 @@ class _TankDetailPageState extends State<TankDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
-              color: _DS.sectionBg,
+              color: context.appSurface2,
               borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(12), topRight: Radius.circular(12)),
-              border: const Border(bottom: BorderSide(color: _DS.cardBorder))),
+              border: Border(bottom: BorderSide(color: context.appBorder))),
             child: Row(children: [
               Container(
                 padding: const EdgeInsets.all(6),
@@ -1053,7 +1043,9 @@ class _TankDetailPageState extends State<TankDetailPage> {
                   borderRadius: BorderRadius.circular(8)),
                 child: Icon(_sectionIcon(iconKey), size: 16, color: _DS.accent)),
               const SizedBox(width: 10),
-              Text(title.toUpperCase(), style: _DS.sectionTitle),
+              Text(title.toUpperCase(), style: GoogleFonts.spaceGrotesk(
+                  fontSize: 12, fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8, color: context.appTextMuted)),
               const Spacer(),
               GestureDetector(
                 onTap: () => setState(() {
@@ -1061,7 +1053,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
                   else { _expanded.add(idx); }
                 }),
                 child: Icon(Icons.keyboard_arrow_up_rounded,
-                    size: 20, color: const Color(0xFF94A3B8))),
+                    size: 20, color: context.appTextSecondary)),
             ]),
           ),
           // Fields
@@ -1119,12 +1111,12 @@ class _TankDetailPageState extends State<TankDetailPage> {
           isExpanded: true,
           underline: const SizedBox.shrink(),
           isDense: true,
-          style: const TextStyle(fontSize: 13, color: _DS.titleColor),
-          hint: const Text('\u2014 select line \u2014',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+          style: TextStyle(fontSize: 13, color: context.appTextPrimary),
+          hint: Text('\u2014 select line \u2014',
+              style: TextStyle(color: context.appTextMuted, fontSize: 13)),
           items: _lines.map((l) => DropdownMenuItem(
             value: l,
-            child: Text(l, style: const TextStyle(fontSize: 13, color: _DS.titleColor)))).toList(),
+            child: Text(l, style: TextStyle(fontSize: 13, color: context.appTextPrimary)))).toList(),
           onChanged: (v) {
             setState(() {
               ctrl.text         = v ?? '';
@@ -1152,13 +1144,13 @@ class _TankDetailPageState extends State<TankDetailPage> {
       return DropdownButtonFormField<String>(
         initialValue: val.isEmpty ? null : val,
         decoration: _dec(f.label),
-        style: GoogleFonts.jetBrainsMono(fontSize: 13, color: _DS.titleColor),
-        hint: const Text('— select —',
-            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+        style: GoogleFonts.jetBrainsMono(fontSize: 13, color: context.appTextPrimary),
+        hint: Text('— select —',
+            style: TextStyle(color: context.appTextMuted, fontSize: 13)),
         items: opts.map((v) => DropdownMenuItem(
           value: v,
           child: Text(v, style: GoogleFonts.jetBrainsMono(
-              fontSize: 13, color: _DS.titleColor)))).toList(),
+              fontSize: 13, color: context.appTextPrimary)))).toList(),
         onChanged: (v) => setState(() => ctrl.text = v ?? ''),
       );
     }
@@ -1170,20 +1162,20 @@ class _TankDetailPageState extends State<TankDetailPage> {
       return DropdownButtonFormField<String>(
         initialValue: val,
         decoration: _dec(f.label),
-        style: const TextStyle(fontSize: 13, color: _DS.titleColor),
+        style: TextStyle(fontSize: 13, color: context.appTextPrimary),
         items: [
-          const DropdownMenuItem<String>(
+          DropdownMenuItem<String>(
             value: null,
             child: Text('\u2014 not set \u2014',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13))),
+                style: TextStyle(color: context.appTextMuted, fontSize: 13))),
           ...opts.map((v) => DropdownMenuItem(
             value: v,
             child: Row(children: [
-              if (_statusColor(v) != _DS.labelColor)
+              if (_statusColor(v) != AppDS.textMuted)
                 Container(width: 8, height: 8,
                   margin: const EdgeInsets.only(right: 7),
                   decoration: BoxDecoration(color: _statusColor(v), shape: BoxShape.circle)),
-              Text(v, style: const TextStyle(color: _DS.titleColor, fontSize: 13)),
+              Text(v, style: TextStyle(color: context.appTextPrimary, fontSize: 13)),
             ]))),
         ],
         onChanged: (v) => setState(() => ctrl.text = v ?? ''),
@@ -1196,10 +1188,10 @@ class _TankDetailPageState extends State<TankDetailPage> {
         controller: ctrl,
         readOnly: true,
         onTap: () => _pickDate(f.key, f.label),
-        style: const TextStyle(fontSize: 13, color: _DS.titleColor),
+        style: TextStyle(fontSize: 13, color: context.appTextPrimary),
         decoration: _dec(f.label).copyWith(
-          suffixIcon: const Icon(Icons.calendar_today_outlined,
-              size: 16, color: _DS.labelColor)),
+          suffixIcon: Icon(Icons.calendar_today_outlined,
+              size: 16, color: context.appTextMuted)),
       );
     }
 
@@ -1207,7 +1199,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
     return TextFormField(
       controller: ctrl,
       maxLines: f.lines,
-      style: const TextStyle(fontSize: 13, color: _DS.titleColor),
+      style: TextStyle(fontSize: 13, color: context.appTextPrimary),
       decoration: _dec(f.label).copyWith(
         contentPadding: f.lines > 1
             ? const EdgeInsets.all(12)
@@ -1225,18 +1217,18 @@ class _TankDetailPageState extends State<TankDetailPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _DS.sectionBg,
+        color: context.appSurface2,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _DS.cardBorder),
+        border: Border.all(color: context.appBorder),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Label
-        const Text('Tank Position',
-            style: TextStyle(fontSize: 11, color: _DS.labelColor, fontWeight: FontWeight.w600)),
+        Text('Tank Position',
+            style: TextStyle(fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w600)),
         const SizedBox(height: 10),
         // Rack
         Row(children: [
-          const Text('Rack:', style: TextStyle(fontSize: 11, color: _DS.labelColor, fontWeight: FontWeight.w700)),
+          Text('Rack:', style: TextStyle(fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700)),
           const SizedBox(width: 10),
           ...widget.availableRacks.map((rack) => Padding(
             padding: const EdgeInsets.only(right: 6),
@@ -1251,14 +1243,14 @@ class _TankDetailPageState extends State<TankDetailPage> {
                 width: 38, height: 32,
                 decoration: BoxDecoration(
                   color: _selectedRack == rack
-                      ? _DS.accent.withValues(alpha: 0.1) : Colors.white,
+                      ? _DS.accent.withValues(alpha: 0.1) : context.appSurface,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: _selectedRack == rack ? _DS.accent : _DS.cardBorder,
+                    color: _selectedRack == rack ? _DS.accent : context.appBorder,
                     width: _selectedRack == rack ? 1.5 : 1)),
                 child: Center(child: Text(rack, style: GoogleFonts.jetBrainsMono(
                   fontSize: 11, fontWeight: FontWeight.w700,
-                  color: _selectedRack == rack ? _DS.accent : _DS.labelColor))),
+                  color: _selectedRack == rack ? _DS.accent : context.appTextMuted))),
               ),
             ),
           )),
@@ -1266,9 +1258,9 @@ class _TankDetailPageState extends State<TankDetailPage> {
         const SizedBox(height: 10),
         // Row
         Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 0, children: [
-          const Padding(
-            padding: EdgeInsets.only(right: 10),
-            child: Text('Row:', style: TextStyle(fontSize: 11, color: _DS.labelColor, fontWeight: FontWeight.w700))),
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Text('Row:', style: TextStyle(fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700))),
           ..._detailRowLabels.map((r) => Padding(
             padding: const EdgeInsets.only(right: 6),
             child: InkWell(
@@ -1283,31 +1275,31 @@ class _TankDetailPageState extends State<TankDetailPage> {
                 width: 38, height: 44,
                 decoration: BoxDecoration(
                   color: _selectedRow == r
-                      ? _DS.accent.withValues(alpha: 0.1) : Colors.white,
+                      ? _DS.accent.withValues(alpha: 0.1) : context.appSurface,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: _selectedRow == r ? _DS.accent : _DS.cardBorder,
+                    color: _selectedRow == r ? _DS.accent : context.appBorder,
                     width: _selectedRow == r ? 1.5 : 1)),
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Text(r, style: GoogleFonts.jetBrainsMono(
                     fontSize: 12, fontWeight: FontWeight.w700,
-                    color: _selectedRow == r ? _DS.accent : _DS.labelColor)),
+                    color: _selectedRow == r ? _DS.accent : context.appTextMuted)),
                   Text(r == 'A' ? '1.1L' : '3.5L',
                     style: GoogleFonts.jetBrainsMono(fontSize: 8,
                       color: _selectedRow == r
                           ? _DS.accent.withValues(alpha: 0.7)
-                          : _DS.labelColor.withValues(alpha: 0.6))),
+                          : context.appTextMuted.withValues(alpha: 0.6))),
                 ]),
               ),
             ),
           )),
           const SizedBox(width: 8),
           Text(_selectedRow == 'A' ? '(15 × 1.1 L)' : '(10 × 3.5 L)',
-              style: GoogleFonts.jetBrainsMono(fontSize: 10, color: _DS.labelColor)),
+              style: GoogleFonts.jetBrainsMono(fontSize: 10, color: context.appTextMuted)),
         ]),
         const SizedBox(height: 10),
         // Column
-        const Text('Column:', style: TextStyle(fontSize: 11, color: _DS.labelColor, fontWeight: FontWeight.w700)),
+        Text('Column:', style: TextStyle(fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),
         Wrap(
           spacing: 5, runSpacing: 5,
@@ -1324,27 +1316,27 @@ class _TankDetailPageState extends State<TankDetailPage> {
                 decoration: BoxDecoration(
                   color: occupied
                       ? _DS.red.withValues(alpha: 0.08)
-                      : (sel ? _DS.accent.withValues(alpha: 0.12) : Colors.white),
+                      : (sel ? _DS.accent.withValues(alpha: 0.12) : context.appSurface),
                   borderRadius: BorderRadius.circular(5),
                   border: Border.all(
                     color: occupied ? _DS.red.withValues(alpha: 0.4)
-                        : (sel ? _DS.accent : _DS.cardBorder),
+                        : (sel ? _DS.accent : context.appBorder),
                     width: sel ? 1.5 : 1)),
                 child: Center(child: Text('$col', style: GoogleFonts.jetBrainsMono(
                   fontSize: 11, fontWeight: FontWeight.w600,
                   color: occupied ? _DS.red
-                      : (sel ? _DS.accent : _DS.labelColor)))),
+                      : (sel ? _DS.accent : context.appTextMuted)))),
               ),
             );
           }),
         ),
         const SizedBox(height: 8),
         Row(children: [
-          const Icon(Icons.tag_rounded, size: 12, color: _DS.labelColor),
+          Icon(Icons.tag_rounded, size: 12, color: context.appTextMuted),
           const SizedBox(width: 4),
           Text('Selected: $_currentTankId',
               style: GoogleFonts.jetBrainsMono(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: _DS.titleColor)),
+                  fontSize: 12, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
         ]),
       ]),
     );
@@ -1370,14 +1362,14 @@ class _TankDetailPageState extends State<TankDetailPage> {
     };
     return InputDecorator(
       decoration: _dec(f.label).copyWith(
-        fillColor: const Color(0xFFF0F4F8),
-        suffixIcon: const Icon(Icons.auto_awesome_outlined,
-            size: 14, color: _DS.labelColor)),
+        fillColor: context.appSurface2,
+        suffixIcon: Icon(Icons.auto_awesome_outlined,
+            size: 14, color: context.appTextMuted)),
       child: Text(value,
           style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: hasValue ? valueColor : _DS.labelColor)),
+              color: hasValue ? valueColor : context.appTextMuted)),
     );
   }
 
@@ -1385,17 +1377,17 @@ class _TankDetailPageState extends State<TankDetailPage> {
   Widget _buildLineBreedersDisplay() {
     return InputDecorator(
       decoration: _dec('Parent Lines (from fish line)').copyWith(
-        fillColor: const Color(0xFFF0F4F8),
+        fillColor: context.appSurface2,
         helperText: 'Edit in the Fish Lines record',
-        helperStyle: const TextStyle(fontSize: 10, color: _DS.labelColor),
-        suffixIcon: const Icon(Icons.link_rounded, size: 15, color: _DS.labelColor)),
+        helperStyle: TextStyle(fontSize: 10, color: context.appTextMuted),
+        suffixIcon: Icon(Icons.link_rounded, size: 15, color: context.appTextMuted)),
       child: _lineBreeders.isEmpty
-          ? const Text('—', style: TextStyle(color: _DS.labelColor, fontSize: 13))
+          ? Text('—', style: TextStyle(color: context.appTextMuted, fontSize: 13))
           : Wrap(
               spacing: 6, runSpacing: 4,
               children: _lineBreeders.map((b) => Chip(
                 label: Text(b,
-                    style: const TextStyle(fontSize: 11, color: _DS.titleColor)),
+                    style: TextStyle(fontSize: 11, color: context.appTextPrimary)),
                 backgroundColor: _DS.accent.withValues(alpha: 0.08),
                 side: BorderSide(color: _DS.accent.withValues(alpha: 0.3)),
                 visualDensity: VisualDensity.compact,
@@ -1407,16 +1399,16 @@ class _TankDetailPageState extends State<TankDetailPage> {
   // ── Shared decoration ─────────────────────────────────────────────────────
   InputDecoration _dec(String label) => InputDecoration(
     labelText: label,
-    labelStyle: const TextStyle(fontSize: 12, color: _DS.labelColor),
+    labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
     isDense: true,
     filled: true,
-    fillColor: const Color(0xFFFAFAFC),
+    fillColor: context.appSurface,
     border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: _DS.cardBorder)),
+        borderSide: BorderSide(color: context.appBorder)),
     enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: _DS.cardBorder)),
+        borderSide: BorderSide(color: context.appBorder)),
     focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: _DS.accent, width: 1.5)),

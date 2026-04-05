@@ -1151,17 +1151,16 @@ class _WaterQcPageState extends State<WaterQcPage> {
                             Expanded(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: context.appSurface,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppDS.tableBorder),
-                                  boxShadow: const [BoxShadow(
-                                      color: AppDS.shadow,
-                                      blurRadius: 4,
-                                      offset: Offset(0, 2))],
+                                  border: Border.all(color: context.appBorder),
+                                  boxShadow: [BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2))],
                                 ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: NotificationListener<ScrollNotification>(
+                                clipBehavior: Clip.antiAlias,
+                                child: NotificationListener<ScrollNotification>(
                                     onNotification: (n) {
                                       if (n is ScrollUpdateNotification) {
                                         if (n.metrics.axis == Axis.horizontal) {
@@ -1204,7 +1203,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
                                               )),
                                             ]),
                                           ),
-                                          Container(height: 1, color: AppDS.tableBorder),
+                                          Container(height: 1, color: context.appBorder),
                                           // Rows
                                           Expanded(
                                             child: ListView.builder(
@@ -1225,7 +1224,6 @@ class _WaterQcPageState extends State<WaterQcPage> {
                                   ),
                                 ),
                               ),
-                            ),
                             const SizedBox(width: 4),
                             AppVerticalThumb(
                               contentLength: (_filteredRows.length + 1) * AppDS.tableRowH,
@@ -1306,11 +1304,11 @@ class _WaterQcPageState extends State<WaterQcPage> {
   // ── Row builder ────────────────────────────────────────────────────────────
 
   Widget _buildRow(Map<String, dynamic> row, int i) {
-    final bg = i.isEven ? AppDS.tableRowEven : AppDS.tableRowOdd;
+    final bg = i.isEven ? context.appSurface : context.appSurface2;
     return Container(
       decoration: BoxDecoration(
         color: bg,
-        border: const Border(bottom: BorderSide(color: AppDS.tableBorder, width: 1)),
+        border: Border(bottom: BorderSide(color: context.appBorder, width: 0.5)),
       ),
       child: Row(children: [
         SizedBox(
@@ -1318,7 +1316,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
           child: AppIconButton(
             icon: Icons.delete_outline,
             tooltip: 'Delete row',
-            color: AppDS.tableTextMute,
+            color: context.appTextMuted,
             onPressed: () => _deleteRow(row),
           ),
         ),
@@ -1369,7 +1367,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
             child: Text(val?.toString() ?? '—',
                 style: GoogleFonts.jetBrainsMono(
                     fontSize: 11,
-                    color: AppDS.tableText,
+                    color: context.appTextPrimary,
                     fontWeight: FontWeight.w500),
                 overflow: TextOverflow.ellipsis),
           ),
@@ -1394,9 +1392,9 @@ class _WaterQcPageState extends State<WaterQcPage> {
               isEmpty ? '—' : val.toString(),
               style: isEmpty
                   ? GoogleFonts.jetBrainsMono(
-                      fontSize: 11, color: AppDS.tableTextMute)
+                      fontSize: 11, color: context.appTextMuted)
                   : GoogleFonts.jetBrainsMono(
-                      fontSize: 11, color: const Color(0xFF15803D)),
+                      fontSize: 11, color: AppDS.green),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1431,23 +1429,23 @@ class _WaterQcPageState extends State<WaterQcPage> {
               keyboardType: type == 'num'
                   ? const TextInputType.numberWithOptions(decimal: true)
                   : TextInputType.text,
-              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppDS.tableText),
-              decoration: const InputDecoration(
+              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: context.appTextPrimary),
+              decoration: InputDecoration(
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: context.appSurface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(4)),
-                  borderSide: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
+                  borderRadius: const BorderRadius.all(Radius.circular(4)),
+                  borderSide: BorderSide(color: _pageAccent, width: 1.5),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(4)),
-                  borderSide: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
+                  borderRadius: const BorderRadius.all(Radius.circular(4)),
+                  borderSide: BorderSide(color: _pageAccent, width: 1.5),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(4)),
-                  borderSide: BorderSide(color: Color(0xFF22D3EE), width: 2),
+                  borderRadius: const BorderRadius.all(Radius.circular(4)),
+                  borderSide: BorderSide(color: _pageAccent, width: 2),
                 ),
               ),
             ),
@@ -1459,7 +1457,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
     // ── Read-only cell ────────────────────────────────────────────────────
     final isEmpty = val == null || val.toString().trim().isEmpty;
     Color? cellBg;
-    Color textColor = AppDS.tableText;
+    Color textColor = context.appTextPrimary;
     if (type == 'num' && !isEmpty && _isOutOfRange(key, val)) {
       cellBg    = AppDS.red.withValues(alpha: 0.13);
       textColor = AppDS.red;
@@ -1492,7 +1490,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
         child: Text(
           displayVal,
           style: isEmpty
-              ? GoogleFonts.jetBrainsMono(fontSize: 11, color: AppDS.tableTextMute)
+              ? GoogleFonts.jetBrainsMono(fontSize: 11, color: context.appTextMuted)
               : (type == 'num'
                   ? GoogleFonts.jetBrainsMono(fontSize: 11, color: textColor)
                   : GoogleFonts.spaceGrotesk(fontSize: 11, color: textColor)),

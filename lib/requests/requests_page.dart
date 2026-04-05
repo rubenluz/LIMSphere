@@ -257,6 +257,25 @@ class _RequestsPageState extends State<RequestsPage> {
   bool _canEdit(_Req r)   => _isAdmin || _hasWritePerm || _isCreator(r);
   bool get _canClose      => _isAdmin || _hasWritePerm;
 
+  void _showTypeFilterMenu() {
+    final renderBox = context.findRenderObject() as RenderBox;
+    final offset = renderBox.localToGlobal(Offset.zero);
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(offset.dx + renderBox.size.width - 180, offset.dy + 56, 0, 0),
+      color: context.appSurface2,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: context.appBorder2)),
+      items: ['all', ..._kTypes].map((t) => PopupMenuItem(
+        value: t,
+        child: Text(t == 'all' ? 'All Types' : _typeLabel(t),
+            style: GoogleFonts.spaceGrotesk(
+                fontSize: 13, color: context.appTextPrimary)),
+      )).toList(),
+    ).then((v) { if (v != null) setState(() => _typeFilter = v); });
+  }
+
   // ── Dialogs ─────────────────────────────────────────────────────────────────
 
   void _showRequestDialog([_Req? existing]) {
@@ -606,124 +625,182 @@ class _RequestsPageState extends State<RequestsPage> {
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    return Scaffold(
-      backgroundColor: context.appBg,
-      appBar: AppBar(
-        backgroundColor: AppDS.bg,
-        elevation: 0,
-        titleSpacing: 16,
-        automaticallyImplyLeading: false,
-        leading: MediaQuery.of(context).size.width < 700 ? IconButton(
-          icon: const Icon(Icons.menu_rounded, color: AppDS.textSecondary),
-          tooltip: 'Menu',
-          onPressed: openAppDrawer,
-        ) : null,
-        title: Text('Requests',
-            style: GoogleFonts.spaceGrotesk(
-                color: AppDS.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18)),
-        actions: [
-          // Type filter
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _typeFilter,
-                dropdownColor: AppDS.surface,
-                icon: const Icon(Icons.filter_list_rounded,
-                    size: 14, color: AppDS.textSecondary),
-                selectedItemBuilder: (_) =>
-                    ['all', ..._kTypes].map((t) => Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(t == 'all' ? 'All Types' : _typeLabel(t),
-                          style: GoogleFonts.spaceGrotesk(
-                              color: AppDS.textSecondary, fontSize: 12)),
-                    )).toList(),
-                items: ['all', ..._kTypes].map((t) => DropdownMenuItem(
-                  value: t,
-                  child: Text(t == 'all' ? 'All Types' : _typeLabel(t),
-                      style: GoogleFonts.spaceGrotesk(
-                          color: AppDS.textPrimary, fontSize: 12)),
-                )).toList(),
-                onChanged: (v) { if (v != null) setState(() => _typeFilter = v); },
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded,
-                color: AppDS.textSecondary, size: 20),
-            tooltip: 'Refresh',
-            onPressed: _load,
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                  backgroundColor: _kAccent,
-                  padding: const EdgeInsets.symmetric(horizontal: 14)),
-              icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-              label: Text('New Request',
-                  style: GoogleFonts.spaceGrotesk(
-                      fontSize: 12, color: Colors.white)),
-              onPressed: _showRequestDialog,
-            ),
-          ),
-        ],
-      ),
-      body: Column(children: [
-        // Status chips
+    return Column(
+      children: [
+        // ── Toolbar ────────────────────────────────────────────────────────
         Container(
-          color: context.appSurface,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          height: 56,
+          decoration: BoxDecoration(
+            color: context.appSurface2,
+            border: Border(bottom: BorderSide(color: context.appBorder)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
-            for (final (key, label) in [
-              ('all',       'All'),
-              ('pending',   'Pending'),
-              ('concluded', 'Concluded'),
-              ('refused',   'Refused'),
-            ])
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => setState(() => _statusFilter = key),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: _statusFilter == key
-                          ? (key == 'all'
-                                  ? _kAccent
-                                  : _statusColor(key))
-                              .withValues(alpha: 0.15)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: _statusFilter == key
-                            ? (key == 'all' ? _kAccent : _statusColor(key))
-                            : context.appBorder,
+            if (MediaQuery.of(context).size.width < 700) ...[
+              IconButton(
+                icon: const Icon(Icons.menu_rounded, size: 20),
+                color: context.appTextSecondary,
+                tooltip: 'Menu',
+                onPressed: openAppDrawer,
+              ),
+            ],
+            const Icon(Icons.assignment_outlined, size: 18, color: Color(0xFF8B5CF6)),
+            const SizedBox(width: 8),
+            Text('Requests', style: GoogleFonts.spaceGrotesk(
+              fontSize: 16, fontWeight: FontWeight.w600,
+              color: context.appTextPrimary)),
+            const SizedBox(width: 16),
+            // Status chips
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  for (final (key, label) in [
+                    ('all',       'All'),
+                    ('pending',   'Pending'),
+                    ('concluded', 'Concluded'),
+                    ('refused',   'Refused'),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _statusFilter = key),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _statusFilter == key
+                                ? (key == 'all'
+                                        ? _kAccent
+                                        : _statusColor(key))
+                                    .withValues(alpha: 0.15)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _statusFilter == key
+                                  ? (key == 'all' ? _kAccent : _statusColor(key))
+                                  : context.appBorder,
+                            ),
+                          ),
+                          child: Text(label,
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _statusFilter == key
+                                    ? (key == 'all' ? _kAccent : _statusColor(key))
+                                    : context.appTextSecondary,
+                              )),
+                        ),
                       ),
                     ),
-                    child: Text(label,
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _statusFilter == key
-                              ? (key == 'all' ? _kAccent : _statusColor(key))
-                              : context.appTextSecondary,
-                        )),
+                  Text('${filtered.length}',
+                      style: GoogleFonts.jetBrainsMono(
+                          fontSize: 11, color: context.appTextMuted)),
+                ]),
+              ),
+            ),
+            if (MediaQuery.of(context).size.width < 700)
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: context.appTextSecondary, size: 20),
+                tooltip: 'More options',
+                offset: const Offset(0, 36),
+                color: context.appSurface2,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: context.appBorder2)),
+                onSelected: (v) {
+                  if (v == 'type') _showTypeFilterMenu();
+                  if (v == 'refresh') _load();
+                  if (v == 'add') _showRequestDialog();
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'type',
+                    child: Row(children: [
+                      Icon(Icons.filter_list_rounded, size: 16,
+                          color: _typeFilter != 'all' ? _kAccent : context.appTextSecondary),
+                      const SizedBox(width: 10),
+                      Text(_typeFilter == 'all' ? 'Filter Type' : _typeLabel(_typeFilter),
+                          style: GoogleFonts.spaceGrotesk(
+                              fontSize: 13, color: context.appTextPrimary)),
+                      if (_typeFilter != 'all') ...[
+                        const Spacer(),
+                        Container(width: 7, height: 7,
+                            decoration: const BoxDecoration(color: _kAccent, shape: BoxShape.circle)),
+                      ],
+                    ])),
+                  PopupMenuItem(
+                    value: 'refresh',
+                    child: Row(children: [
+                      Icon(Icons.refresh_rounded, size: 16, color: context.appTextSecondary),
+                      const SizedBox(width: 10),
+                      Text('Refresh', style: GoogleFonts.spaceGrotesk(
+                          fontSize: 13, color: context.appTextPrimary)),
+                    ])),
+                  PopupMenuItem(
+                    value: 'add',
+                    child: Row(children: [
+                      const Icon(Icons.add, size: 16, color: _kAccent),
+                      const SizedBox(width: 10),
+                      Text('New Request', style: GoogleFonts.spaceGrotesk(
+                          fontSize: 13, color: _kAccent)),
+                    ])),
+                ],
+              )
+            else ...[
+              // Type filter dropdown
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _typeFilter,
+                    dropdownColor: context.appSurface2,
+                    icon: Icon(Icons.filter_list_rounded,
+                        size: 14, color: context.appTextSecondary),
+                    selectedItemBuilder: (_) =>
+                        ['all', ..._kTypes].map((t) => Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(t == 'all' ? 'All Types' : _typeLabel(t),
+                              style: GoogleFonts.spaceGrotesk(
+                                  color: context.appTextSecondary, fontSize: 12)),
+                        )).toList(),
+                    items: ['all', ..._kTypes].map((t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(t == 'all' ? 'All Types' : _typeLabel(t),
+                          style: GoogleFonts.spaceGrotesk(
+                              color: context.appTextPrimary, fontSize: 12)),
+                    )).toList(),
+                    onChanged: (v) { if (v != null) setState(() => _typeFilter = v); },
                   ),
                 ),
               ),
-            const Spacer(),
-            Text('${filtered.length} request${filtered.length == 1 ? '' : 's'}',
-                style: GoogleFonts.spaceGrotesk(
-                    fontSize: 11, color: context.appTextMuted)),
+              Tooltip(
+                message: 'Refresh',
+                child: IconButton(
+                  icon: Icon(Icons.refresh_rounded,
+                      color: context.appTextSecondary, size: 18),
+                  onPressed: _load,
+                ),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _kAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                  minimumSize: const Size(0, 36),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+                ),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('New Request'),
+                onPressed: _showRequestDialog,
+              ),
+            ],
           ]),
         ),
-        Divider(height: 1, color: context.appBorder),
+        Container(height: 1, color: context.appBorder),
 
-        // List
+        // ── List ──────────────────────────────────────────────────────────
         Expanded(
           child: _loading
               ? const Center(
@@ -740,7 +817,7 @@ class _RequestsPageState extends State<RequestsPage> {
                       itemBuilder: (_, i) => _buildCard(filtered[i]),
                     ),
         ),
-      ]),
+      ],
     );
   }
 

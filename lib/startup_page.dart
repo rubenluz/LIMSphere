@@ -154,7 +154,7 @@ class _StartupPageState extends State<StartupPage>
                     ),
                     const SizedBox(height: 28),
                     const Text(
-                      'LIMS Sphere',
+                      'LIMSphere',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
