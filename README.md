@@ -1,6 +1,6 @@
-# Limsphere
+# LIMSphere
 
-Limsphere is a Flutter-based application designed as a modern Laboratory Information Management System (LIMS). It aims to streamline sample tracking, data management, and workflow automation in research and laboratory environments.
+LIMSphere is a Flutter-based application designed as a modern Laboratory Information Management System (LIMS). It aims to streamline sample tracking, data management, and workflow automation in research and laboratory environments.
 
 ---
 
