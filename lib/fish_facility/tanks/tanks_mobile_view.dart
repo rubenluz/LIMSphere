@@ -65,8 +65,18 @@ extension _MobileView on _FishTanksPageState {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row 1: icon + title + rack selector
+          // Row 1: menu + icon + title + rack selector
           Row(children: [
+            IconButton(
+              icon: const Icon(Icons.menu_rounded, size: 20),
+              color: context.appTextSecondary,
+              tooltip: 'Menu',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              // ignore: invalid_use_of_protected_member
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+            const SizedBox(width: 8),
             const Icon(Icons.grid_view_outlined, size: 16, color: AppDS.accent),
             const SizedBox(width: 6),
             Text('Tank Map', style: GoogleFonts.spaceGrotesk(

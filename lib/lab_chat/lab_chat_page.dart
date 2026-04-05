@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:lims_sphere/lab_chat/lab_message.dart';
+import 'package:limsphere/lab_chat/lab_message.dart';
 import '/theme/theme.dart';
 import '/menu/app_nav.dart';
 

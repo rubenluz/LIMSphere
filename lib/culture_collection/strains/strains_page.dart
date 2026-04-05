@@ -3,6 +3,7 @@
 // Has its own Scaffold + AppBar (exception to the no-scaffold page rule).
 
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import '/theme/module_permission.dart';
 import 'package:flutter/services.dart';
@@ -24,6 +25,37 @@ import '../../requests/requests_page.dart';
 import '../../labels/label_page.dart';
 
 // ignore_for_file: use_build_context_synchronously
+
+// Top-level so it can run in a compute isolate.
+List<Map<String, dynamic>> _parseStrainRows(List<dynamic> raw) {
+  return raw.map((r) {
+    final row = Map<String, dynamic>.from(r as Map);
+    final s = row['samples'] as Map<String, dynamic>? ?? {};
+    for (final k in [
+      'rebeca', 'ccpi', 'date', 'country', 'archipelago', 'island',
+      'municipality', 'local', 'habitat_type', 'habitat_1', 'habitat_2',
+      'habitat_3', 'method', 'gps', 'temperature', 'ph', 'conductivity',
+      'oxygen', 'salinity', 'radiation', 'responsible', 'observations',
+    ]) {
+      row['s_$k'] = s['sample_$k'];
+    }
+    row.remove('samples');
+    // Compute next transfer inline.
+    if (row['strain_next_transfer']?.toString().isNotEmpty != true) {
+      final lastStr = row['strain_last_transfer']?.toString() ?? '';
+      final days = int.tryParse(row['strain_periodicity']?.toString() ?? '');
+      if (lastStr.isNotEmpty && days != null) {
+        try {
+          final next = DateTime.parse(lastStr).add(Duration(days: days));
+          row['strain_next_transfer'] =
+              '${next.year.toString().padLeft(4, "0")}-${next.month.toString().padLeft(2, "0")}-${next.day.toString().padLeft(2, "0")}';
+          row['_next_transfer_computed'] = true;
+        } catch (_) {}
+      }
+    }
+    return row;
+  }).toList();
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
@@ -229,32 +261,17 @@ class _StrainsPageState extends State<StrainsPage> {
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  List<Map<String, dynamic>> _strainRowsFromRaw(List<dynamic> raw) =>
-      raw.map((r) {
-        final row = Map<String, dynamic>.from(r as Map);
-        final s = row['samples'] as Map<String, dynamic>? ?? {};
-        for (final k in [
-          'rebeca', 'ccpi', 'date', 'country', 'archipelago', 'island',
-          'municipality', 'local', 'habitat_type', 'habitat_1', 'habitat_2',
-          'habitat_3', 'method', 'gps', 'temperature', 'ph', 'conductivity',
-          'oxygen', 'salinity', 'radiation', 'responsible', 'observations',
-        ]) { row['s_$k'] = s['sample_$k']; }
-        row.remove('samples');
-        _computeNextTransfer(row);
-        return row;
-      }).toList();
-
   Future<void> _load() async {
+    setState(() => _loading = true);
     final cacheKey = widget.filterSampleId != null ? 'strains_${widget.filterSampleId}' : 'strains';
     final cached = await DataCache.read(cacheKey);
     if (cached != null && mounted) {
-      _rows = _strainRowsFromRaw(cached);
+      _rows = await compute(_parseStrainRows, cached);
+      if (!mounted) return;
       if (_hideEmpty) { _detectEmptyCols(); } else { _emptyColKeys = {}; }
       _buildPeriodicityOptions();
       _applyFilter();
       setState(() => _loading = false);
-    } else {
-      setState(() => _loading = true);
     }
     try {
       var q = Supabase.instance.client.from('strains').select('''
@@ -273,7 +290,8 @@ class _StrainsPageState extends State<StrainsPage> {
       final res = await q.order('strain_code', ascending: true);
       await DataCache.write(cacheKey, res as List<dynamic>);
       if (!mounted) return;
-      _rows = _strainRowsFromRaw(res);
+      _rows = await compute(_parseStrainRows, res);
+      if (!mounted) return;
       if (_hideEmpty) { _detectEmptyCols(); } else { _emptyColKeys = {}; }
       _buildPeriodicityOptions();
       _applyFilter();
@@ -740,36 +758,35 @@ class _StrainsPageState extends State<StrainsPage> {
               onCopy: _copySelectedInfo,
               onExport: _exportSelectedCsv,
             )
-          : buildStrainsNormalAppBar(
-              context: context,
-              desktop: desktop,
-              filterSampleId: widget.filterSampleId,
-              showFilters: _showFilters,
-              onToggleFilters: () => setState(() => _showFilters = !_showFilters),
-              onAdd: _showAddStrainDialog,
-              onRefresh: _load,
-              onSelect: _enterSelectionMode,
-              onToggleColManager: () => setState(() => _showColManager = !_showColManager),
-              onImport: () async {
-                final ok = await Navigator.push<bool>(context,
-                    MaterialPageRoute(builder: (_) => const ExcelImportPage(mode: 'strains')));
-                if (ok == true) _load();
-              },
-            ),
+          : null,
       body: Column(children: [
+        if (!_selectionMode)
+          buildStrainsToolbar(
+            context: context,
+            desktop: desktop,
+            filterSampleId: widget.filterSampleId,
+            showFilters: _showFilters,
+            filteredCount: _filtered.length,
+            totalCount: _rows.length,
+            search: _search,
+            searchController: _searchController,
+            onSearchChanged: (v) { setState(() => _search = v); _applyFilter(); },
+            onToggleFilters: () => setState(() => _showFilters = !_showFilters),
+            onToggleColManager: () => setState(() => _showColManager = !_showColManager),
+            onImport: () async {
+              final ok = await Navigator.push<bool>(context,
+                  MaterialPageRoute(builder: (_) => const ExcelImportPage(mode: 'strains')));
+              if (ok == true) _load();
+            },
+            onExport: _enterSelectionMode,
+            onAdd: _showAddStrainDialog,
+          ),
         StrainsToolbar(
-          showFilters: _showFilters,
           activeFilters: _activeFilters,
           sortKeys: _sortKeys,
           sortDirs: _sortDirs,
           periodicityOptions: _periodicityOptions,
           selectedPeriodicity: _selectedPeriodicity,
-          filteredCount: _filtered.length,
-          totalCount: _rows.length,
-          search: _search,
-          searchController: _searchController,
-          onSearchChanged: (v) { setState(() => _search = v); _applyFilter(); },
-          onToggleFilters: () => setState(() => _showFilters = !_showFilters),
           onClearSort: _resetSort,
           onRemoveSortKey: (i, key) {
             setState(() { _sortKeys.removeAt(i); _sortDirs.remove(key); });
@@ -828,7 +845,14 @@ class _StrainsPageState extends State<StrainsPage> {
             }),
           ),
         if (_loading)
-          const Expanded(child: Center(child: CircularProgressIndicator()))
+          Expanded(child: Center(child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text('Loading strains…', style: TextStyle(color: context.appTextSecondary, fontSize: 14)),
+            ],
+          )))
         else
           Expanded(child: _buildGrid()),
       ]),
@@ -852,7 +876,7 @@ class _StrainsPageState extends State<StrainsPage> {
     }
     final cols = _visibleCols;
     final totalWidth = (_selectionMode ? AppDS.tableCheckW : 0.0) +
-        AppDS.tableOpenW * 3 + cols.fold(0.0, (s, c) => s + _colWidth(c));
+        AppDS.tableOpenW * 2 + cols.fold(0.0, (s, c) => s + _colWidth(c));
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -862,9 +886,9 @@ class _StrainsPageState extends State<StrainsPage> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.appSurface,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppDS.tableBorder),
+                  border: Border.all(color: context.appBorder),
                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
                 ),
                 clipBehavior: Clip.antiAlias,
@@ -950,7 +974,7 @@ class _StrainsPageState extends State<StrainsPage> {
             activeColor: AppDS.accent, checkColor: Colors.white,
             side: BorderSide(color: context.appBorder2, width: 1.5),
           ))),
-        SizedBox(width: AppDS.tableOpenW * 3),
+        SizedBox(width: AppDS.tableOpenW * 2),
         ...List.generate(cols.length, (i) {
           final col = cols[i];
           return Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1077,20 +1101,22 @@ class _StrainsPageState extends State<StrainsPage> {
                   value: isSelected, onChanged: (_) => _toggleRowSelection(row['strain_id']),
                   visualDensity: VisualDensity.compact, activeColor: AppDS.blue800,
                 ))),
-          Container(width: AppDS.tableOpenW * 3, height: AppDS.tableRowH, color: cellBase,
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Container(width: AppDS.tableOpenW * 2, height: AppDS.tableRowH, color: cellBase,
+              child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
                 IconButton(
                   icon: Icon(Icons.launch_rounded, size: 14,
                       color: _selectionMode ? AppDS.textSecondary : AppDS.textSecondary),
                   tooltip: 'Open strain', padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(minWidth: 12, minHeight: 16, maxWidth: 16),
+                  style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                   onPressed: _selectionMode ? null : () => _openDetail(row),
                 ),
                 IconButton(
                   icon: Icon(Icons.outbox_outlined, size: 14,
                       color: _selectionMode ? AppDS.textSecondary : AppDS.textSecondary),
                   tooltip: 'Quick Request', padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16, maxWidth: 16),
+                  style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                   onPressed: _selectionMode ? null : () => showQuickRequestDialog(
                     context,
                     type: 'strains',
@@ -1101,7 +1127,8 @@ class _StrainsPageState extends State<StrainsPage> {
                   icon: Icon(Icons.print_outlined, size: 14,
                       color: _selectionMode ? AppDS.textSecondary : AppDS.textSecondary),
                   tooltip: 'Quick Print', padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16, maxWidth: 16),
+                  style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                   onPressed: _selectionMode ? null : () => showQuickPrintDialog(
                     context,
                     category: 'Strains',

@@ -56,11 +56,11 @@ class _FishStocksPageState extends State<FishStocksPage> {
   final _hOffset   = ValueNotifier<double>(0);
   final _vOffset   = ValueNotifier<double>(0);
 
-  // Cached text styles — computed once, reused on every cell build
-  static final _tsNormal    = GoogleFonts.spaceGrotesk(fontSize: 12.5, color: AppDS.tableText);
-  static final _tsMono      = GoogleFonts.jetBrainsMono(fontSize: 12,   color: AppDS.tableText);
-  static final _tsNormalMut = GoogleFonts.spaceGrotesk(fontSize: 12.5, color: AppDS.tableTextMute);
-  static final _tsMonoMut   = GoogleFonts.jetBrainsMono(fontSize: 12,   color: AppDS.tableTextMute);
+  // Text styles — use context-adaptive colors for dark/light mode
+  TextStyle get _tsNormal    => GoogleFonts.spaceGrotesk(fontSize: 12.5, color: context.appTextPrimary);
+  TextStyle get _tsMono      => GoogleFonts.jetBrainsMono(fontSize: 12,   color: context.appTextPrimary);
+  TextStyle get _tsNormalMut => GoogleFonts.spaceGrotesk(fontSize: 12.5, color: context.appTextMuted);
+  TextStyle get _tsMonoMut   => GoogleFonts.jetBrainsMono(fontSize: 12,   color: context.appTextMuted);
 
   static const _cols = [
     ('tankId',            'Tank',         72.0, true),
@@ -701,9 +701,9 @@ class _FishStocksPageState extends State<FishStocksPage> {
                             Expanded(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: context.appSurface,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppDS.tableBorder),
+                                  border: Border.all(color: context.appBorder),
                                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
                                 ),
                                 clipBehavior: Clip.antiAlias,
@@ -797,11 +797,11 @@ class _FishStocksPageState extends State<FishStocksPage> {
   }
 
   Widget _buildRow(FishStock stock, int rowIndex) {
-    final rowBg = rowIndex.isEven ? AppDS.tableRowEven : AppDS.tableRowOdd;
+    final rowBg = rowIndex.isEven ? context.appSurface : context.appSurface2;
     return Container(
       decoration: BoxDecoration(
         color: rowBg,
-        border: const Border(bottom: BorderSide(color: AppDS.tableBorder, width: 1)),
+        border: Border(bottom: BorderSide(color: context.appBorder, width: 1)),
       ),
       child: Row(
           children: [
@@ -935,7 +935,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
                   decoration: InputDecoration(
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    filled: true, fillColor: Colors.white,
+                    filled: true, fillColor: context.appSurface,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(4),
                       borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),

@@ -188,7 +188,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   void initState() {
     super.initState();
     _expanded.addAll(List.generate(_groups.length, (i) => i));
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override

@@ -2,8 +2,8 @@
 // extraction from the stored URL, and session restore on startup.
 
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
-import '../database_connection/database_connection_model.dart';
-import '../core/local_storage.dart';
+import '/database_connection/database_connection_model.dart';
+import '/core/local_storage.dart';
 
 class SupabaseManager {
   static SupabaseClient? _client;
@@ -57,11 +57,13 @@ class SupabaseManager {
     // If already initialized to the same URL, reuse the existing instance
     if (_client != null && _currentUrl == url) return;
 
-    // If Supabase was initialized to a different URL, dispose it first
-    try {
-      await Supabase.instance.dispose();
-    } catch (_) {
-      // Not yet initialized — that's fine
+    // Only dispose if we previously initialized (avoids assert in debug mode)
+    if (_client != null) {
+      try {
+        await Supabase.instance.dispose();
+      } catch (_) {}
+      _client = null;
+      _currentUrl = null;
     }
 
     await Supabase.initialize(url: url, anonKey: anonKey);

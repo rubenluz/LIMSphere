@@ -1,5 +1,5 @@
-// strains_toolbar.dart - Toolbar widget for StrainsPage: search field, filter
-// chips, view-mode toggles, export button, add-strain button.
+// strains_toolbar.dart - Secondary toolbar: cycle chips, sort chips, active
+// filter chips.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,19 +13,12 @@ import '/theme/theme.dart';
 // Toolbar
 // ─────────────────────────────────────────────────────────────────────────────
 class StrainsToolbar extends StatelessWidget {
-  final bool showFilters;
   final List<ActiveFilter> activeFilters;
   final List<String> sortKeys;
   final Map<String, bool> sortDirs;
   final List<int> periodicityOptions;
   final int? selectedPeriodicity;
-  final int filteredCount;
-  final int totalCount;
-  final String search;
-  final TextEditingController searchController;
-  final ValueChanged<String> onSearchChanged;
 
-  final VoidCallback onToggleFilters;
   final VoidCallback onClearSort;
   final void Function(int i, String key) onRemoveSortKey;
   final void Function(int? v) onPeriodicityChanged;
@@ -33,18 +26,11 @@ class StrainsToolbar extends StatelessWidget {
 
   const StrainsToolbar({
     super.key,
-    required this.showFilters,
     required this.activeFilters,
     required this.sortKeys,
     required this.sortDirs,
     required this.periodicityOptions,
     required this.selectedPeriodicity,
-    required this.filteredCount,
-    required this.totalCount,
-    required this.search,
-    required this.searchController,
-    required this.onSearchChanged,
-    required this.onToggleFilters,
     required this.onClearSort,
     required this.onRemoveSortKey,
     required this.onPeriodicityChanged,
@@ -56,62 +42,18 @@ class StrainsToolbar extends StatelessWidget {
     final hasActive = activeFilters.any((f) => f.value.isNotEmpty) ||
         selectedPeriodicity != null;
     final hasSort = sortKeys.isNotEmpty;
+    final hasCycle = periodicityOptions.isNotEmpty;
+
+    // Hide entirely when nothing to show
+    if (!hasCycle && !hasSort && !hasActive) return const SizedBox.shrink();
 
     return Container(
       color: context.appSurface,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── Search + count + cycle row ────────────────────────────────────────
-        Row(children: [
-          Expanded(
-            child: TextField(
-              controller: searchController,
-              style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary),
-              decoration: InputDecoration(
-                hintText: 'Search strains…',
-                hintStyle: GoogleFonts.spaceGrotesk(color: context.appTextMuted, fontSize: 13),
-                prefixIcon: Icon(Icons.search_rounded, color: context.appTextMuted, size: 18),
-                suffixIcon: search.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear, size: 16, color: context.appTextMuted),
-                        onPressed: () {
-                          searchController.clear();
-                          onSearchChanged('');
-                        })
-                    : null,
-                isDense: true,
-                filled: true,
-                fillColor: context.appSurface2,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: context.appBorder)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: context.appBorder)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              onChanged: onSearchChanged,
-            ),
-          ),
-          const SizedBox(width: 10),
-          // Count badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: context.appSurface2,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: context.appBorder),
-            ),
-            child: Text('$filteredCount / $totalCount',
-                style: GoogleFonts.jetBrainsMono(
-                    fontSize: 11, fontWeight: FontWeight.w600, color: context.appTextMuted)),
-          ),
-          // Cycle chips
-          if (periodicityOptions.isNotEmpty) ...[
-            const SizedBox(width: 12),
+        // ── Cycle chips row (aligned left) ───────────────────────────────────
+        if (hasCycle)
+          Row(children: [
             Text('Cycle:',
                 style: GoogleFonts.spaceGrotesk(
                     fontSize: 11,
@@ -126,10 +68,9 @@ class StrainsToolbar extends StatelessWidget {
                     compact: true,
                     onTap: () => onPeriodicityChanged(
                         selectedPeriodicity == d ? null : d)))),
-          ],
-        ]),
+          ]),
         if (hasSort) ...[
-          const SizedBox(height: 8),
+          if (hasCycle) const SizedBox(height: 6),
           SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(children: [
@@ -162,7 +103,7 @@ class StrainsToolbar extends StatelessWidget {
               ])),
         ],
         if (hasActive) ...[
-          const SizedBox(height: 8),
+          if (hasCycle || hasSort) const SizedBox(height: 6),
           SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(children: [

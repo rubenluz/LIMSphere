@@ -16,6 +16,70 @@ import '/theme/module_permission.dart';
 import '/theme/grid_widgets.dart';
 import '../shared_widgets.dart';
 
+part 'water_qc_mobile_view.dart';
+
+// ── Shared constants (accessible from part files) ──────────────────────────
+
+const _pageAccent = Color(0xFF22D3EE);
+
+// (key, label, width, type: 'date'|'num'|'maint'|'incident'|'text')
+const _cols = [
+  ('record_date',              'Date',              100.0, 'date'),
+  ('ph',                       'pH',                 60.0, 'num'),
+  ('conductivity',             'Conductivity',       95.0, 'num'),
+  ('temperature',              'Temp (°C)',           80.0, 'num'),
+  ('nitrates',                 'NO₃⁻ (mg/L)',        85.0, 'num'),
+  ('nitrites',                 'NO₂⁻ (mg/L)',        85.0, 'num'),
+  ('hardness_dkh',             'Hardness (dKH)',      90.0, 'num'),
+  ('ph_calibration',           'pH Cal.',             85.0, 'maint'),
+  ('conductivity_calibration', 'Cond. Cal.',          85.0, 'maint'),
+  ('temperature_check',        'Temp Check',          85.0, 'maint'),
+  ('ro_filter_sediment',       'RO Sediment',         95.0, 'maint'),
+  ('ro_filter_carbon',         'RO Carbon',           85.0, 'maint'),
+  ('incidents',                'Incidents',          130.0, 'incident'),
+  ('observations',             'Observations',       160.0, 'text'),
+];
+
+// Tab navigation skips 'date' and 'maint' columns
+const _tabCols = [
+  'ph', 'conductivity', 'temperature', 'nitrates', 'nitrites', 'hardness_dkh',
+  'incidents', 'observations',
+];
+
+const _maintKeys = [
+  'ph_calibration', 'conductivity_calibration', 'temperature_check',
+  'ro_filter_sediment', 'ro_filter_carbon',
+];
+
+const _maintLabels = <String, String>{
+  'ph_calibration':            'pH Calibration',
+  'conductivity_calibration':  'Conductivity Calibration',
+  'temperature_check':         'Temperature Check',
+  'ro_filter_sediment':        'RO pre-filter (Sediments 5µm)',
+  'ro_filter_carbon':          'RO pre-filter (Active carbon)',
+};
+
+// (key, label, unit, hasMin)
+const _thresholdDefs = [
+  ('ph',           'pH',           '',        true),
+  ('conductivity', 'Conductivity', 'µS/cm',   true),
+  ('temperature',  'Temperature',  '°C',      true),
+  ('nitrates',     'NO₃⁻',        'mg/L',    false),
+  ('nitrites',     'NO₂⁻',        'mg/L',    false),
+];
+
+// These columns display as integers (no decimals)
+const _intCols = {'conductivity', 'nitrates', 'nitrites'};
+
+const _numericCols = [
+  'ph', 'conductivity', 'temperature', 'nitrates', 'nitrites', 'hardness_dkh',
+];
+
+String fmtDate(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+// ── Page widget ────────────────────────────────────────────────────────────
+
 class WaterQcPage extends StatefulWidget {
   const WaterQcPage({super.key});
 
@@ -44,59 +108,8 @@ class _WaterQcPageState extends State<WaterQcPage> {
   final _hOffset   = ValueNotifier<double>(0);
   final _vOffset   = ValueNotifier<double>(0);
 
-  static const _pageAccent = Color(0xFF22D3EE);
-
-  // (key, label, width, type: 'date'|'num'|'maint'|'incident'|'text')
-  static const _cols = [
-    ('record_date',              'Date',              100.0, 'date'),
-    ('ph',                       'pH',                 60.0, 'num'),
-    ('conductivity',             'Conductivity',       95.0, 'num'),
-    ('temperature',              'Temp (°C)',           80.0, 'num'),
-    ('nitrates',                 'NO₃⁻ (mg/L)',        85.0, 'num'),
-    ('nitrites',                 'NO₂⁻ (mg/L)',        85.0, 'num'),
-    ('hardness_dkh',             'Hardness (dKH)',      90.0, 'num'),
-    ('ph_calibration',           'pH Cal.',             85.0, 'maint'),
-    ('conductivity_calibration', 'Cond. Cal.',          85.0, 'maint'),
-    ('temperature_check',        'Temp Check',          85.0, 'maint'),
-    ('ro_filter_sediment',       'RO Sediment',         95.0, 'maint'),
-    ('ro_filter_carbon',         'RO Carbon',           85.0, 'maint'),
-    ('incidents',                'Incidents',          130.0, 'incident'),
-    ('observations',             'Observations',       160.0, 'text'),
-  ];
-
-  // Tab navigation skips 'date' and 'maint' columns
-  static const _tabCols = [
-    'ph', 'conductivity', 'temperature', 'nitrates', 'nitrites', 'hardness_dkh',
-    'incidents', 'observations',
-  ];
-
-  static const _maintKeys = [
-    'ph_calibration', 'conductivity_calibration', 'temperature_check',
-    'ro_filter_sediment', 'ro_filter_carbon',
-  ];
-
-  static const _maintLabels = <String, String>{
-    'ph_calibration':            'pH Calibration',
-    'conductivity_calibration':  'Conductivity Calibration',
-    'temperature_check':         'Temperature Check',
-    'ro_filter_sediment':        'RO pre-filter (Sediments 5µm)',
-    'ro_filter_carbon':          'RO pre-filter (Active carbon)',
-  };
-
   // key → {minValue: double?, maxValue: double?}
   final Map<String, Map<String, dynamic>> _thresholds = {};
-
-  // (key, label, unit, hasMin)
-  static const _thresholdDefs = [
-    ('ph',           'pH',           '',        true),
-    ('conductivity', 'Conductivity', 'µS/cm',   true),
-    ('temperature',  'Temperature',  '°C',      true),
-    ('nitrates',     'NO₃⁻',        'mg/L',    false),
-    ('nitrites',     'NO₂⁻',        'mg/L',    false),
-  ];
-
-  // These columns display as integers (no decimals)
-  static const _intCols = {'conductivity', 'nitrates', 'nitrites'};
 
   @override
   void initState() {
@@ -115,10 +128,6 @@ class _WaterQcPageState extends State<WaterQcPage> {
     _vOffset.dispose();
     super.dispose();
   }
-
-  static const _numericCols = [
-    'ph', 'conductivity', 'temperature', 'nitrates', 'nitrites', 'hardness_dkh',
-  ];
 
   List<Map<String, dynamic>> get _filteredRows {
     var d = _rows.toList();
@@ -630,9 +639,6 @@ class _WaterQcPageState extends State<WaterQcPage> {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  static String fmtDate(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
   void _snack(String msg, {bool error = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: GoogleFonts.spaceGrotesk(color: AppDS.textPrimary)),
@@ -933,6 +939,8 @@ class _WaterQcPageState extends State<WaterQcPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.of(context).size.width < 600) return _buildMobileLayout();
+
     final tableWidth = _cols.fold(0.0, (s, c) => s + c.$3) + 36;
 
     return Column(

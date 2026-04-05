@@ -1,105 +1,237 @@
-// strains_appbars.dart - AppBar widget variants for StrainsPage (normal view,
-// selection mode, search mode).
+// strains_appbars.dart - Toolbar and AppBar variants for StrainsPage.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '/theme/theme.dart';
 import '/menu/app_nav.dart';
+import '/theme/theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Normal AppBar
+// Normal toolbar (matches stocks_page style — Container row, not AppBar)
 // ─────────────────────────────────────────────────────────────────────────────
-PreferredSizeWidget buildStrainsNormalAppBar({
+Widget buildStrainsToolbar({
   required BuildContext context,
   required bool desktop,
   required dynamic filterSampleId,
   required bool showFilters,
+  required int filteredCount,
+  required int totalCount,
+  required String search,
+  required TextEditingController searchController,
+  required ValueChanged<String> onSearchChanged,
   required VoidCallback onToggleFilters,
-  required VoidCallback onAdd,
-  required VoidCallback onRefresh,
-  required VoidCallback onSelect,
   required VoidCallback onToggleColManager,
   required VoidCallback onImport,
+  required VoidCallback onExport,
+  required VoidCallback onAdd,
 }) {
-  final btnColor = context.appTextSecondary;
-  Widget btn({
-    required IconData icon,
-    required String tooltip,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    if (desktop) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: TextButton.icon(
-          icon: Icon(icon, size: 16, color: btnColor),
-          label: Text(label, style: GoogleFonts.spaceGrotesk(fontSize: 12, color: btnColor)),
-          onPressed: onPressed,
-          style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
+  final title = filterSampleId != null
+      ? 'Strains — Sample $filterSampleId'
+      : 'Strains';
+
+  if (MediaQuery.of(context).size.width < 700) {
+    // ── Mobile layout ──────────────────────────────────────────────────────
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(children: [
+        IconButton(
+          icon: Icon(Icons.menu_rounded, color: context.appTextSecondary),
+          tooltip: 'Menu',
+          onPressed: openAppDrawer,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
         ),
-      );
-    }
-    return IconButton(
-        icon: Icon(icon, size: 20, color: btnColor),
-        tooltip: tooltip,
-        onPressed: onPressed,
-        padding: const EdgeInsets.all(8),
-        constraints: const BoxConstraints(minWidth: 36, minHeight: 36));
+        const SizedBox(width: 4),
+        Expanded(
+          child: SizedBox(
+            height: 36,
+            child: _buildSearchField(context, searchController, search, onSearchChanged),
+          ),
+        ),
+        const SizedBox(width: 4),
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, color: context.appTextSecondary, size: 20),
+          tooltip: 'More options',
+          offset: const Offset(0, 36),
+          color: context.appSurface2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: context.appBorder2)),
+          onSelected: (v) {
+            switch (v) {
+              case 'filter':  onToggleFilters();
+              case 'columns': onToggleColManager();
+              case 'import':  onImport();
+              case 'export':  onExport();
+              case 'add':     onAdd();
+            }
+          },
+          itemBuilder: (_) => [
+            _popupItem(context, 'filter', Icons.tune,
+                showFilters ? 'Hide Filters' : 'Show Filters',
+                iconColor: showFilters ? AppDS.accent : null),
+            _popupItem(context, 'columns', Icons.view_column_outlined, 'Columns'),
+            _popupItem(context, 'import', Icons.upload_file_rounded, 'Import'),
+            _popupItem(context, 'export', Icons.file_download_outlined, 'Export'),
+            PopupMenuItem(
+              value: 'add',
+              child: Row(children: [
+                const Icon(Icons.add, size: 16, color: AppDS.accent),
+                const SizedBox(width: 10),
+                Text('Add Strain', style: GoogleFonts.spaceGrotesk(
+                    fontSize: 13, color: AppDS.accent)),
+              ])),
+          ],
+        ),
+      ]),
+    );
   }
 
-  return AppBar(
-    backgroundColor: context.appSurface,
-    foregroundColor: context.appTextPrimary,
-    elevation: 0,
-    titleSpacing: 12,
-    leading: desktop ? null : IconButton(
-      icon: const Icon(Icons.menu_rounded),
-      color: context.appTextSecondary,
-      tooltip: 'Menu',
-      onPressed: openAppDrawer,
+  // ── Desktop layout ─────────────────────────────────────────────────────────
+  return Container(
+    height: 56,
+    decoration: BoxDecoration(
+      color: context.appSurface2,
+      border: Border(bottom: BorderSide(color: context.appBorder)),
     ),
-    title: Text(
-        filterSampleId != null
-            ? 'Strains — Sample $filterSampleId'
-            : 'Strains',
-        style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600, fontSize: 16)),
-    actions: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: TextButton.icon(
-          icon: Icon(Icons.tune_rounded, size: 16,
-              color: showFilters ? AppDS.accent : btnColor),
-          label: Text('Filters',
-              style: GoogleFonts.spaceGrotesk(
-                  fontSize: 12,
-                  color: showFilters ? AppDS.accent : btnColor)),
-          onPressed: onToggleFilters,
-          style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
-        ),
-      ),
-      btn(icon: Icons.refresh_rounded,       tooltip: 'Refresh',               label: 'Refresh',  onPressed: onRefresh),
-      btn(icon: Icons.checklist_rounded,     tooltip: 'Select rows & columns', label: 'Select',   onPressed: onSelect),
-      btn(icon: Icons.view_column_outlined,  tooltip: 'Manage columns',        label: 'Columns',  onPressed: onToggleColManager),
-      btn(icon: Icons.upload_file_rounded,   tooltip: 'Import from Excel',     label: 'Import',   onPressed: onImport),
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Row(children: [
+      const Icon(Icons.biotech_outlined, size: 18, color: Color(0xFF0EA5E9)),
       const SizedBox(width: 8),
-      Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: AppDS.accent,
-            foregroundColor: const Color(0xFF0F172A),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-            minimumSize: const Size(0, 36),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          onPressed: onAdd,
-          icon: const Icon(Icons.add, size: 16),
-          label: Text('Add Strain', style: GoogleFonts.spaceGrotesk(fontSize: 13)),
+      Text(title, style: GoogleFonts.spaceGrotesk(
+        fontSize: 16, fontWeight: FontWeight.w600,
+        color: context.appTextPrimary)),
+      const SizedBox(width: 16),
+      Expanded(
+        child: SizedBox(
+          height: 36,
+          child: _buildSearchField(context, searchController, search, onSearchChanged),
         ),
       ),
-    ],
+      const SizedBox(width: 10),
+      // Count badge
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: context.appSurface3,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: context.appBorder),
+        ),
+        child: Text('$filteredCount / $totalCount',
+            style: GoogleFonts.jetBrainsMono(
+                fontSize: 11, fontWeight: FontWeight.w600, color: context.appTextMuted)),
+      ),
+      const SizedBox(width: 4),
+      // Filter
+      Tooltip(
+        message: showFilters ? 'Hide filters' : 'Show filters',
+        child: Stack(children: [
+          IconButton(
+            icon: Icon(Icons.tune,
+                color: showFilters ? AppDS.accent : context.appTextSecondary,
+                size: 18),
+            onPressed: onToggleFilters,
+          ),
+        ]),
+      ),
+      // Columns
+      Tooltip(
+        message: 'Manage columns',
+        child: IconButton(
+          icon: Icon(Icons.view_column_outlined,
+              color: context.appTextSecondary, size: 18),
+          onPressed: onToggleColManager,
+        ),
+      ),
+      // Import
+      Tooltip(
+        message: 'Import from Excel',
+        child: IconButton(
+          icon: Icon(Icons.upload_file_rounded,
+              color: context.appTextSecondary, size: 18),
+          onPressed: onImport,
+        ),
+      ),
+      // Export
+      Tooltip(
+        message: 'Export',
+        child: IconButton(
+          icon: Icon(Icons.file_download_outlined,
+              color: context.appTextSecondary, size: 18),
+          onPressed: onExport,
+        ),
+      ),
+      // Add Strain
+      FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppDS.accent,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          minimumSize: const Size(0, 36),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+        ),
+        onPressed: onAdd,
+        icon: const Icon(Icons.add, size: 16),
+        label: const Text('Add Strain'),
+      ),
+    ]),
+  );
+}
+
+PopupMenuItem<String> _popupItem(
+    BuildContext context, String value, IconData icon, String label,
+    {Color? iconColor}) {
+  return PopupMenuItem(
+    value: value,
+    child: Row(children: [
+      Icon(icon, size: 16, color: iconColor ?? context.appTextSecondary),
+      const SizedBox(width: 10),
+      Text(label, style: GoogleFonts.spaceGrotesk(
+          fontSize: 13, color: context.appTextPrimary)),
+    ]),
+  );
+}
+
+Widget _buildSearchField(
+    BuildContext context,
+    TextEditingController controller,
+    String search,
+    ValueChanged<String> onChanged) {
+  return TextField(
+    controller: controller,
+    style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary),
+    decoration: InputDecoration(
+      hintText: 'Search strains…',
+      hintStyle: GoogleFonts.spaceGrotesk(color: context.appTextMuted, fontSize: 13),
+      prefixIcon: Icon(Icons.search_rounded, color: context.appTextMuted, size: 16),
+      suffixIcon: search.isNotEmpty
+          ? IconButton(
+              icon: Icon(Icons.clear, size: 14, color: context.appTextMuted),
+              onPressed: () {
+                controller.clear();
+                onChanged('');
+              })
+          : null,
+      isDense: true,
+      filled: true,
+      fillColor: context.appSurface3,
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder)),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder)),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    ),
+    onChanged: onChanged,
   );
 }
 

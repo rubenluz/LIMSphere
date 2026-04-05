@@ -495,9 +495,9 @@ class _FishLinesPageState extends State<FishLinesPage> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: context.appSurface,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppDS.tableBorder),
+                        border: Border.all(color: context.appBorder),
                         boxShadow: const [BoxShadow(color: AppDS.shadow, blurRadius: 4, offset: Offset(0, 2))],
                       ),
                       child: ClipRRect(
@@ -587,11 +587,11 @@ class _FishLinesPageState extends State<FishLinesPage> {
   }
 
   Widget _buildRow(FishLine line, int rowIndex) {
-    final rowBg = rowIndex.isEven ? AppDS.tableRowEven : AppDS.tableRowOdd;
+    final rowBg = rowIndex.isEven ? context.appSurface : context.appSurface2;
     return Container(
       decoration: BoxDecoration(
         color: rowBg,
-        border: const Border(bottom: BorderSide(color: AppDS.tableBorder, width: 1)),
+        border: Border(bottom: BorderSide(color: context.appBorder, width: 1)),
       ),
       child: Row(
         children: [
@@ -609,7 +609,7 @@ class _FishLinesPageState extends State<FishLinesPage> {
           _stockCountCell(line.stockMales,     50, AppDS.accent),
           _stockCountCell(line.stockFemales,   50, AppDS.pink),
           _stockCountCell(line.stockJuveniles, 50, AppDS.orange),
-          _stockCountCell(line.stockTotal,     65, AppDS.tableText, bold: true),
+          _stockCountCell(line.stockTotal,     65, context.appTextPrimary, bold: true),
           _typeCell(line, 100),
           _textCell(line, 'fishlineOriginLab', 150),
           _textCell(line, 'fishlineAlias', 110),
@@ -863,7 +863,7 @@ class _FishLinesPageState extends State<FishLinesPage> {
                   controller: _editController, autofocus: true,
                   style: GoogleFonts.spaceGrotesk(
                     fontSize: 12.5, fontWeight: FontWeight.w600,
-                    color: AppDS.tableText),
+                    color: context.appTextPrimary),
                   decoration: _editDeco,
                   onSubmitted: (v) => _commitEdit(l, 'fishlineName', v),
                   onTapOutside: (_) =>
@@ -872,7 +872,7 @@ class _FishLinesPageState extends State<FishLinesPage> {
               : Text(l.fishlineName,
                   style: GoogleFonts.spaceGrotesk(
                     fontSize: 12.5, fontWeight: FontWeight.w600,
-                    color: AppDS.tableText),
+                    color: context.appTextPrimary),
                   overflow: TextOverflow.ellipsis),
         ),
       ),
@@ -900,9 +900,9 @@ class _FishLinesPageState extends State<FishLinesPage> {
                   controller: _editController, autofocus: true,
                   style: mono
                       ? GoogleFonts.jetBrainsMono(
-                          fontSize: 11.5, color: AppDS.tableText)
+                          fontSize: 11.5, color: context.appTextPrimary)
                       : GoogleFonts.spaceGrotesk(
-                          fontSize: 12, color: AppDS.tableText),
+                          fontSize: 12, color: context.appTextPrimary),
                   decoration: _editDeco,
                   onSubmitted: (v) => _commitEdit(l, key, v),
                   onTapOutside: (_) =>
@@ -915,8 +915,8 @@ class _FishLinesPageState extends State<FishLinesPage> {
                       : GoogleFonts.spaceGrotesk(fontSize: 12))
                       .copyWith(
                           color: val == null
-                              ? AppDS.tableTextMute
-                              : AppDS.tableText),
+                              ? context.appTextMuted
+                              : context.appTextPrimary),
                   overflow: TextOverflow.ellipsis),
         ),
       ),
@@ -936,7 +936,7 @@ class _FishLinesPageState extends State<FishLinesPage> {
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: Text(val ?? '—',
             style: GoogleFonts.spaceGrotesk(fontSize: 12,
-                color: val == null ? AppDS.tableTextMute : AppDS.tableText),
+                color: val == null ? context.appTextMuted : context.appTextPrimary),
             overflow: TextOverflow.ellipsis),
         ),
       ),
@@ -986,8 +986,8 @@ class _FishLinesPageState extends State<FishLinesPage> {
             l.fishlineDateBirth?.toIso8601String().split('T')[0] ?? '—',
             style: GoogleFonts.jetBrainsMono(fontSize: 11,
                 color: l.fishlineDateBirth == null
-                    ? AppDS.tableTextMute
-                    : AppDS.tableText)),
+                    ? context.appTextMuted
+                    : context.appTextPrimary)),
         ),
       ),
     );
@@ -1003,7 +1003,7 @@ class _FishLinesPageState extends State<FishLinesPage> {
           style: GoogleFonts.jetBrainsMono(
             fontSize: 11,
             fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
-            color: count > 0 ? color : AppDS.tableTextMute),
+            color: count > 0 ? color : context.appTextMuted),
         ),
       ),
     );
@@ -1021,7 +1021,7 @@ class _FishLinesPageState extends State<FishLinesPage> {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         child: Text(val,
           style: GoogleFonts.jetBrainsMono(fontSize: 11,
-              color: days == null ? AppDS.tableTextMute : AppDS.tableText)),
+              color: days == null ? context.appTextMuted : context.appTextPrimary)),
       ),
     );
   }

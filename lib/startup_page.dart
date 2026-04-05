@@ -54,31 +54,24 @@ class _StartupPageState extends State<StartupPage>
 
     // Run all startup work concurrently with a fixed 2-second splash.
     final work = () async {
-      final isOnline = await checkConnectivity();
-      if (mounted && !isOnline) {
-        setState(() => _offline = true);
-      }
+      try {
+        final isOnline = await checkConnectivity();
+        if (mounted && !isOnline) {
+          setState(() => _offline = true);
+        }
 
-      final restored = await SupabaseManager.restoreLastConnection();
-      if (!restored) {
-        final connections = await LocalStorage.loadConnections();
-        route = connections.isNotEmpty ? '/connections' : '/add_connection';
-        return;
-      }
+        final restored = await SupabaseManager.restoreLastConnection();
+        if (!restored) {
+          final connections = await LocalStorage.loadConnections();
+          route = connections.isNotEmpty ? '/connections' : '/add_connection';
+          return;
+        }
 
-      final sessionValid = await LocalStorage.hasValidSession();
-      if (sessionValid && SupabaseManager.hasActiveSession) {
-        try {
-          final email = Supabase.instance.client.auth.currentSession?.user.email;
-          if (email != null) {
-            await Supabase.instance.client
-                .from('users')
-                .update({'user_last_login': DateTime.now().toIso8601String()})
-                .eq('user_email', email);
-          }
-        } catch (_) {}
-        route = '/menu';
-      }
+        final sessionValid = await LocalStorage.hasValidSession();
+        if (sessionValid && SupabaseManager.hasActiveSession) {
+          route = '/menu';
+        }
+      } catch (_) {}
     }();
 
     await Future.wait([work, Future.delayed(const Duration(seconds: 2))]);

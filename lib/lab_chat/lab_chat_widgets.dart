@@ -135,9 +135,12 @@ class _MessageBubbleState extends State<_MessageBubble> {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 3),
                           child: Row(children: [
-                            Text(msg.displayName,
-                              style: _body(size: 13,
-                                weight: FontWeight.w700, color: aColor)),
+                            Flexible(
+                              child: Text(msg.displayName,
+                                overflow: TextOverflow.ellipsis,
+                                style: _body(size: 13,
+                                  weight: FontWeight.w700, color: aColor)),
+                            ),
                             const SizedBox(width: 8),
                             Text(_formatDate(msg.createdAt),
                               style: _mono(size: 9.5, color: context.appTextMuted)),

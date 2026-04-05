@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.silvuzapp.limssphere"
+    namespace = "com.silvuzapps.limsphere"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -19,9 +19,15 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.silvuzapp.limssphere"
+        applicationId = "com.silvuzapps.limsphere"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

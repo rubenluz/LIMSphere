@@ -21,7 +21,6 @@ import '../function_excel_import_page.dart';
 import 'samples_columns.dart';
 import 'samples_design_tokens.dart';
 import '/theme/theme.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import '/supabase/supabase_manager.dart';
 import '../../camera/qr_scanner/qr_code_rules.dart';
 
@@ -60,6 +59,17 @@ class _SamplesPageState extends State<SamplesPage> {
   Set<String> _hiddenCols   = {};
   Set<String> _emptyColKeys = {};
   bool _showColManager = false;
+  bool _showFilters    = false;
+
+  // Active filters
+  String? _filterCountry;
+  String? _filterIsland;
+  String? _filterHabitatType;
+  String? _filterProject;
+
+  bool get _hasActiveFilter =>
+      _filterCountry != null || _filterIsland != null ||
+      _filterHabitatType != null || _filterProject != null;
 
   // Column widths / order
   final Map<String, double> _colWidths = {};
@@ -167,22 +177,9 @@ class _SamplesPageState extends State<SamplesPage> {
   Future<void> _saveColWidth(String key, double w) async =>
       (await SharedPreferences.getInstance()).setDouble('$samplePrefColWidths.$key', w);
 
-  Future<void> _resetColWidths() async {
-    final prefs = await SharedPreferences.getInstance();
-    for (final k in prefs.getKeys().where((k) => k.startsWith('$samplePrefColWidths.')).toList()) {
-      await prefs.remove(k);
-    }
-    setState(() => _colWidths.clear());
-  }
-
   Future<void> _saveColOrder() async {
     if (_colOrder == null) return;
     (await SharedPreferences.getInstance()).setString(samplePrefColOrder, _colOrder!.join(','));
-  }
-
-  Future<void> _resetColOrder() async {
-    await (await SharedPreferences.getInstance()).remove(samplePrefColOrder);
-    setState(() => _colOrder = null);
   }
 
   void _reorderCol(String colKey, int toVisibleIndex) {
@@ -253,6 +250,10 @@ class _SamplesPageState extends State<SamplesPage> {
       list = list.where((r) =>
           r.values.any((v) => v?.toString().toLowerCase().contains(q) == true)).toList();
     }
+    if (_filterCountry != null)     list = list.where((r) => r['sample_country']?.toString()      == _filterCountry).toList();
+    if (_filterIsland != null)      list = list.where((r) => r['sample_island']?.toString()       == _filterIsland).toList();
+    if (_filterHabitatType != null) list = list.where((r) => r['sample_habitat_type']?.toString() == _filterHabitatType).toList();
+    if (_filterProject != null)     list = list.where((r) => r['sample_project']?.toString()      == _filterProject).toList();
     _filtered = list;
     _applySort();
   }
@@ -356,42 +357,6 @@ class _SamplesPageState extends State<SamplesPage> {
     }
   }
 
-
-  void _showQr(Map<String, dynamic> row) {
-    final id = row['sample_id'];
-    if (id == null) return;
-    final ref = SupabaseManager.projectRef ?? 'local';
-    final data = QrRules.build(ref, 'samples', id as int);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(row['sample_code']?.toString() ?? 'QR Code',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary)),
-        content: SizedBox(
-          width: 260,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(12),
-              child: QrImageView(data: data, size: 200),
-            ),
-            const SizedBox(height: 10),
-            Text(data,
-                style: GoogleFonts.spaceGrotesk(
-                    color: ctx.appTextMuted, fontSize: 11)),
-          ]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Close',
-                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary))),
-        ],
-      ),
-    );
-  }
 
   void _openDetail(Map<String, dynamic> row) {
     Navigator.push(
@@ -519,6 +484,7 @@ class _SamplesPageState extends State<SamplesPage> {
       body: Column(children: [
         _buildToolbar(),
         Divider(height: 1, color: context.appBorder),
+        if (_showFilters)    _buildFilterPanel(),
         if (_showColManager) _buildColumnManager(),
         if (_loading)
           const Expanded(child: Center(child: CircularProgressIndicator()))
@@ -532,100 +498,199 @@ class _SamplesPageState extends State<SamplesPage> {
   PreferredSizeWidget _buildNormalAppBar(bool desktop) {
     final iconColor = context.appTextSecondary;
 
-    Widget btn({required IconData icon, required String tooltip, required String label, required VoidCallback onPressed}) {
-      if (desktop) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: TextButton.icon(
-            icon: Icon(icon, size: 16, color: iconColor),
-            label: Text(label, style: TextStyle(fontSize: 12, color: iconColor)),
+    Tooltip iconBtn(IconData icon, String tip, VoidCallback onPressed, {Color? color}) =>
+        Tooltip(
+          message: tip,
+          child: IconButton(
+            icon: Icon(icon, size: 20, color: color ?? iconColor),
             onPressed: onPressed,
-            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
+            padding: const EdgeInsets.all(8),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
         );
-      }
-      return IconButton(
-          icon: Icon(icon, size: 20, color: iconColor),
-          tooltip: tooltip,
-          onPressed: onPressed,
-          padding: const EdgeInsets.all(8),
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36));
-    }
 
     return AppBar(
       backgroundColor: context.appSurface,
       foregroundColor: context.appTextPrimary,
       elevation: 0,
+      titleSpacing: 0,
       leading: desktop ? null : IconButton(
         icon: const Icon(Icons.menu_rounded),
-        color: context.appTextSecondary,
+        color: iconColor,
         tooltip: 'Menu',
         onPressed: openAppDrawer,
       ),
-      title: Text('Samples', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600, fontSize: 16)),
-      actions: [
-        // ── Add Sample ───────────────────────────────────────────────────
+      title: Row(
+        mainAxisSize: desktop ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          if (desktop) const SizedBox(width: 16),
+          const Icon(Icons.biotech_outlined, size: 18, color: AppDS.accent),
+          const SizedBox(width: 8),
+          Text('Samples', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600, fontSize: 16)),
+          if (desktop) ...[
+            const SizedBox(width: 16),
+            Expanded(
+              child: SizedBox(
+                height: 36,
+                child: TextField(
+                  controller: _searchController,
+                  style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Search samples…',
+                    hintStyle: GoogleFonts.spaceGrotesk(color: context.appTextMuted, fontSize: 13),
+                    prefixIcon: Icon(Icons.search, size: 16, color: context.appTextMuted),
+                    suffixIcon: _search.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.close, size: 14, color: context.appTextMuted),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _search = '');
+                              _applyFilter();
+                            })
+                        : null,
+                    filled: true,
+                    fillColor: context.appSurface3,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: context.appBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppDS.accent, width: 1.5),
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  ),
+                  onChanged: (v) { setState(() => _search = v); _applyFilter(); },
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: context.appSurface2,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: context.appBorder),
+              ),
+              child: Text('${_filtered.length} / ${_rows.length}',
+                  style: GoogleFonts.spaceGrotesk(fontSize: 12, fontWeight: FontWeight.w600, color: context.appTextMuted)),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ],
+      ),
+      actions: desktop ? [
+        Tooltip(
+          message: _showFilters ? 'Hide filters' : 'Show filters',
+          child: Stack(children: [
+            IconButton(
+              icon: Icon(Icons.tune, size: 20,
+                  color: _showFilters ? AppDS.accent : iconColor),
+              onPressed: () => setState(() => _showFilters = !_showFilters),
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            ),
+            if (_hasActiveFilter)
+              Positioned(
+                right: 6, top: 6,
+                child: Container(
+                  width: 7, height: 7,
+                  decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle),
+                ),
+              ),
+          ]),
+        ),
+        iconBtn(Icons.checklist_rounded, 'Select rows & columns', _enterSelectionMode),
+        iconBtn(
+          _showColManager ? Icons.view_column : Icons.view_column_outlined,
+          'Manage columns',
+          () => setState(() => _showColManager = !_showColManager),
+          color: _showColManager ? AppDS.accent : null,
+        ),
+        iconBtn(Icons.upload_file_rounded, 'Import from Excel', () async {
+          final ok = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(builder: (_) => const ExcelImportPage(mode: 'samples')));
+          if (ok == true) _load();
+        }),
+        iconBtn(Icons.download_outlined, 'Export CSV', _exportCsv),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
           child: FilledButton.icon(
             onPressed: _addRow,
             icon: const Icon(Icons.add, size: 16),
             label: const Text('Add Sample', style: TextStyle(fontSize: 12)),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFF59E0B),
-              foregroundColor: Colors.black,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               minimumSize: const Size(0, 36),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ),
-        // ── CSV export ───────────────────────────────────────────────────
-        Tooltip(
-          message: 'Export CSV',
-          child: IconButton(
-            icon: Icon(Icons.download_outlined, size: 20, color: iconColor),
-            onPressed: _exportCsv,
-            padding: const EdgeInsets.all(8),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          ),
-        ),
-        btn(
-            icon: Icons.upload_file_rounded,
-            tooltip: 'Import from Excel',
-            label: 'Import',
-            onPressed: () async {
+      ] : [
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, color: iconColor, size: 20),
+          tooltip: 'More options',
+          offset: const Offset(0, 36),
+          color: context.appSurface2,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: context.appBorder2)),
+          onSelected: (v) async {
+            if (v == 'filter')  setState(() => _showFilters = !_showFilters);
+            if (v == 'select')  _enterSelectionMode();
+            if (v == 'columns') setState(() => _showColManager = !_showColManager);
+            if (v == 'import') {
               final ok = await Navigator.push<bool>(
                   context,
-                  MaterialPageRoute(
-                      builder: (_) =>
-                          const ExcelImportPage(mode: 'samples')));
+                  MaterialPageRoute(builder: (_) => const ExcelImportPage(mode: 'samples')));
               if (ok == true) _load();
-            }),
-        btn(icon: Icons.refresh_rounded,    tooltip: 'Refresh',            label: 'Refresh',  onPressed: _load),
-        btn(icon: Icons.checklist_rounded,  tooltip: 'Select rows & cols', label: 'Select',   onPressed: _enterSelectionMode),
-        btn(icon: _showColManager ? Icons.view_column : Icons.view_column_outlined,
-            tooltip: 'Manage columns', label: 'Columns',
-            onPressed: () => setState(() => _showColManager = !_showColManager)),
-        if (desktop) ...[
-          btn(icon: Icons.width_normal_outlined, tooltip: 'Reset widths', label: 'Reset widths',
-              onPressed: () async { await _resetColWidths(); _snack('Column widths reset'); }),
-          btn(icon: Icons.reorder_rounded, tooltip: 'Reset order', label: 'Reset order',
-              onPressed: () async { await _resetColOrder(); _snack('Column order reset'); }),
-        ] else
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: iconColor),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            onSelected: (v) async {
-              if (v == 'widths') { await _resetColWidths(); _snack('Column widths reset'); }
-              if (v == 'order')  { await _resetColOrder();  _snack('Column order reset'); }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'widths', child: ListTile(leading: Icon(Icons.width_normal_outlined), title: Text('Reset column widths'), dense: true)),
-              const PopupMenuItem(value: 'order',  child: ListTile(leading: Icon(Icons.reorder_rounded),       title: Text('Reset column order'),  dense: true)),
-            ],
-          ),
-        const SizedBox(width: 4),
+            }
+            if (v == 'export') _exportCsv();
+            if (v == 'add')    _addRow();
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(value: 'filter', child: Row(children: [
+              Icon(Icons.tune, size: 16, color: _showFilters ? AppDS.accent : iconColor),
+              const SizedBox(width: 10),
+              Text(_showFilters ? 'Hide Filters' : 'Show Filters',
+                  style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary)),
+              if (_hasActiveFilter) ...[
+                const Spacer(),
+                Container(width: 7, height: 7,
+                    decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle)),
+              ],
+            ])),
+            PopupMenuItem(value: 'select', child: Row(children: [
+              Icon(Icons.checklist_rounded, size: 16, color: iconColor),
+              const SizedBox(width: 10),
+              Text('Select', style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary)),
+            ])),
+            PopupMenuItem(value: 'columns', child: Row(children: [
+              Icon(Icons.view_column_outlined, size: 16, color: iconColor),
+              const SizedBox(width: 10),
+              Text('Columns', style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary)),
+            ])),
+            PopupMenuItem(value: 'import', child: Row(children: [
+              Icon(Icons.upload_file_rounded, size: 16, color: iconColor),
+              const SizedBox(width: 10),
+              Text('Import', style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary)),
+            ])),
+            PopupMenuItem(value: 'export', child: Row(children: [
+              Icon(Icons.download_outlined, size: 16, color: iconColor),
+              const SizedBox(width: 10),
+              Text('Export CSV', style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary)),
+            ])),
+            PopupMenuItem(value: 'add', child: Row(children: [
+              const Icon(Icons.add, size: 16, color: AppDS.accent),
+              const SizedBox(width: 10),
+              Text('Add Sample', style: GoogleFonts.spaceGrotesk(fontSize: 13, color: AppDS.accent)),
+            ])),
+          ],
+        ),
       ],
     );
   }
@@ -674,50 +739,155 @@ class _SamplesPageState extends State<SamplesPage> {
     );
   }
 
+  // ── Filter panel ──────────────────────────────────────────────────────────
+  Widget _buildFilterPanel() {
+    List<String> uniqueVals(String key) => _rows
+        .map((r) => r[key]?.toString() ?? '')
+        .where((v) => v.isNotEmpty)
+        .toSet()
+        .toList()..sort();
+
+    Widget filterRow(String label, String? current, List<String> options, ValueChanged<String?> onChanged) {
+      return Row(children: [
+        SizedBox(
+          width: 90,
+          child: Text(label, style: TextStyle(
+              fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w600)),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              _chip('All', current == null, () => onChanged(null)),
+              ...options.map((v) => Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: _chip(v, current == v, () => onChanged(v)),
+              )),
+            ]),
+          ),
+        ),
+      ]);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.appSurface,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          filterRow('Country', _filterCountry, uniqueVals('sample_country'), (v) {
+            setState(() => _filterCountry = v); _applyFilter();
+          }),
+          const SizedBox(height: 8),
+          filterRow('Island', _filterIsland, uniqueVals('sample_island'), (v) {
+            setState(() => _filterIsland = v); _applyFilter();
+          }),
+          const SizedBox(height: 8),
+          filterRow('Habitat', _filterHabitatType, uniqueVals('sample_habitat_type'), (v) {
+            setState(() => _filterHabitatType = v); _applyFilter();
+          }),
+          const SizedBox(height: 8),
+          filterRow('Project', _filterProject, uniqueVals('sample_project'), (v) {
+            setState(() => _filterProject = v); _applyFilter();
+          }),
+          if (_hasActiveFilter) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: const Icon(Icons.clear, size: 13),
+                label: const Text('Clear filters', style: TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(foregroundColor: context.appTextSecondary),
+                onPressed: () {
+                  setState(() {
+                    _filterCountry = null;
+                    _filterIsland = null;
+                    _filterHabitatType = null;
+                    _filterProject = null;
+                  });
+                  _applyFilter();
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? AppDS.accent.withValues(alpha: 0.15) : context.appSurface2,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? AppDS.accent : context.appBorder2),
+        ),
+        child: Text(label,
+            style: TextStyle(
+              fontSize: 12,
+              color: selected ? AppDS.accent : context.appTextSecondary,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            )),
+      ),
+    );
+  }
+
   // ── Toolbar ───────────────────────────────────────────────────────────────
   Widget _buildToolbar() {
+    final desktop = isSampleDesktop(context);
     final hasSort = _sortKeys.isNotEmpty;
+    if (desktop && !hasSort) return const SizedBox.shrink();
     return Container(
       color: context.appSurface,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: TextField(
-            controller: _searchController,
-            style: TextStyle(fontSize: 13, color: context.appTextPrimary),
-            decoration: InputDecoration(
-              hintText: 'Search samples…',
-              hintStyle: TextStyle(color: context.appTextMuted, fontSize: 13),
-              prefixIcon: Icon(Icons.search_rounded, color: context.appTextMuted, size: 18),
-              suffixIcon: _search.isNotEmpty
-                  ? IconButton(icon: Icon(Icons.clear, size: 16, color: context.appTextMuted), onPressed: () {
-                      _searchController.clear();
-                      setState(() => _search = '');
-                      _applyFilter();
-                    })
-                  : null,
-              isDense: true, filled: true, fillColor: context.appSurface3,
-              border:        OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        if (!desktop) ...[
+          Row(children: [
+            Expanded(child: TextField(
+              controller: _searchController,
+              style: TextStyle(fontSize: 13, color: context.appTextPrimary),
+              decoration: InputDecoration(
+                hintText: 'Search samples…',
+                hintStyle: TextStyle(color: context.appTextMuted, fontSize: 13),
+                prefixIcon: Icon(Icons.search_rounded, color: context.appTextMuted, size: 18),
+                suffixIcon: _search.isNotEmpty
+                    ? IconButton(icon: Icon(Icons.clear, size: 16, color: context.appTextMuted), onPressed: () {
+                        _searchController.clear();
+                        setState(() => _search = '');
+                        _applyFilter();
+                      })
+                    : null,
+                isDense: true, filled: true, fillColor: context.appSurface3,
+                border:        OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              ),
+              onChanged: (v) { setState(() => _search = v); _applyFilter(); },
+            )),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: context.appSurface2,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: context.appBorder),
+              ),
+              child: Text('${_filtered.length} / ${_rows.length}',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.appTextMuted)),
             ),
-            onChanged: (v) { setState(() => _search = v); _applyFilter(); },
-          )),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: context.appSurface2,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: context.appBorder),
-            ),
-            child: Text('${_filtered.length} / ${_rows.length}',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.appTextMuted)),
-          ),
-        ]),
+          ]),
+          if (hasSort) const SizedBox(height: 8),
+        ],
         if (hasSort) ...[
-          const SizedBox(height: 8),
           SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
             Text('Sort:', style: TextStyle(fontSize: 11, color: context.appTextSecondary, fontWeight: FontWeight.w600)),
             const SizedBox(width: 6),
@@ -831,7 +1001,7 @@ class _SamplesPageState extends State<SamplesPage> {
     }
 
     final cols = _visibleCols;
-    final totalWidth = (_selectionMode ? AppDS.tableCheckW : 0.0) + AppDS.tableOpenW * 2 +
+    final totalWidth = (_selectionMode ? AppDS.tableCheckW : 0.0) + AppDS.tableOpenW +
         cols.fold(0.0, (s, c) => s + _colWidth(c));
 
     return Padding(
@@ -842,9 +1012,9 @@ class _SamplesPageState extends State<SamplesPage> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.appSurface,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppDS.tableBorder),
+                  border: Border.all(color: context.appBorder),
                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
                 ),
                 clipBehavior: Clip.antiAlias,
@@ -926,7 +1096,7 @@ class _SamplesPageState extends State<SamplesPage> {
             activeColor: Colors.white, checkColor: context.appSurface,
             side: BorderSide(color: context.appHeaderText.withValues(alpha: 0.38), width: 1.5),
           ))),
-        SizedBox(width: AppDS.tableOpenW * 2),
+        SizedBox(width: AppDS.tableOpenW),
         ...List.generate(cols.length, (i) {
           final col      = cols[i];
           final isDrag   = _draggingColKey == col.key;
@@ -1025,8 +1195,12 @@ class _SamplesPageState extends State<SamplesPage> {
   // ── Data row ──────────────────────────────────────────────────────────────
   Widget _buildDataRow(Map<String, dynamic> row, int index, List<SampleColDef> cols) {
     final isSelected = _selectedRowIds.contains(row['sample_code']);
-    final Color rowBg   = isSelected ? AppDS.tableRowSel : index.isEven ? AppDS.tableRowEven : AppDS.tableRowOdd;
-    final Color cellBase = isSelected ? AppDS.tableRowSel : index.isEven ? AppDS.tableRowEven : AppDS.tableRowOdd;
+    final isDark     = Theme.of(context).brightness == Brightness.dark;
+    final baseEven   = context.appSurface;
+    final baseOdd    = context.appSurface2;
+    final selColor   = isDark ? const Color(0xFF1E3A5F) : AppDS.tableRowSel;
+    final Color rowBg   = isSelected ? selColor : index.isEven ? baseEven : baseOdd;
+    final Color cellBase = isSelected ? selColor : index.isEven ? baseEven : baseOdd;
 
     return GestureDetector(
       onTap: _selectionMode ? () => _toggleRowSelection(row['sample_code']) : null,
@@ -1034,7 +1208,7 @@ class _SamplesPageState extends State<SamplesPage> {
         height: AppDS.tableRowH,
         decoration: BoxDecoration(
           color: rowBg,
-          border: const Border(bottom: BorderSide(color: AppDS.tableBorder, width: 0.5)),
+          border: Border(bottom: BorderSide(color: context.appBorder, width: 0.5)),
         ),
         child: Row(children: [
           if (_selectionMode)
@@ -1047,27 +1221,19 @@ class _SamplesPageState extends State<SamplesPage> {
                 activeColor: AppDS.blue800,
               )),
             ),
-          // Open / QR buttons
+          // Open button
           Container(
-            width: AppDS.tableOpenW * 2, height: AppDS.tableRowH, color: cellBase,
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              IconButton(
-                icon: Icon(Icons.launch_rounded, size: 14,
-                    color: _selectionMode ? AppDS.textSecondary : AppDS.textSecondary),
+            width: AppDS.tableOpenW, height: AppDS.tableRowH, color: cellBase,
+            child: Center(
+              child: IconButton(
+                icon: Icon(Icons.launch_rounded, size: 14, color: AppDS.textSecondary),
                 tooltip: 'Open sample',
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                constraints: const BoxConstraints(minWidth: 4, minHeight: 16, maxWidth: 16, maxHeight: 16),
+                style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                 onPressed: _selectionMode ? null : () => _openDetail(row),
               ),
-              IconButton(
-                icon: Icon(Icons.qr_code_outlined, size: 14,
-                    color: _selectionMode ? AppDS.textSecondary : AppDS.textSecondary),
-                tooltip: 'QR Code',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                onPressed: _selectionMode ? null : () => _showQr(row),
-              ),
-            ]),
+            ),
           ),
           ...cols.map((col) => _buildDataCell(row, col, cellBase)),
         ]),
@@ -1093,7 +1259,7 @@ class _SamplesPageState extends State<SamplesPage> {
         width: width, height: AppDS.tableRowH,
         decoration: BoxDecoration(
           color: cellBase,
-          border: const Border(right: BorderSide(color: AppDS.tableBorder)),
+          border: Border(right: BorderSide(color: context.appBorder)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: isEditing
@@ -1115,7 +1281,7 @@ class _SamplesPageState extends State<SamplesPage> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   row[col.key]?.toString() ?? '',
-                  style: isReadOnly ? AppDS.tableReadOnlyStyle : AppDS.tableCellStyle,
+                  style: TextStyle(fontSize: 12, color: isReadOnly ? context.appTextMuted : context.appTextPrimary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

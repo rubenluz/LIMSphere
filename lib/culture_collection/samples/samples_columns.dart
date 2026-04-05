@@ -14,7 +14,7 @@ class SampleColDef {
 const List<SampleColDef> sampleAllColumns = [
   // Identifiers
   SampleColDef('sample_code',         'Code',                    width: 60,  readOnly: true),
-  SampleColDef('sample_rebeca',       'REBECA',                width: 120),
+  SampleColDef('sample_rebeca',       'REBECA',                width: 80),
   SampleColDef('sample_ccpi',         'CCPI',                  width: 110),
   SampleColDef('sample_permit',       'Permit',                width: 120),
   SampleColDef('sample_other_code',   'Other Code',            width: 120),

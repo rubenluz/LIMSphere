@@ -103,7 +103,7 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        title: 'LIMS Sphere',
+        title: 'LIMSphere',
         debugShowCheckedModeBanner: false,
         builder: (context, child) {
           return SafeArea(

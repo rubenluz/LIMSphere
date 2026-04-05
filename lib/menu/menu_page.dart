@@ -8,8 +8,8 @@ import '../camera/qr_scanner/qr_code_rules.dart';
 import '../camera/qr_scanner/qr_scanner_page.dart';
 import '../camera/camera_page.dart';
 import 'app_nav.dart';
-import 'package:lims_sphere/lab_chat/lab_chat_page.dart';
-import 'package:lims_sphere/labels/label_page.dart';
+import 'package:limsphere/lab_chat/lab_chat_page.dart';
+import 'package:limsphere/labels/label_page.dart';
 import '../locations/locations_page.dart';
 import '../resources/reagents/reagents_page.dart';
 import '../resources/machines/machines_page.dart';
@@ -19,11 +19,11 @@ import '/theme/module_permission.dart';
 import '../admin/settings_page.dart';
 import '../admin/backups_page.dart';
 import '../admin/backup_service.dart';
-import 'package:lims_sphere/fish_facility/lines/fish_lines_page.dart';
-import 'package:lims_sphere/fish_facility/water_qc/water_qc_page.dart';
-import 'package:lims_sphere/sops/sops_page.dart';
-import 'package:lims_sphere/fish_facility/stocks/stocks_page.dart';
-import 'package:lims_sphere/fish_facility/tanks/tanks_page.dart';
+import 'package:limsphere/fish_facility/lines/fish_lines_page.dart';
+import 'package:limsphere/fish_facility/water_qc/water_qc_page.dart';
+import 'package:limsphere/sops/sops_page.dart';
+import 'package:limsphere/fish_facility/stocks/stocks_page.dart';
+import 'package:limsphere/fish_facility/tanks/tanks_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '../culture_collection/samples/samples_page.dart';
@@ -341,7 +341,7 @@ class _MenuPageState extends State<MenuPage> {
     if (mounted) {
       setState(() {
         _visibleGroups = AppSettings.visibleGroups;
-        _ensureValidSelection();
+        if (!_loadingUser) _ensureValidSelection();
       });
     }
   }
@@ -414,13 +414,20 @@ class _MenuPageState extends State<MenuPage> {
         setState(() {
           _userInfo = Map<String, dynamic>.from(rows[0]);
           _loadingUser = false;
+          _ensureValidSelection();
         });
         if (_hasRole(_userInfo['user_role'] ?? '', 'admin')) _loadPendingUsers();
       } else {
-        setState(() => _loadingUser = false);
+        setState(() {
+          _loadingUser = false;
+          _ensureValidSelection();
+        });
       }
     } catch (_) {
-      setState(() => _loadingUser = false);
+      setState(() {
+        _loadingUser = false;
+        _ensureValidSelection();
+      });
     }
   }
 
@@ -451,8 +458,14 @@ class _MenuPageState extends State<MenuPage> {
       nav?.pop();
       return;
     }
-    setState(() => _selectedId = id);
-    nav?.pop();
+    if (nav != null) {
+      nav.pop();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedId = id);
+      });
+    } else {
+      setState(() => _selectedId = id);
+    }
   }
 
   void _showAccessDenied(String moduleId) async {
@@ -524,8 +537,10 @@ class _MenuPageState extends State<MenuPage> {
     final userRole = _userInfo['user_role']?.toString() ?? '';
     for (final item in _topItems) {
       final visible = item.id == 'backups'
-          ? _getModulePerm('backups') != 'none'
-          : _visibleGroups.contains(item.id);
+          ? !(Platform.isAndroid || Platform.isIOS) && _getModulePerm('backups') != 'none'
+          : item.mobileOnly
+              ? (Platform.isAndroid || Platform.isIOS)
+              : _visibleGroups.contains(item.id);
       if (!visible) continue;
       if (item.id == _selectedId && item.builder != null) {
         return _maybeWrapReadOnly(item.id, item.builder!(this));
@@ -615,7 +630,7 @@ class _MenuPageState extends State<MenuPage> {
                   if (!collapsed) ...[
                     const SizedBox(width: 10),
                     const Expanded(
-                      child: Text('LIMS Sphere',
+                      child: Text('LIMSphere',
                         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold,
                             fontSize: 14, overflow: TextOverflow.ellipsis)),
                     ),
@@ -635,6 +650,7 @@ class _MenuPageState extends State<MenuPage> {
                     .where((item) {
                       if (item.mobileOnly) return isDrawer;
                       if (item.id == 'backups') {
+                        if (Platform.isAndroid || Platform.isIOS) return false;
                         return _getModulePerm('backups') != 'none';
                       }
                       if (!_visibleGroups.contains(item.id)) return false;

@@ -410,60 +410,117 @@ class _SopPageState extends State<SopPage> {
             ),
           ),
         ),
-        const SizedBox(width: 4),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            '${_filtered.length} record${_filtered.length == 1 ? '' : 's'}',
-            style: GoogleFonts.spaceGrotesk(fontSize: 12, color: context.appTextMuted),
-          ),
-        ),
-        Tooltip(
-          message: _showFilters ? 'Hide filters' : 'Show filters',
-          child: Stack(children: [
-            IconButton(
-              icon: Icon(Icons.tune,
-                  color: _showFilters ? AppDS.accent : context.appTextSecondary,
-                  size: 18),
-              onPressed: () => setState(() => _showFilters = !_showFilters),
+        if (MediaQuery.of(context).size.width < 700)
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: context.appTextSecondary, size: 20),
+            tooltip: 'More options',
+            offset: const Offset(0, 36),
+            color: context.appSurface2,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: context.appBorder2)),
+            onSelected: (v) {
+              if (v == 'filter') setState(() => _showFilters = !_showFilters);
+              if (v == 'zip') _downloadAllFiles();
+              if (v == 'export') _exportCsv();
+              if (v == 'add') _showDialog();
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'filter',
+                child: Row(children: [
+                  Icon(Icons.tune, size: 16,
+                      color: _showFilters ? AppDS.accent : context.appTextSecondary),
+                  const SizedBox(width: 10),
+                  Text(_showFilters ? 'Hide Filters' : 'Show Filters',
+                      style: GoogleFonts.spaceGrotesk(fontSize: 13, color: context.appTextPrimary)),
+                  if (_hasActiveFilter) ...[
+                    const Spacer(),
+                    Container(width: 7, height: 7,
+                        decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle)),
+                  ],
+                ])),
+              PopupMenuItem(
+                value: 'zip',
+                child: Row(children: [
+                  Icon(Icons.folder_zip_outlined, size: 16, color: context.appTextSecondary),
+                  const SizedBox(width: 10),
+                  Text('Download ZIP', style: GoogleFonts.spaceGrotesk(
+                      fontSize: 13, color: context.appTextPrimary)),
+                ])),
+              PopupMenuItem(
+                value: 'export',
+                child: Row(children: [
+                  Icon(Icons.download_outlined, size: 16, color: context.appTextSecondary),
+                  const SizedBox(width: 10),
+                  Text('Export CSV', style: GoogleFonts.spaceGrotesk(
+                      fontSize: 13, color: context.appTextPrimary)),
+                ])),
+              PopupMenuItem(
+                value: 'add',
+                child: Row(children: [
+                  const Icon(Icons.add, size: 16, color: AppDS.accent),
+                  const SizedBox(width: 10),
+                  Text('New SOP', style: GoogleFonts.spaceGrotesk(
+                      fontSize: 13, color: AppDS.accent)),
+                ])),
+            ],
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              '${_filtered.length} record${_filtered.length == 1 ? '' : 's'}',
+              style: GoogleFonts.spaceGrotesk(fontSize: 12, color: context.appTextMuted),
             ),
-            if (_hasActiveFilter)
-              Positioned(
-                right: 6, top: 6,
-                child: Container(
-                  width: 7, height: 7,
-                  decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle),
-                ),
+          ),
+          Tooltip(
+            message: _showFilters ? 'Hide filters' : 'Show filters',
+            child: Stack(children: [
+              IconButton(
+                icon: Icon(Icons.tune,
+                    color: _showFilters ? AppDS.accent : context.appTextSecondary,
+                    size: 18),
+                onPressed: () => setState(() => _showFilters = !_showFilters),
               ),
-          ]),
-        ),
-        Tooltip(
-          message: 'Download files as ZIP',
-          child: IconButton(
-            icon: Icon(Icons.folder_zip_outlined, color: context.appTextSecondary, size: 18),
-            onPressed: _downloadAllFiles,
+              if (_hasActiveFilter)
+                Positioned(
+                  right: 6, top: 6,
+                  child: Container(
+                    width: 7, height: 7,
+                    decoration: const BoxDecoration(color: AppDS.accent, shape: BoxShape.circle),
+                  ),
+                ),
+            ]),
           ),
-        ),
-        Tooltip(
-          message: 'Export CSV',
-          child: IconButton(
-            icon: Icon(Icons.download_outlined, color: context.appTextSecondary, size: 18),
-            onPressed: _exportCsv,
+          Tooltip(
+            message: 'Download files as ZIP',
+            child: IconButton(
+              icon: Icon(Icons.folder_zip_outlined, color: context.appTextSecondary, size: 18),
+              onPressed: _downloadAllFiles,
+            ),
           ),
-        ),
-        FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: AppDS.accent,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-            minimumSize: const Size(0, 36),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+          Tooltip(
+            message: 'Export CSV',
+            child: IconButton(
+              icon: Icon(Icons.download_outlined, color: context.appTextSecondary, size: 18),
+              onPressed: _exportCsv,
+            ),
           ),
-          onPressed: () => _showDialog(),
-          icon: const Icon(Icons.add, size: 16),
-          label: const Text('New SOP'),
-        ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppDS.accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+            ),
+            onPressed: () => _showDialog(),
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('New SOP'),
+          ),
+        ],
       ]),
     );
   }

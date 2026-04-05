@@ -6,8 +6,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '/menu/app_nav.dart';
+import '/theme/theme.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard_widgets/next_transfer_widget.dart';
@@ -107,7 +110,7 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final client = HttpClient();
       final req = await client.getUrl(Uri.parse(api));
-      req.headers.set('User-Agent', 'LIMSSphere');
+      req.headers.set('User-Agent', 'LIMSphere');
       final res = await req.close().timeout(const Duration(seconds: 10));
       final body = await res.transform(const Utf8Decoder()).join();
       client.close();
@@ -123,7 +126,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       for (final file in files) {
         final name = (file as Map<String, dynamic>)['name'] as String? ?? '';
-        final m = RegExp(r'LIMSSphere_installer_v(\d+\.\d+\.\d+)').firstMatch(name);
+        final m = RegExp(r'LIMSphere_installer_v(\d+\.\d+\.\d+)').firstMatch(name);
         if (m != null) {
           final ver = m.group(1)!;
           if (latestVer == null || _cmpVer(ver, latestVer) > 0) {
@@ -555,18 +558,23 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ]),
             const SizedBox(height: 12),
-            ...available.map((w) => ListTile(
-              leading: Icon(w['icon'] as IconData),
-              title: Text(w['name'] as String),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              onTap: () async {
-                final nav = Navigator.of(ctx);
-                setState(() => _mobileWidgets.add(w['id'] as String));
-                await _saveMobileConfig();
-                nav.pop();
-              },
-            )),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: available.map((w) => ListTile(
+                  leading: Icon(w['icon'] as IconData),
+                  title: Text(w['name'] as String),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  onTap: () async {
+                    final nav = Navigator.of(ctx);
+                    setState(() => _mobileWidgets.add(w['id'] as String));
+                    await _saveMobileConfig();
+                    nav.pop();
+                  },
+                )).toList(),
+              ),
+            ),
           ],
         ),
       ),
@@ -657,16 +665,16 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildUpdateButton() {
     switch (_updateStatus) {
       case _UpdateStatus.checking:
-        return const SizedBox(
+        return SizedBox(
           width: 16, height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator(strokeWidth: 2, color: context.appTextSecondary),
         );
       case _UpdateStatus.upToDate:
         return Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.check_circle, size: 15, color: Color(0xFF22C55E)),
+          const Icon(Icons.check_circle, size: 15, color: AppDS.green),
           const SizedBox(width: 5),
           Text('Application up to date${_currentVersion != null ? ' (v$_currentVersion)' : ''}',
-              style: TextStyle(fontSize: 12, color: Colors.green.shade600,
+              style: TextStyle(fontSize: 12, color: AppDS.green,
                   fontWeight: FontWeight.w600)),
         ]);
       case _UpdateStatus.updateAvailable:
@@ -676,7 +684,7 @@ class _DashboardPageState extends State<DashboardPage> {
           children: [
             if (_currentVersion != null)
               Text('Current: v$_currentVersion',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                  style: TextStyle(fontSize: 11, color: context.appTextMuted)),
             const SizedBox(height: 4),
             TextButton.icon(
               style: TextButton.styleFrom(
@@ -706,10 +714,10 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Padding(
               padding: const EdgeInsets.all(4),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.refresh, size: 14, color: Colors.grey.shade400),
+                Icon(Icons.refresh, size: 14, color: context.appTextMuted),
                 const SizedBox(width: 4),
                 Text('Retry',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                    style: TextStyle(fontSize: 12, color: context.appTextMuted)),
               ]),
             ),
           ),
@@ -717,24 +725,29 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Widget _buildHeader() {
-    final name = widget.userInfo['user_name'] as String? ??
-        widget.userInfo['user_username'] as String? ?? '';
+  Widget _buildToolbar() {
     final isMobile = MediaQuery.of(context).size.width < 700;
-    return Row(
-      children: [
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: [
         if (isMobile) ...[
           IconButton(
             icon: const Icon(Icons.menu_rounded, size: 20),
+            color: context.appTextSecondary,
             tooltip: 'Menu',
             onPressed: openAppDrawer,
           ),
-          const SizedBox(width: 4),
         ],
-        Text(
-          'Welcome back${name.isNotEmpty ? ", $name" : ''}!',
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
+        const Icon(Icons.space_dashboard_outlined, size: 18, color: Color(0xFF6366F1)),
+        const SizedBox(width: 8),
+        Text('Dashboard', style: GoogleFonts.spaceGrotesk(
+          fontSize: 16, fontWeight: FontWeight.w600,
+          color: context.appTextPrimary)),
         const Spacer(),
         if (_isDesktop) _buildUpdateButton(),
         const SizedBox(width: 12),
@@ -742,23 +755,17 @@ class _DashboardPageState extends State<DashboardPage> {
           message: 'View on GitHub',
           child: InkWell(
             borderRadius: BorderRadius.circular(6),
-            onTap: () {
-              const url = 'https://github.com/rubenluz/blue_open_lims';
-              if (Platform.isWindows) {
-                Process.run('cmd', ['/c', 'start', '', url], runInShell: true);
-              } else if (Platform.isMacOS) {
-                Process.run('open', [url]);
-              } else {
-                Process.run('xdg-open', [url]);
-              }
-            },
-            child: const Padding(
-              padding: EdgeInsets.all(6),
-              child: FaIcon(FontAwesomeIcons.github, size: 18),
+            onTap: () => launchUrl(
+              Uri.parse('https://github.com/rubenluz/blue_open_lims'),
+              mode: LaunchMode.externalApplication,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: FaIcon(FontAwesomeIcons.github, size: 18, color: context.appTextSecondary),
             ),
           ),
         ),
-      ],
+      ]),
     );
   }
 
@@ -768,39 +775,43 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 700;
 
-    return Padding(
-      padding: EdgeInsets.all(isMobile ? 12 : 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 16),
+    return Column(
+      children: [
+        _buildToolbar(),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.all(isMobile ? 12 : 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Pending users banner ───────────────────────────────────
+                if (widget.pendingUsers.isNotEmpty) ...[
+                  Card(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: ListTile(
+                      leading: const Icon(Icons.person_add_outlined),
+                      title: Text(
+                          '${widget.pendingUsers.length} user(s) awaiting approval'),
+                      trailing: TextButton(
+                        onPressed: widget.onGoToPendingUsers,
+                        child: const Text('Review'),
+                      ),
+                    ),
+                  ),
+                ],
 
-          // ── Pending users banner ─────────────────────────────────────────
-          if (widget.pendingUsers.isNotEmpty) ...[
-            Card(
-              color: Theme.of(context).colorScheme.errorContainer,
-              margin: const EdgeInsets.only(bottom: 16),
-              child: ListTile(
-                leading: const Icon(Icons.person_add_outlined),
-                title: Text(
-                    '${widget.pendingUsers.length} user(s) awaiting approval'),
-                trailing: TextButton(
-                  onPressed: widget.onGoToPendingUsers,
-                  child: const Text('Review'),
+                // ── Grid (desktop) or List (mobile) ────────────────────────
+                Expanded(
+                  child: isMobile
+                      ? _buildMobileList()
+                      : _buildDesktopGrid(),
                 ),
-              ),
+              ],
             ),
-          ],
-
-          // ── Grid (desktop) or List (mobile) ──────────────────────────────
-          Expanded(
-            child: isMobile
-                ? _buildMobileList()
-                : _buildDesktopGrid(),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -1,4 +1,4 @@
-package com.example.culture_app
+package com.silvuzapps.limsphere
 
 import io.flutter.embedding.android.FlutterActivity
 

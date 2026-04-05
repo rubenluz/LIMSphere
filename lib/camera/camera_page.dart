@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '/theme/theme.dart';
 import '/menu/app_nav.dart';
+import 'item_log/item_register_page.dart';
 import 'qr_scanner/qr_scanner_page.dart';
 
 class CameraPage extends StatelessWidget {
@@ -54,6 +55,17 @@ class CameraPage extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const QrScannerPage()),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _FeatureCard(
+                  icon: Icons.inventory_2_outlined,
+                  color: const Color(0xFFF59E0B),
+                  title: 'Item Register',
+                  subtitle: 'Scan or enter items to register in the system',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ItemRegisterPage()),
                   ),
                 ),
               ],
