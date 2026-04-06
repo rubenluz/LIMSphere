@@ -225,7 +225,7 @@ List<int> _ql570PageHeader(
     _kQl570PrintInfoFlags,
     spec.mediaType,
     spec.tapeWidthMm,
-    spec.labelLengthMm,
+    (rasterLines * 25.4 / _kQl570Dpi).round().clamp(0, 255),
     rasterLines & 0xFF,
     (rasterLines >> 8) & 0xFF,
     (rasterLines >> 16) & 0xFF,
@@ -335,12 +335,15 @@ Future<Uint8List> _ql570DieCut(
   for (final record in printRecords) {
     for (int c = 0; c < tpl.copies; c++) {
       final image = await _renderLabelToImage(tpl, record, _kQl570Dpi,
-          floorHeight: true, printableW: spec.printableDots);
+          printableW: spec.printableDots);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
       if (byteData == null) continue;
       final rgba = byteData.buffer.asUint8List();
       final iw = image.width;
       final ih = image.height;
+
+      final expectedDots = (spec.labelLengthMm * _kQl570Dpi / 25.4).round();
+      debugPrint('[QL570] expectedDots=$expectedDots vs rasterLines=$ih');
 
       buf.add(_ql570PageHeader(
         tpl,
@@ -463,7 +466,7 @@ Uint8List _ql570SolidBlack(double tapeMm, double labelHMm,
     continuousRoll: continuousRoll,
   );
   final spec = _ql570MediaSpec(tpl, cfg);
-  final height = (labelHMm * _kQl570Dpi / 25.4).floor();
+  final height = (labelHMm * _kQl570Dpi / 25.4).round();
   final endByte    = continuousRoll
       ? (cutMode == 'none' ? 0x0C : 0x1A)
       : _kQl570DieCutEndByte;
