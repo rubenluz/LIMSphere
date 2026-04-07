@@ -327,7 +327,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
 
   // ── Step 0: pick file(s) ────────────────────────────────────────────────────
   Future<void> _pickSampleFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv'],
       withData: true,
@@ -343,7 +343,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
   }
 
   Future<void> _pickStrainFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv'],
       withData: true,

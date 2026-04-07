@@ -122,7 +122,7 @@ class _BackupsPageState extends State<BackupsPage> {
   }
 
   Future<void> _chooseCustomFolder() async {
-    final selected = await FilePicker.platform.getDirectoryPath(
+    final selected = await FilePicker.getDirectoryPath(
       dialogTitle: 'Choose backup folder',
       lockParentWindow: true,
     );

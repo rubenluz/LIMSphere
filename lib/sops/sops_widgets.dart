@@ -321,21 +321,21 @@ class _SopDialogState extends State<_SopDialog> {
   }
 
   Future<void> _pickPdf() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom, allowedExtensions: ['pdf'], withData: true);
     if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
     setState(() { _pdfBytes = result.files.first.bytes; _pdfName = result.files.first.name; _clearPdf = false; });
   }
 
   Future<void> _pickTxt() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom, allowedExtensions: ['txt'], withData: true);
     if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
     setState(() { _txtBytes = result.files.first.bytes; _txtName = result.files.first.name; _clearTxt = false; });
   }
 
   Future<void> _pickDoc() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom, allowedExtensions: ['doc', 'docx'], withData: true);
     if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
     setState(() { _docBytes = result.files.first.bytes; _docName = result.files.first.name; _clearDoc = false; });
