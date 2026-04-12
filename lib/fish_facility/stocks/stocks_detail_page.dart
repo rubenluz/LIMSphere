@@ -2,6 +2,8 @@
 // fields (genotype, zygosity, generation, mutation info), linked line and tank.
 // Pushed via Navigator with its own Scaffold + AppBar.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +11,7 @@ import '../tanks/tanks_connection_model.dart';
 import '../lines/fish_lines_connection_model.dart';
 import '../lines/fish_lines_detail_page.dart';
 import '../../requests/requests_page.dart';
+import '../../backups/backup_service.dart';
 import '/supabase/supabase_manager.dart';
 import '/camera/qr_scanner/qr_code_rules.dart';
 import '/theme/theme.dart';
@@ -470,6 +473,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
         await client.from('fish_stocks')
             .upsert(payload, onConflict: 'fish_stocks_tank_id');
       }
+      unawaited(BackupService.instance.notifyCrudChange('fish_stocks'));
       widget.onSaved?.call();
       _snack('Saved successfully.');
     } catch (e) {
@@ -522,6 +526,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
           .from('fish_stocks')
           .delete()
           .eq('fish_stocks_tank_id', tankId);
+      unawaited(BackupService.instance.notifyCrudChange('fish_stocks'));
       widget.onSaved?.call();
       if (mounted) Navigator.pop(context);
     } catch (e) {

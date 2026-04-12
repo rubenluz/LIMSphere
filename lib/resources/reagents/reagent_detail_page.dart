@@ -3,15 +3,19 @@
 // Pushed via Navigator with its own Scaffold + AppBar.
 // Light and dark theme
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+import '../../backups/backup_service.dart';
 import '../../supabase/supabase_manager.dart';
 import '/theme/theme.dart';
 import 'reagent_model.dart';
 import '../../requests/requests_page.dart';
+import '../../camera/qr_scanner/qr_code_rules.dart';
 
 class ReagentDetailPage extends StatefulWidget {
   final int reagentId;
@@ -38,6 +42,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   late final TextEditingController _casCtrl;
   late final TextEditingController _lotCtrl;
   late final TextEditingController _concentrationCtrl;
+  late final TextEditingController _formulaCtrl;
   late final TextEditingController _hazardCtrl;
   late final TextEditingController _quantityCtrl;
   late final TextEditingController _unitCtrl;
@@ -46,7 +51,8 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   late final TextEditingController _notesCtrl;
 
   // Dropdown / date state
-  String  _type        = 'chemical';
+  String  _type          = 'biological';
+  String? _physicalState;
   String? _storageTemp;
   int?    _locationId;
   DateTime? _expiryDate;
@@ -65,6 +71,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     _casCtrl           = TextEditingController();
     _lotCtrl           = TextEditingController();
     _concentrationCtrl = TextEditingController();
+    _formulaCtrl       = TextEditingController();
     _hazardCtrl        = TextEditingController();
     _quantityCtrl      = TextEditingController();
     _unitCtrl          = TextEditingController();
@@ -85,6 +92,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     _casCtrl.dispose();
     _lotCtrl.dispose();
     _concentrationCtrl.dispose();
+    _formulaCtrl.dispose();
     _hazardCtrl.dispose();
     _quantityCtrl.dispose();
     _unitCtrl.dispose();
@@ -128,7 +136,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
 
       if (mounted) {
         _codeCtrl.text          = reagent.code ?? '';
-        _nameCtrl.text          = reagent.name;
+        _nameCtrl.text          = reagent.name ?? '';
         _brandCtrl.text         = reagent.brand ?? '';
         _supplierCtrl.text      = reagent.supplier ?? '';
         _responsibleCtrl.text   = reagent.responsible ?? '';
@@ -136,14 +144,16 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _casCtrl.text           = reagent.casNumber ?? '';
         _lotCtrl.text           = reagent.lotNumber ?? '';
         _concentrationCtrl.text = reagent.concentration ?? '';
+        _formulaCtrl.text       = reagent.formula ?? '';
         _hazardCtrl.text        = reagent.hazard ?? '';
         _quantityCtrl.text      = reagent.quantity?.toString() ?? '';
         _unitCtrl.text          = reagent.unit ?? '';
         _quantityMinCtrl.text   = reagent.quantityMin?.toString() ?? '';
         _positionCtrl.text      = reagent.position ?? '';
         _notesCtrl.text         = reagent.notes ?? '';
-        _type        = reagent.type;
-        _storageTemp = reagent.storageTemp;
+        _type          = reagent.type;
+        _physicalState = reagent.physicalState;
+        _storageTemp   = reagent.storageTemp;
         _locationId  = reagent.locationId;
         _expiryDate  = reagent.expiryDate;
         _receivedDate = reagent.receivedDate;
@@ -164,20 +174,22 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   }
 
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty) { _snack('Name is required'); return; }
+    if (_codeCtrl.text.trim().isEmpty) { _snack('Code is required'); return; }
     setState(() => _saving = true);
     try {
       final data = <String, dynamic>{
-        'reagent_code':         _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
-        'reagent_name':         _nameCtrl.text.trim(),
-        'reagent_type':         _type,
-        'reagent_brand':        _brandCtrl.text.trim().isEmpty        ? null : _brandCtrl.text.trim(),
+        'reagent_code':         _codeCtrl.text.trim(),
+        'reagent_name':         _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
+        'reagent_type':           _type,
+        'reagent_physical_state': _physicalState,
+        'reagent_brand':          _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
         'reagent_supplier':     _supplierCtrl.text.trim().isEmpty     ? null : _supplierCtrl.text.trim(),
         'reagent_responsible':  _responsibleCtrl.text.trim().isEmpty  ? null : _responsibleCtrl.text.trim(),
         'reagent_reference':    _referenceCtrl.text.trim().isEmpty    ? null : _referenceCtrl.text.trim(),
         'reagent_cas_number':   _casCtrl.text.trim().isEmpty          ? null : _casCtrl.text.trim(),
         'reagent_lot_number':   _lotCtrl.text.trim().isEmpty          ? null : _lotCtrl.text.trim(),
         'reagent_concentration':_concentrationCtrl.text.trim().isEmpty? null : _concentrationCtrl.text.trim(),
+        'reagent_formula':      _formulaCtrl.text.trim().isEmpty      ? null : _formulaCtrl.text.trim(),
         'reagent_hazard':       _hazardCtrl.text.trim().isEmpty       ? null : _hazardCtrl.text.trim(),
         'reagent_quantity':     double.tryParse(_quantityCtrl.text.trim()),
         'reagent_unit':         _unitCtrl.text.trim().isEmpty         ? null : _unitCtrl.text.trim(),
@@ -189,11 +201,13 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         'reagent_received_date':_receivedDate?.toIso8601String().substring(0, 10),
         'reagent_opened_date':  _openedDate?.toIso8601String().substring(0, 10),
         'reagent_notes':        _notesCtrl.text.trim().isEmpty        ? null : _notesCtrl.text.trim(),
+        'reagent_qrcode':       QrRules.build(SupabaseManager.projectRef ?? 'local', 'reagents', widget.reagentId),
       };
       await Supabase.instance.client
           .from('reagents')
           .update(data)
           .eq('reagent_id', widget.reagentId);
+      unawaited(BackupService.instance.notifyCrudChange('reagents'));
       await _load();
       _snack('Saved');
     } catch (e) {
@@ -212,6 +226,51 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     );
     if (picked != null) onPicked(picked);
   }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.appSurface,
+        title: Text('Delete reagent?',
+            style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary)),
+        content: Text(
+          'This will permanently delete "${_reagent?.name}". This cannot be undone.',
+          style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel',
+                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete',
+                style: GoogleFonts.spaceGrotesk(color: AppDS.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await Supabase.instance.client
+          .from('reagents')
+          .delete()
+          .eq('reagent_id', widget.reagentId);
+      unawaited(BackupService.instance.notifyCrudChange('reagents'));
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      _snack('Delete failed: $e');
+    }
+  }
+
+  Color _physicalStateColor(String s) => switch (s) {
+        'liquid' => const Color(0xFF38BDF8),
+        'solid'  => const Color(0xFF94A3B8),
+        'gas'    => const Color(0xFFA78BFA),
+        _        => const Color(0xFF64748B),
+      };
 
   void _snack(String msg) {
     if (!mounted) return;
@@ -242,18 +301,18 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         actions: [
           if (r != null) ...[
             IconButton(
-              icon: const Icon(Icons.qr_code, size: 20),
-              tooltip: 'QR Code',
-              onPressed: () => _showQr(r),
-            ),
-            IconButton(
               icon: const Icon(Icons.outbox_outlined, size: 20),
               tooltip: 'Quick Request',
               onPressed: () => showQuickRequestDialog(
                 context,
                 type: 'reagents',
-                prefillTitle: r.name,
+                prefillTitle: r.name ?? '',
               ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20, color: AppDS.red),
+              tooltip: 'Delete',
+              onPressed: _delete,
             ),
             _saving
                 ? const Padding(
@@ -283,11 +342,19 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
 
   Widget _buildBody(BuildContext context, ReagentModel r) {
     final typeAccentMap = <String, Color>{
+      'biological':           const Color(0xFF22C55E),
+      'consumables':          const Color(0xFFF59E0B),
+      'ppe':                  const Color(0xFFF97316),
+      'bioactivity_assays':   const Color(0xFF8B5CF6),
+      'analytical_chemistry': const Color(0xFF06B6D4),
+      'media_preparation':    const Color(0xFF10B981),
+      'cleaning_maintenance': const Color(0xFF94A3B8),
+      'standards':            const Color(0xFF86b0d3),
+      // legacy
       'chemical': const Color(0xFF38BDF8),
-      'biological': const Color(0xFF22C55E),
-      'kit': const Color(0xFF8B5CF6),
-      'media': const Color(0xFF10B981),
-      'gas': const Color(0xFF64748B),
+      'kit':      const Color(0xFF8B5CF6),
+      'media':    const Color(0xFF10B981),
+      'gas':      const Color(0xFF64748B),
       'consumable': const Color(0xFFF59E0B),
     };
     final accent = typeAccentMap[r.type] ?? AppDS.accent;
@@ -372,7 +439,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         const SizedBox(width: 24),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(r.name,
+            Text(r.name ?? '—',
                 style: GoogleFonts.spaceGrotesk(
                     color: context.appTextPrimary,
                     fontSize: 22,
@@ -386,6 +453,11 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
             const SizedBox(height: 8),
             Wrap(spacing: 6, runSpacing: 4, children: [
               _Badge(label: ReagentModel.typeLabel(r.type), color: accent),
+              if (r.physicalState != null)
+                _Badge(
+                  label: ReagentModel.physicalStateLabel(r.physicalState!),
+                  color: _physicalStateColor(r.physicalState!),
+                ),
               if (r.isExpired)      _Badge(label: 'Expired',       color: AppDS.red),
               if (r.isExpiringSoon && !r.isExpired)
                                     _Badge(label: 'Expiring soon', color: AppDS.yellow),
@@ -414,7 +486,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   Widget _buildDetailsSection(BuildContext context) {
     return Column(children: [
       _FieldRow(children: [
-        _InlineField(label: 'Name *', controller: _nameCtrl),
+        _InlineField(label: 'Name', controller: _nameCtrl),
         _InlineDropdown<String>(
           label: 'Type',
           value: _type,
@@ -426,23 +498,44 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
                             color: context.appTextPrimary, fontSize: 13)),
                   ))
               .toList(),
-          onChanged: (v) => setState(() => _type = v ?? 'chemical'),
+          onChanged: (v) => setState(() => _type = v ?? 'biological'),
         ),
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
+        _InlineDropdown<String?>(
+          label: 'Physical State',
+          value: _physicalState,
+          items: [
+            DropdownMenuItem<String?>(
+              value: null,
+              child: Text('—',
+                  style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextMuted, fontSize: 13)),
+            ),
+            ...ReagentModel.physicalStateOptions.map((s) => DropdownMenuItem<String?>(
+                  value: s,
+                  child: Text(ReagentModel.physicalStateLabel(s),
+                      style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextPrimary, fontSize: 13)),
+                )),
+          ],
+          onChanged: (v) => setState(() => _physicalState = v),
+        ),
         _InlineField(label: 'Brand', controller: _brandCtrl),
-        _InlineField(label: 'Supplier', controller: _supplierCtrl),
       ]),
       const SizedBox(height: 10),
-      _InlineField(label: 'Responsible', controller: _responsibleCtrl),
+      _FieldRow(children: [
+        _InlineField(label: 'Supplier', controller: _supplierCtrl),
+        _InlineField(label: 'Responsible', controller: _responsibleCtrl),
+      ]),
     ]);
   }
 
   Widget _buildIdentificationSection(BuildContext context) {
     return Column(children: [
       _FieldRow(children: [
-        _InlineField(label: 'Code (e.g. BR001)', controller: _codeCtrl),
+        _InlineField(label: 'Code * (e.g. BR001)', controller: _codeCtrl),
         _InlineField(label: 'Reference', controller: _referenceCtrl),
         _InlineField(label: 'CAS Number', controller: _casCtrl),
       ]),
@@ -452,7 +545,10 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _InlineField(label: 'Concentration', controller: _concentrationCtrl),
       ]),
       const SizedBox(height: 10),
-      _InlineField(label: 'Hazard', controller: _hazardCtrl),
+      _FieldRow(children: [
+        _InlineField(label: 'Formula', controller: _formulaCtrl),
+        _InlineField(label: 'Hazard', controller: _hazardCtrl),
+      ]),
     ]);
   }
 

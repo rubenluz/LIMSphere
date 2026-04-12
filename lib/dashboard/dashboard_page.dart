@@ -1,6 +1,6 @@
-// dashboard_page.dart - Customizable dashboard with 10 widget slot types
-// (next transfers, strains by origin/medium, tank cleaning, fish by line,
-// to-do, timelines, transfer status, in-care). Layout persisted in SharedPrefs.
+// dashboard_page.dart – Customizable dashboard with 5 named profiles (desktop).
+// Each profile persists its own 4×2 grid layout independently.
+// Mobile: single reorderable widget list.
 
 import 'dart:convert';
 import 'dart:io';
@@ -25,19 +25,33 @@ import 'dashboard_widgets/transfer_timeline_widget.dart';
 import 'dashboard_widgets/tank_cleaning_timeline_widget.dart';
 import 'dashboard_widgets/maintenance_overview_widget.dart';
 
-// All available widgets — add new ones here and they appear in the picker.
+const int _kProfileCount = 5;
+
+// Category order for the widget picker.
+const _widgetCategories = [
+  'Fish Facility',
+  'Culture Collection',
+  'Resources',
+  'Requests',
+  'Backups',
+  'General',
+];
+
 const _availableWidgets = [
-  {'id': 'next_transfer',    'name': 'Next Transfers',    'icon': Icons.schedule},
-  {'id': 'strains_by_origin','name': 'Strains by Origin', 'icon': Icons.pie_chart},
-  {'id': 'strains_by_medium','name': 'Strains by Medium', 'icon': Icons.water_drop},
-  {'id': 'transfer_status',  'name': 'Transfer Status',   'icon': Icons.warning_amber},
-  {'id': 'in_care',          'name': 'In Care',           'icon': Icons.medical_services},
-  {'id': 'tank_cleaning',    'name': 'Tank Cleaning',     'icon': Icons.cleaning_services_outlined},
-  {'id': 'fish_by_line',     'name': 'Active Fish Lines',  'icon': Icons.biotech_outlined},
-  {'id': 'to_do',            'name': 'To-Do',             'icon': Icons.checklist_rounded},
-  {'id': 'transfer_timeline', 'name': 'Transfer Timeline', 'icon': Icons.timeline_rounded},
-  {'id': 'cleaning_timeline',       'name': 'Cleaning Timeline',      'icon': Icons.cleaning_services_outlined},
-  {'id': 'maintenance_overview',    'name': 'Fish Facility Maintenance', 'icon': Icons.build_circle_outlined},
+  // ── Fish Facility ────────────────────────────────────────────────────────
+  {'id': 'fish_by_line',        'name': 'Active Fish Lines',        'icon': Icons.biotech_outlined,           'cat': 'Fish Facility'},
+  {'id': 'tank_cleaning',       'name': 'Tank Cleaning',            'icon': Icons.cleaning_services_outlined, 'cat': 'Fish Facility'},
+  {'id': 'cleaning_timeline',   'name': 'Cleaning Timeline',        'icon': Icons.timeline_rounded,           'cat': 'Fish Facility'},
+  {'id': 'maintenance_overview','name': 'Fish Facility Maintenance', 'icon': Icons.build_circle_outlined,      'cat': 'Fish Facility'},
+  // ── Culture Collection ───────────────────────────────────────────────────
+  {'id': 'next_transfer',       'name': 'Next Transfers',           'icon': Icons.schedule,                   'cat': 'Culture Collection'},
+  {'id': 'transfer_status',     'name': 'Transfer Status',          'icon': Icons.warning_amber,              'cat': 'Culture Collection'},
+  {'id': 'transfer_timeline',   'name': 'Transfer Timeline',        'icon': Icons.timeline_rounded,           'cat': 'Culture Collection'},
+  {'id': 'in_care',             'name': 'In Care',                  'icon': Icons.medical_services,           'cat': 'Culture Collection'},
+  {'id': 'strains_by_origin',   'name': 'Strains by Origin',        'icon': Icons.pie_chart,                  'cat': 'Culture Collection'},
+  {'id': 'strains_by_medium',   'name': 'Strains by Medium',        'icon': Icons.water_drop,                 'cat': 'Culture Collection'},
+  // ── General ──────────────────────────────────────────────────────────────
+  {'id': 'to_do',               'name': 'To-Do',                   'icon': Icons.checklist_rounded,          'cat': 'General'},
 ];
 
 class DashboardPage extends StatefulWidget {
@@ -59,8 +73,23 @@ class DashboardPage extends StatefulWidget {
 enum _UpdateStatus { checking, upToDate, updateAvailable, error }
 
 class _DashboardPageState extends State<DashboardPage> {
-  // Desktop: 8-slot grid (4 cols × 2 rows), index = row*4 + col
-  Map<int, String?> _desktopSlots = {};
+  // ── Profiles ───────────────────────────────────────────────────────────────
+  int _activeProfile = 0;
+  final List<String> _profileTitles =
+      List.generate(_kProfileCount, (i) => 'Dashboard ${i + 1}');
+  final List<Map<int, String?>> _profileSlots =
+      List.generate(_kProfileCount, (_) => {for (int j = 0; j < 8; j++) j: null});
+  final List<Map<int, int>> _profileSpans =
+      List.generate(_kProfileCount, (_) => {for (int j = 0; j < 4; j++) j: 1});
+
+  // Convenience getters pointing at the active profile's maps.
+  Map<int, String?> get _desktopSlots => _profileSlots[_activeProfile];
+  Map<int, int>    get _desktopSpans  => _profileSpans[_activeProfile];
+
+  // ── Profile title editing ─────────────────────────────────────────────────
+  bool _editingTitle = false;
+  final _titleController = TextEditingController();
+  final _titleFocusNode  = FocusNode();
 
   // ── Update check (desktop only) ───────────────────────────────────────────
   _UpdateStatus _updateStatus = _UpdateStatus.checking;
@@ -68,23 +97,39 @@ class _DashboardPageState extends State<DashboardPage> {
   String? _latestVersion;
   String? _downloadUrl;
 
-  // Span per top-row slot (index 0-3): 1 = normal, 2 = double-height
-  Map<int, int> _desktopSpans = {};
-
-  // Mobile: ordered list of widget ids (no empty slots)
+  // ── Mobile ────────────────────────────────────────────────────────────────
   List<String> _mobileWidgets = [];
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+    _titleFocusNode.addListener(_onTitleFocusChange);
     _initializeDashboard();
     _checkForUpdate();
   }
 
-  // ── Update check ───────────────────────────────────────────────────────────
+  @override
+  void dispose() {
+    _titleFocusNode.removeListener(_onTitleFocusChange);
+    _titleController.dispose();
+    _titleFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _onTitleFocusChange() {
+    if (!_titleFocusNode.hasFocus && _editingTitle) {
+      _commitTitleEdit();
+    }
+  }
+
+  // ── Platform helper ────────────────────────────────────────────────────────
 
   static bool get _isDesktop =>
       !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+
+  // ── Update check ───────────────────────────────────────────────────────────
 
   int _cmpVer(String a, String b) {
     final av = a.split('.').map(int.tryParse).toList();
@@ -106,7 +151,8 @@ class _DashboardPageState extends State<DashboardPage> {
       setState(() => _updateStatus = _UpdateStatus.upToDate);
       return;
     }
-    const api = 'https://api.github.com/repos/rubenluz/limsphere/contents/desktop_release';
+    const api =
+        'https://api.github.com/repos/rubenluz/limsphere/contents/desktop_release';
     try {
       final client = HttpClient();
       final req = await client.getUrl(Uri.parse(api));
@@ -168,46 +214,69 @@ class _DashboardPageState extends State<DashboardPage> {
   // ── Init & persistence ─────────────────────────────────────────────────────
 
   Future<void> _initializeDashboard() async {
-    _desktopSlots = {for (int i = 0; i < 8; i++) i: null};
-    _desktopSpans = {for (int i = 0; i < 4; i++) i: 1};
-
     final prefs = await SharedPreferences.getInstance();
 
-    // ── Desktop slots ──────────────────────────────────────────────────────
-    final savedDesktop = prefs.getString('dashboard_slots');
-    if (savedDesktop != null && savedDesktop.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(savedDesktop) as Map<String, dynamic>;
-        decoded.forEach((key, value) {
-          final index = int.tryParse(key);
-          if (index != null) _desktopSlots[index] = value as String?;
-        });
-      } catch (_) {
-        _applyDesktopDefaults();
-      }
-    } else {
-      _applyDesktopDefaults();
+    // Migrate legacy single-profile keys → profile 0
+    final oldSlots = prefs.getString('dashboard_slots');
+    if (oldSlots != null) {
+      await prefs.setString('dashboard_slots_0', oldSlots);
+      await prefs.remove('dashboard_slots');
+    }
+    final oldSpans = prefs.getString('dashboard_spans');
+    if (oldSpans != null) {
+      await prefs.setString('dashboard_spans_0', oldSpans);
+      await prefs.remove('dashboard_spans');
     }
 
-    // ── Desktop spans ──────────────────────────────────────────────────────
-    final savedSpans = prefs.getString('dashboard_spans');
-    if (savedSpans != null && savedSpans.isNotEmpty) {
+    // Load profile titles
+    final savedTitles = prefs.getString('dashboard_profile_titles');
+    if (savedTitles != null) {
       try {
-        final decoded = jsonDecode(savedSpans) as Map<String, dynamic>;
-        decoded.forEach((key, value) {
-          final index = int.tryParse(key);
-          if (index != null && index < 4) {
-            _desktopSpans[index] = (value as num).toInt();
-          }
-        });
+        final list = List<String>.from(jsonDecode(savedTitles) as List);
+        for (int i = 0; i < _kProfileCount && i < list.length; i++) {
+          _profileTitles[i] = list[i];
+        }
       } catch (_) {}
     }
 
-    // ── Mobile widget list ─────────────────────────────────────────────────
+    // Load each profile's slots and spans
+    for (int p = 0; p < _kProfileCount; p++) {
+      final savedSlots = prefs.getString('dashboard_slots_$p');
+      if (savedSlots != null && savedSlots.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(savedSlots) as Map<String, dynamic>;
+          decoded.forEach((key, value) {
+            final index = int.tryParse(key);
+            if (index != null) _profileSlots[p][index] = value as String?;
+          });
+        } catch (_) {
+          if (p == 0) _applyDesktopDefaults(0);
+        }
+      } else if (p == 0) {
+        // Profile 0 defaults on first launch
+        _applyDesktopDefaults(0);
+      }
+      // Profiles 1–4 with no saved config start as empty grids.
+
+      final savedSpans = prefs.getString('dashboard_spans_$p');
+      if (savedSpans != null && savedSpans.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(savedSpans) as Map<String, dynamic>;
+          decoded.forEach((key, value) {
+            final index = int.tryParse(key);
+            if (index != null && index < 4) {
+              _profileSpans[p][index] = (value as num).toInt();
+            }
+          });
+        } catch (_) {}
+      }
+    }
+
+    // Mobile widgets
     final savedMobile = prefs.getString('dashboard_mobile_widgets');
     if (savedMobile != null && savedMobile.isNotEmpty) {
       try {
-        _mobileWidgets = List<String>.from(jsonDecode(savedMobile));
+        _mobileWidgets = List<String>.from(jsonDecode(savedMobile) as List);
       } catch (_) {
         _applyMobileDefaults();
       }
@@ -218,22 +287,15 @@ class _DashboardPageState extends State<DashboardPage> {
     if (mounted) setState(() {});
   }
 
-  void _applyDesktopDefaults() {
-    // Col 0: To-Do spanning full height
-    _desktopSlots[0] = 'to_do';      _desktopSpans[0] = 2;
-    _desktopSlots[4] = null;
-
-    // Col 1: Next Transfer (top) + Tank Cleaning (bottom)
-    _desktopSlots[1] = 'next_transfer'; _desktopSpans[1] = 1;
-    _desktopSlots[5] = 'tank_cleaning';
-
-    // Col 2: Transfer Status (top) + Fish by Line (bottom)
-    _desktopSlots[2] = 'transfer_status'; _desktopSpans[2] = 1;
-    _desktopSlots[6] = 'fish_by_line';
-
-    // Col 3: In Care spanning full height
-    _desktopSlots[3] = 'in_care';    _desktopSpans[3] = 2;
-    _desktopSlots[7] = null;
+  void _applyDesktopDefaults(int profile) {
+    _profileSlots[profile][0] = 'to_do';           _profileSpans[profile][0] = 2;
+    _profileSlots[profile][4] = null;
+    _profileSlots[profile][1] = 'next_transfer';   _profileSpans[profile][1] = 1;
+    _profileSlots[profile][5] = 'tank_cleaning';
+    _profileSlots[profile][2] = 'transfer_status'; _profileSpans[profile][2] = 1;
+    _profileSlots[profile][6] = 'fish_by_line';
+    _profileSlots[profile][3] = 'in_care';         _profileSpans[profile][3] = 2;
+    _profileSlots[profile][7] = null;
   }
 
   void _applyMobileDefaults() {
@@ -250,46 +312,76 @@ class _DashboardPageState extends State<DashboardPage> {
     final prefs = await SharedPreferences.getInstance();
     final toSave = <String, String?>{};
     _desktopSlots.forEach((k, v) => toSave[k.toString()] = v);
-    await prefs.setString('dashboard_slots', jsonEncode(toSave));
+    await prefs.setString('dashboard_slots_$_activeProfile', jsonEncode(toSave));
   }
 
   Future<void> _saveDesktopSpans() async {
     final prefs = await SharedPreferences.getInstance();
     final toSave = <String, int>{};
     _desktopSpans.forEach((k, v) => toSave[k.toString()] = v);
-    await prefs.setString('dashboard_spans', jsonEncode(toSave));
+    await prefs.setString('dashboard_spans_$_activeProfile', jsonEncode(toSave));
   }
 
   Future<void> _saveMobileConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        'dashboard_mobile_widgets', jsonEncode(_mobileWidgets));
+    await prefs.setString('dashboard_mobile_widgets', jsonEncode(_mobileWidgets));
+  }
+
+  Future<void> _saveProfileTitles() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('dashboard_profile_titles', jsonEncode(_profileTitles));
+  }
+
+  // ── Profile switching & title editing ─────────────────────────────────────
+
+  void _switchProfile(int index) {
+    if (index == _activeProfile) return;
+    setState(() {
+      if (_editingTitle) _editingTitle = false;
+      _activeProfile = index;
+    });
+  }
+
+  void _startTitleEdit() {
+    _titleController.text = _profileTitles[_activeProfile];
+    setState(() => _editingTitle = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _titleFocusNode.requestFocus());
+  }
+
+  Future<void> _commitTitleEdit() async {
+    final newTitle = _titleController.text.trim();
+    setState(() {
+      if (newTitle.isNotEmpty) _profileTitles[_activeProfile] = newTitle;
+      _editingTitle = false;
+    });
+    await _saveProfileTitles();
   }
 
   // ── Widget builder ─────────────────────────────────────────────────────────
 
   Widget _buildWidget(String widgetType) {
     switch (widgetType) {
-      case 'next_transfer':     return const NextTransferWidget();
-      case 'strains_by_origin': return const StrainsByOriginWidget();
-      case 'strains_by_medium': return const StrainsByMediumWidget();
-      case 'transfer_status':   return const TransferStatusWidget();
-      case 'in_care':           return const InCareWidget();
-      case 'tank_cleaning':     return const TankCleaningWidget();
-      case 'fish_by_line':      return const FishByLineWidget();
-      case 'to_do':              return const ToDoWidget();
-      case 'transfer_timeline':  return const TransferTimelineWidget();
-      case 'cleaning_timeline':      return const TankCleaningTimelineWidget();
-      case 'maintenance_overview':   return const MaintenanceOverviewWidget();
-      default:                       return const SizedBox.shrink();
+      case 'next_transfer':        return const NextTransferWidget();
+      case 'strains_by_origin':    return const StrainsByOriginWidget();
+      case 'strains_by_medium':    return const StrainsByMediumWidget();
+      case 'transfer_status':      return const TransferStatusWidget();
+      case 'in_care':              return const InCareWidget();
+      case 'tank_cleaning':        return const TankCleaningWidget();
+      case 'fish_by_line':         return const FishByLineWidget();
+      case 'to_do':                return const ToDoWidget();
+      case 'transfer_timeline':    return const TransferTimelineWidget();
+      case 'cleaning_timeline':    return const TankCleaningTimelineWidget();
+      case 'maintenance_overview': return const MaintenanceOverviewWidget();
+      default:                     return const SizedBox.shrink();
     }
   }
 
-  // ── Desktop: 4-col × 2-row grid ────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // DESKTOP
+  // ══════════════════════════════════════════════════════════════════════════
 
   void _showDesktopWidgetPicker(int slotIndex) {
     final hasWidget = _desktopSlots[slotIndex] != null;
-    // Spans only apply to top-row slots (0–3); bottom slots use index as-is
     final isTopRow = slotIndex < 4;
     int dialogSpan = _desktopSpans[slotIndex] ?? 1;
 
@@ -303,84 +395,99 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Height selector (top-row slots only) ──────────────────
                 if (isTopRow) ...[
                   Row(children: [
                     const Icon(Icons.height, size: 16),
                     const SizedBox(width: 8),
                     const Text('Height:',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w500, fontSize: 13)),
+                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
                     const SizedBox(width: 12),
                     ChoiceChip(
                       label: const Text('1 row'),
                       selected: dialogSpan == 1,
-                      onSelected: (v) {
-                        if (v) setDs(() => dialogSpan = 1);
-                      },
+                      onSelected: (v) { if (v) setDs(() => dialogSpan = 1); },
                     ),
                     const SizedBox(width: 8),
                     ChoiceChip(
                       label: const Text('2 rows'),
                       selected: dialogSpan == 2,
-                      onSelected: (v) {
-                        if (v) setDs(() => dialogSpan = 2);
-                      },
+                      onSelected: (v) { if (v) setDs(() => dialogSpan = 2); },
                     ),
                   ]),
                   const Divider(height: 16),
                 ],
-                // ── Widget list ────────────────────────────────────────────
                 SizedBox(
-                  height: 240,
+                  height: 360,
                   child: ListView(
                     shrinkWrap: true,
-                    children: _availableWidgets
-                        .map((w) => ListTile(
-                              leading: Icon(w['icon'] as IconData),
-                              title: Text(w['name'] as String),
-                              selected:
-                                  _desktopSlots[slotIndex] == w['id'],
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              onTap: () async {
-                                final span = isTopRow ? dialogSpan : 1;
-                                setState(() {
-                                  _desktopSlots[slotIndex] =
-                                      w['id'] as String;
-                                  if (isTopRow) {
-                                    _desktopSpans[slotIndex] = span;
-                                    if (span == 2) {
-                                      // absorb the bottom slot
-                                      _desktopSlots[slotIndex + 4] = null;
+                    children: [
+                      for (final cat in _widgetCategories) ...[
+                        ...() {
+                          final ws = _availableWidgets
+                              .where((w) => w['cat'] == cat)
+                              .toList();
+                          if (ws.isEmpty) return <Widget>[];
+                          return [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 12, 4, 2),
+                              child: Row(children: [
+                                Text(cat.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.0,
+                                      color: Theme.of(ctx).colorScheme.outline,
+                                    )),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                    child: Divider(
+                                        color: Theme.of(ctx).dividerColor,
+                                        height: 1)),
+                              ]),
+                            ),
+                            for (final w in ws)
+                              ListTile(
+                                leading: Icon(w['icon'] as IconData),
+                                title: Text(w['name'] as String),
+                                selected: _desktopSlots[slotIndex] == w['id'],
+                                dense: true,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
+                                onTap: () async {
+                                  final span = isTopRow ? dialogSpan : 1;
+                                  setState(() {
+                                    _desktopSlots[slotIndex] =
+                                        w['id'] as String;
+                                    if (isTopRow) {
+                                      _desktopSpans[slotIndex] = span;
+                                      if (span == 2) {
+                                        _desktopSlots[slotIndex + 4] = null;
+                                      }
                                     }
-                                  }
-                                });
-                                final nav = Navigator.of(ctx);
-                                await _saveDesktopConfig();
-                                if (isTopRow) await _saveDesktopSpans();
-                                nav.pop();
-                              },
-                            ))
-                        .toList(),
+                                  });
+                                  final nav = Navigator.of(ctx);
+                                  await _saveDesktopConfig();
+                                  if (isTopRow) await _saveDesktopSpans();
+                                  nav.pop();
+                                },
+                              ),
+                          ];
+                        }(),
+                      ],
+                    ],
                   ),
                 ),
               ],
             ),
           ),
           actions: [
-            // Apply height change without changing the widget
-            if (hasWidget &&
-                isTopRow &&
-                dialogSpan != (_desktopSpans[slotIndex] ?? 1))
+            if (hasWidget && isTopRow && dialogSpan != (_desktopSpans[slotIndex] ?? 1))
               TextButton(
                 onPressed: () async {
                   final nav = Navigator.of(ctx);
                   setState(() {
                     _desktopSpans[slotIndex] = dialogSpan;
-                    if (dialogSpan == 2) {
-                      _desktopSlots[slotIndex + 4] = null;
-                    }
+                    if (dialogSpan == 2) _desktopSlots[slotIndex + 4] = null;
                   });
                   await _saveDesktopConfig();
                   await _saveDesktopSpans();
@@ -408,9 +515,7 @@ class _DashboardPageState extends State<DashboardPage> {
               label: const Text('Reset to Defaults'),
               onPressed: () async {
                 final nav = Navigator.of(ctx);
-                setState(() {
-                  _applyDesktopDefaults();
-                });
+                setState(() => _applyDesktopDefaults(_activeProfile));
                 await _saveDesktopConfig();
                 await _saveDesktopSpans();
                 nav.pop();
@@ -454,7 +559,6 @@ class _DashboardPageState extends State<DashboardPage> {
               )
             : Stack(children: [
                 Positioned.fill(child: _buildWidget(widgetType)),
-                // Small edit button top-right
                 Positioned(
                   top: 4, right: 4,
                   child: Material(
@@ -475,7 +579,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Grid fills the available height; each column handles its own span.
   Widget _buildDesktopGrid() {
     const cols = 4;
     const spacing = 12.0;
@@ -483,8 +586,8 @@ class _DashboardPageState extends State<DashboardPage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: List.generate(cols, (col) {
-        final topIdx = col;     // row 0: indices 0–3
-        final botIdx = col + 4; // row 1: indices 4–7
+        final topIdx = col;
+        final botIdx = col + 4;
         final span = _desktopSpans[topIdx] ?? 1;
 
         final Widget colContent = span == 2
@@ -507,175 +610,129 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // ── Mobile: reorderable list ───────────────────────────────────────────────
-
-  void _showMobileWidgetPicker() {
-    // Only show widgets not already on the list
-    final available = _availableWidgets
-        .where((w) => !_mobileWidgets.contains(w['id']))
-        .toList();
-
-    if (available.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All widgets are already on your dashboard')),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+  /// Profile selector bar — sits below the toolbar, desktop only.
+  Widget _buildProfileSelector() {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          // ── Numbered profile buttons ─────────────────────────────────────
+          ...List.generate(_kProfileCount, (i) {
+            final active = i == _activeProfile;
+            return Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: GestureDetector(
+                onTap: () => _switchProfile(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: active ? AppDS.accent : Colors.transparent,
+                    border: Border.all(
+                      color: active ? AppDS.accent : context.appBorder,
+                      width: 1.5,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${i + 1}',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: active ? Colors.white : context.appTextSecondary,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(children: [
-              const Text('Add Widget',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const Spacer(),
-              TextButton.icon(
-                icon: const Icon(Icons.restore, size: 14),
-                label: const Text('Reset', style: TextStyle(fontSize: 13)),
-                onPressed: () async {
-                  final nav = Navigator.of(ctx);
-                  setState(() => _applyMobileDefaults());
-                  await _saveMobileConfig();
-                  nav.pop();
-                },
+            );
+          }),
+          const SizedBox(width: 8),
+          Container(width: 1, height: 20, color: context.appBorder),
+          const SizedBox(width: 12),
+          // ── Editable profile title ───────────────────────────────────────
+          if (_editingTitle)
+            SizedBox(
+              width: 200,
+              height: 30,
+              child: TextField(
+                controller: _titleController,
+                focusNode: _titleFocusNode,
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: context.appTextPrimary,
+                ),
+                cursorColor: AppDS.accent,
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  filled: true,
+                  fillColor: context.appSurface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: context.appBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: context.appBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: AppDS.accent),
+                  ),
+                ),
+                onSubmitted: (_) => _commitTitleEdit(),
               ),
-            ]),
-            const SizedBox(height: 12),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: available.map((w) => ListTile(
-                  leading: Icon(w['icon'] as IconData),
-                  title: Text(w['name'] as String),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  onTap: () async {
-                    final nav = Navigator.of(ctx);
-                    setState(() => _mobileWidgets.add(w['id'] as String));
-                    await _saveMobileConfig();
-                    nav.pop();
-                  },
-                )).toList(),
+            )
+          else
+            GestureDetector(
+              onTap: _startTitleEdit,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _profileTitles[_activeProfile],
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.edit_outlined, size: 13, color: context.appTextMuted),
+                ],
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
-
-  Widget _buildMobileList() {
-    return ReorderableListView.builder(
-      shrinkWrap: true,
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 80),
-      itemCount: _mobileWidgets.length + 1, // +1 for the "Add" button at end
-      onReorder: (oldIndex, newIndex) async {
-        // Guard: don't reorder into/from the Add button slot
-        if (oldIndex >= _mobileWidgets.length ||
-            newIndex > _mobileWidgets.length) {
-          return;
-        }
-        setState(() {
-          if (newIndex > oldIndex) newIndex--;
-          final item = _mobileWidgets.removeAt(oldIndex);
-          _mobileWidgets.insert(newIndex, item);
-        });
-        await _saveMobileConfig();
-      },
-      itemBuilder: (ctx, i) {
-        // Last slot: Add Widget button (non-reorderable)
-        if (i == _mobileWidgets.length) {
-          return ListTile(
-            key: const ValueKey('__add__'),
-            leading: const Icon(Icons.add_circle_outline),
-            title: const Text('Add Widget'),
-            onTap: _showMobileWidgetPicker,
-          );
-        }
-
-        final widgetId = _mobileWidgets[i];
-        final meta = _availableWidgets.firstWhere(
-          (w) => w['id'] == widgetId,
-          orElse: () => {'id': widgetId, 'name': widgetId, 'icon': Icons.widgets},
-        );
-
-        return Padding(
-          key: ValueKey(widgetId),
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Widget header row with drag handle + remove
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(children: [
-                  Icon(meta['icon'] as IconData,
-                      size: 14, color: Colors.grey.shade500),
-                  const SizedBox(width: 6),
-                  Text(meta['name'] as String,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500)),
-                  const Spacer(),
-                  // Remove button
-                  GestureDetector(
-                    onTap: () async {
-                      setState(() => _mobileWidgets.removeAt(i));
-                      await _saveMobileConfig();
-                    },
-                    child: Icon(Icons.close,
-                        size: 14, color: Colors.grey.shade400),
-                  ),
-                  const SizedBox(width: 8),
-                  // Drag handle
-                  Icon(Icons.drag_handle,
-                      size: 16, color: Colors.grey.shade400),
-                ]),
-              ),
-              // Widget sizes itself naturally — no fixed height
-              _buildWidget(widgetId),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // ── Header ─────────────────────────────────────────────────────────────────
 
   Widget _buildUpdateButton() {
     switch (_updateStatus) {
       case _UpdateStatus.checking:
         return SizedBox(
           width: 16, height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2, color: context.appTextSecondary),
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: context.appTextSecondary),
         );
       case _UpdateStatus.upToDate:
         return Row(mainAxisSize: MainAxisSize.min, children: [
           const Icon(Icons.check_circle, size: 15, color: AppDS.green),
           const SizedBox(width: 5),
-          Text('Application up to date${_currentVersion != null ? ' (v$_currentVersion)' : ''}',
-              style: TextStyle(fontSize: 12, color: AppDS.green,
-                  fontWeight: FontWeight.w600)),
+          Text(
+            'Application up to date${_currentVersion != null ? ' (v$_currentVersion)' : ''}',
+            style: const TextStyle(
+                fontSize: 12, color: AppDS.green, fontWeight: FontWeight.w600),
+          ),
         ]);
       case _UpdateStatus.updateAvailable:
         return Column(
@@ -693,12 +750,14 @@ class _DashboardPageState extends State<DashboardPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: _openDownload,
               icon: const Icon(Icons.download_rounded, size: 15),
               label: Text('Download v${_latestVersion ?? ''}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600)),
             ),
           ],
         );
@@ -717,7 +776,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 Icon(Icons.refresh, size: 14, color: context.appTextMuted),
                 const SizedBox(width: 4),
                 Text('Retry',
-                    style: TextStyle(fontSize: 12, color: context.appTextMuted)),
+                    style: TextStyle(
+                        fontSize: 12, color: context.appTextMuted)),
               ]),
             ),
           ),
@@ -725,8 +785,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Widget _buildToolbar() {
-    final isMobile = MediaQuery.of(context).size.width < 700;
+  Widget _buildToolbar({bool isMobile = false}) {
     return Container(
       height: 56,
       decoration: BoxDecoration(
@@ -743,11 +802,14 @@ class _DashboardPageState extends State<DashboardPage> {
             onPressed: openAppDrawer,
           ),
         ],
-        const Icon(Icons.space_dashboard_outlined, size: 18, color: Color(0xFF6366F1)),
+        const Icon(Icons.space_dashboard_outlined,
+            size: 18, color: Color(0xFF6366F1)),
         const SizedBox(width: 8),
-        Text('Dashboard', style: GoogleFonts.spaceGrotesk(
-          fontSize: 16, fontWeight: FontWeight.w600,
-          color: context.appTextPrimary)),
+        Text('Dashboard',
+            style: GoogleFonts.spaceGrotesk(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: context.appTextPrimary)),
         const Spacer(),
         if (_isDesktop) _buildUpdateButton(),
         const SizedBox(width: 12),
@@ -761,7 +823,8 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             child: Padding(
               padding: const EdgeInsets.all(6),
-              child: FaIcon(FontAwesomeIcons.github, size: 18, color: context.appTextSecondary),
+              child: FaIcon(FontAwesomeIcons.github,
+                  size: 18, color: context.appTextSecondary),
             ),
           ),
         ),
@@ -769,23 +832,205 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // ── BUILD ──────────────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // MOBILE
+  // ══════════════════════════════════════════════════════════════════════════
 
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 700;
+  void _showMobileWidgetPicker() {
+    final available = _availableWidgets
+        .where((w) => !_mobileWidgets.contains(w['id']))
+        .toList();
 
+    if (available.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('All widgets are already on your dashboard')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(children: [
+              const Text('Add Widget',
+                  style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Spacer(),
+              TextButton.icon(
+                icon: const Icon(Icons.restore, size: 14),
+                label: const Text('Reset', style: TextStyle(fontSize: 13)),
+                onPressed: () async {
+                  final nav = Navigator.of(ctx);
+                  setState(() => _applyMobileDefaults());
+                  await _saveMobileConfig();
+                  nav.pop();
+                },
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final cat in _widgetCategories) ...[
+                    ...() {
+                      final ws = available
+                          .where((w) => w['cat'] == cat)
+                          .toList();
+                      if (ws.isEmpty) return <Widget>[];
+                      return [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 12, 4, 2),
+                          child: Row(children: [
+                            Text(cat.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.0,
+                                  color:
+                                      Theme.of(ctx).colorScheme.outline,
+                                )),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Divider(
+                                    color: Theme.of(ctx).dividerColor,
+                                    height: 1)),
+                          ]),
+                        ),
+                        for (final w in ws)
+                          ListTile(
+                            leading: Icon(w['icon'] as IconData),
+                            title: Text(w['name'] as String),
+                            dense: true,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            onTap: () async {
+                              final nav = Navigator.of(ctx);
+                              setState(() =>
+                                  _mobileWidgets.add(w['id'] as String));
+                              await _saveMobileConfig();
+                              nav.pop();
+                            },
+                          ),
+                      ];
+                    }(),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileList() {
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 80),
+      itemCount: _mobileWidgets.length + 1,
+      onReorder: (oldIndex, newIndex) async {
+        if (oldIndex >= _mobileWidgets.length ||
+            newIndex > _mobileWidgets.length) { return; }
+        setState(() {
+          if (newIndex > oldIndex) newIndex--;
+          final item = _mobileWidgets.removeAt(oldIndex);
+          _mobileWidgets.insert(newIndex, item);
+        });
+        await _saveMobileConfig();
+      },
+      itemBuilder: (ctx, i) {
+        if (i == _mobileWidgets.length) {
+          return ListTile(
+            key: const ValueKey('__add__'),
+            leading: const Icon(Icons.add_circle_outline),
+            title: const Text('Add Widget'),
+            onTap: _showMobileWidgetPicker,
+          );
+        }
+
+        final widgetId = _mobileWidgets[i];
+        final meta = _availableWidgets.firstWhere(
+          (w) => w['id'] == widgetId,
+          orElse: () =>
+              {'id': widgetId, 'name': widgetId, 'icon': Icons.widgets},
+        );
+
+        return Padding(
+          key: ValueKey(widgetId),
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(children: [
+                  Icon(meta['icon'] as IconData,
+                      size: 14, color: Colors.grey.shade500),
+                  const SizedBox(width: 6),
+                  Text(meta['name'] as String,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500)),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () async {
+                      setState(() => _mobileWidgets.removeAt(i));
+                      await _saveMobileConfig();
+                    },
+                    child:
+                        Icon(Icons.close, size: 14, color: Colors.grey.shade400),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.drag_handle,
+                      size: 16, color: Colors.grey.shade400),
+                ]),
+              ),
+              _buildWidget(widgetId),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TOP-LEVEL VIEW BUILDERS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildDesktopView() {
     return Column(
       children: [
         _buildToolbar(),
+        _buildProfileSelector(),
         Expanded(
           child: Padding(
-            padding: EdgeInsets.all(isMobile ? 12 : 24),
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Pending users banner ───────────────────────────────────
-                if (widget.pendingUsers.isNotEmpty) ...[
+                if (widget.pendingUsers.isNotEmpty)
                   Card(
                     color: Theme.of(context).colorScheme.errorContainer,
                     margin: const EdgeInsets.only(bottom: 16),
@@ -799,19 +1044,53 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ),
                   ),
-                ],
-
-                // ── Grid (desktop) or List (mobile) ────────────────────────
-                Expanded(
-                  child: isMobile
-                      ? _buildMobileList()
-                      : _buildDesktopGrid(),
-                ),
+                Expanded(child: _buildDesktopGrid()),
               ],
             ),
           ),
         ),
       ],
     );
+  }
+
+  Widget _buildMobileView() {
+    return Column(
+      children: [
+        _buildToolbar(isMobile: true),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.pendingUsers.isNotEmpty)
+                  Card(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: ListTile(
+                      leading: const Icon(Icons.person_add_outlined),
+                      title: Text(
+                          '${widget.pendingUsers.length} user(s) awaiting approval'),
+                      trailing: TextButton(
+                        onPressed: widget.onGoToPendingUsers,
+                        child: const Text('Review'),
+                      ),
+                    ),
+                  ),
+                Expanded(child: _buildMobileList()),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+    return isMobile ? _buildMobileView() : _buildDesktopView();
   }
 }

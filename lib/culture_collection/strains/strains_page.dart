@@ -3,6 +3,7 @@
 // Has its own Scaffold + AppBar (exception to the no-scaffold page rule).
 
 
+import 'dart:async';
 import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import '/theme/module_permission.dart';
@@ -21,6 +22,7 @@ import '/theme/theme.dart';
 import 'strains_grid_widgets.dart';
 import 'strains_appbars.dart';
 import 'strains_toolbar.dart';
+import '../../backups/backup_service.dart';
 import '../../requests/requests_page.dart';
 import '../../labels/label_page.dart';
 
@@ -358,6 +360,7 @@ class _StrainsPageState extends State<StrainsPage> {
             .update({'strain_next_transfer': null})
             .eq('strain_id', id)),
       ]);
+      unawaited(BackupService.instance.notifyCrudChange('strains'));
       if (mounted) {
         _applyFilter();
         final total = toFix.length + toClear.length;
@@ -481,6 +484,7 @@ class _StrainsPageState extends State<StrainsPage> {
           .from('strains')
           .update(patch)
           .eq('strain_id', id);
+      unawaited(BackupService.instance.notifyCrudChange('strains'));
       final idx = _rows.indexWhere((r) => r['strain_id'] == id);
       if (idx != -1) {
         _rows[idx][key] = value.isEmpty ? null : value;
@@ -574,6 +578,7 @@ class _StrainsPageState extends State<StrainsPage> {
       try {
         await Supabase.instance.client.from('strains')
             .update({'strain_last_transfer': dateStr}).eq('strain_periodicity', periodicity);
+        unawaited(BackupService.instance.notifyCrudChange('strains'));
         if (mounted) { _snack('Updated all strains with $periodicity-day cycle'); _load(); }
       } catch (e) { if (mounted) _snack('Error: $e'); }
     }
@@ -728,6 +733,7 @@ class _StrainsPageState extends State<StrainsPage> {
       final res = await Supabase.instance.client.from('strains')
           .insert({'strain_sample_code': selId, 'strain_code': codeCtrl.text.isEmpty ? null : codeCtrl.text})
           .select().single();
+      unawaited(BackupService.instance.notifyCrudChange('strains'));
       if (mounted) {
         Navigator.push(context, MaterialPageRoute(builder: (_) =>
             StrainDetailPage(strainId: res['strain_code'], onSaved: _load)))

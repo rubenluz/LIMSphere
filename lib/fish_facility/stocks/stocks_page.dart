@@ -1,6 +1,7 @@
 // stocks_page.dart - Fish stock inventory with rack visualisation, status
 // filters, links to lines, add/edit/transfer workflows.
 
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,6 +20,7 @@ import '/theme/grid_widgets.dart';
 import '../add_stock_dialog.dart';
 import '../../requests/requests_page.dart';
 import '../../labels/label_page.dart';
+import '../../backups/backup_service.dart';
 
 
 
@@ -273,6 +275,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
                   'fish_stocks_line_id': _lineIdByName[s.line],
                 })
                 .eq('fish_stocks_id', s.id!);
+            unawaited(BackupService.instance.notifyCrudChange('fish_stocks'));
           } catch (e) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -318,6 +321,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
           .from('fish_stocks')
           .update({dbCol: dbVal})
           .eq('fish_stocks_id', s.id!);
+      unawaited(BackupService.instance.notifyCrudChange('fish_stocks'));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1132,6 +1136,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
               .from('fish_stocks')
               .update({dbCol: picked.toIso8601String().substring(0, 10)})
               .eq('fish_stocks_id', s.id!);
+          unawaited(BackupService.instance.notifyCrudChange('fish_stocks'));
         } catch (e) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

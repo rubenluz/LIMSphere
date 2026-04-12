@@ -5,6 +5,7 @@
 // Note: on the tank label, show feeding frequency before food type, e.g. '2x - GEMMA 300'.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'dart:async';
 import 'dart:io';
 import '/core/data_cache.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ import '../shared_widgets.dart';
 import '../stocks/stocks_detail_page.dart';
 import '/theme/theme.dart';
 import '../add_stock_dialog.dart';
+import '../../backups/backup_service.dart';
 import '../../labels/label_page.dart';
 import 'tanks_widgets/tanks_widget_active_stocks.dart';
 import 'tanks_widgets/tanks_widget_active_fish_lines.dart';
@@ -262,6 +264,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
           .from('fish_stocks')
           .delete()
           .eq('fish_stocks_tank_id', tank.zebraTankId);
+      unawaited(BackupService.instance.notifyCrudChange('fish_stocks'));
       final empty = tank.copyWith(
         zebraStatus: 'empty', zebraLine: null,
         zebraMales: 0, zebraFemales: 0, zebraJuveniles: 0,
@@ -318,6 +321,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
             .from('fish_stocks')
             .upsert(payload, onConflict: 'fish_stocks_tank_id');
       }
+      unawaited(BackupService.instance.notifyCrudChange('fish_stocks'));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -675,34 +679,42 @@ class _FishTanksPageState extends State<FishTanksPage> {
     final hasFish  = _hasFish(tank);
     final isSent   = _isSentinel(tank);
 
-    // Colors — light rack background, vivid fills for contrast
+    final bool dark = context.isDark;
+    // Cell backgrounds — richer alpha in dark mode for visibility
     final Color bg, border;
     if (isSent) {
-      bg     = AppDS.pink.withValues(alpha:0.22);
-      border = AppDS.pink.withValues(alpha:0.80);
+      bg     = AppDS.pink.withValues(alpha: dark ? 0.35 : 0.22);
+      border = AppDS.pink.withValues(alpha: dark ? 0.90 : 0.80);
     } else {
       switch (tank.zebraStatus) {
         case 'quarantine':
-          bg = AppDS.yellow.withValues(alpha:0.22); border = AppDS.yellow.withValues(alpha:0.75); break;
+          bg     = AppDS.yellow.withValues(alpha: dark ? 0.35 : 0.22);
+          border = AppDS.yellow.withValues(alpha: dark ? 0.90 : 0.75);
+          break;
         case 'retired':
-          bg = AppDS.red.withValues(alpha:0.12);    border = AppDS.red.withValues(alpha:0.55);    break;
+          bg     = AppDS.red.withValues(alpha: dark ? 0.25 : 0.12);
+          border = AppDS.red.withValues(alpha: dark ? 0.70 : 0.55);
+          break;
         case 'active':
           if (hasFish) {
-            bg = AppDS.green.withValues(alpha:0.30); border = AppDS.green.withValues(alpha:0.65);
+            bg     = AppDS.green.withValues(alpha: dark ? 0.45 : 0.30);
+            border = AppDS.green.withValues(alpha: dark ? 0.80 : 0.65);
           } else {
-            bg = AppDS.accent.withValues(alpha:0.12); border = AppDS.accent.withValues(alpha:0.40);
+            bg     = AppDS.accent.withValues(alpha: dark ? 0.22 : 0.12);
+            border = AppDS.accent.withValues(alpha: dark ? 0.55 : 0.40);
           }
           break;
         default: // empty
-          bg = (context.isDark ? AppDS.surface3 : Colors.white).withValues(alpha:0.80); border = const Color(0xFFBDD4E8);
+          bg     = (dark ? AppDS.surface3 : Colors.white).withValues(alpha: 0.80);
+          border = dark ? const Color(0xFF334155) : const Color(0xFFBDD4E8);
       }
     }
 
-    // Text colors: dark on light rack background
-    const kTextLine   = Color(0xFF0F172A);  // occupied line name
-    const kTextNum    = Color(0xFF334155);  // fish counts
-    const kTextCol    = Color(0xFF64748B);  // column number
-    const kTextColEmp = Color(0xFFB0CADA); // column on empty
+    // Text colors — adaptive for dark/light mode
+    final kTextLine   = dark ? AppDS.textPrimary    : const Color(0xFF0F172A);
+    final kTextNum    = dark ? AppDS.textPrimary     : const Color(0xFF334155);
+    final kTextCol    = dark ? AppDS.textSecondary  : const Color(0xFF64748B);
+    final kTextColEmp = dark ? AppDS.textMuted      : const Color(0xFFB0CADA);
 
     // Health dot
     final Color healthDot = switch (tank.zebraHealthStatus) {
@@ -762,7 +774,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
                           '♂${tank.zebraMales ?? 0} ♀${tank.zebraFemales ?? 0}'
                           '${(tank.zebraJuveniles ?? 0) > 0 ? ' J${tank.zebraJuveniles}' : ''}',
                           style: GoogleFonts.jetBrainsMono(
-                            fontSize: 9.0, color: kTextNum),
+                            fontSize: 9.0, fontWeight: FontWeight.w700, color: kTextNum),
                           overflow: TextOverflow.clip)
                       else
                         Text('no fish',
@@ -773,7 +785,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
                         Text(
                           tank.zebraFoodType!,
                           style: GoogleFonts.spaceGrotesk(
-                            fontSize: 8.0, color: const Color(0xFF9B6B1A)),
+                            fontSize: 8.0, fontWeight: FontWeight.w600, color: dark ? AppDS.yellow : const Color(0xFF9B6B1A)),
                           overflow: TextOverflow.ellipsis, maxLines: 1),
                         if (tank.zebraFeedingSchedule?.isNotEmpty == true ||
                             tank.zebraFoodAmount != null)
@@ -785,7 +797,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
                                 '(${tank.zebraFoodAmount! % 1 == 0 ? tank.zebraFoodAmount!.toInt() : tank.zebraFoodAmount}${tank.zebraFeedingAmountUnit != null ? ' ${tank.zebraFeedingAmountUnit}' : ''})',
                             ].join(' '),
                             style: GoogleFonts.spaceGrotesk(
-                              fontSize: 8.0, color: const Color(0xFF9B6B1A)),
+                              fontSize: 8.0, fontWeight: FontWeight.w600, color: dark ? AppDS.yellow : const Color(0xFF9B6B1A)),
                             overflow: TextOverflow.ellipsis, maxLines: 1),
                       ],
                       if (tank.zebraResponsible?.isNotEmpty == true)
@@ -1329,6 +1341,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
                   .from('fish_stocks')
                   .delete()
                   .eq('fish_stocks_rack', rackId);
+              unawaited(BackupService.instance.notifyCrudChange('fish_stocks'));
             } catch (_) {}
             final remaining = _racks.keys.where((k) => k != rackId).toList()..sort();
             setState(() {

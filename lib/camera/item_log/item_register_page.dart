@@ -3,6 +3,7 @@
 // Desktop: manual brand + reference entry → DB lookup.
 // Found → update quantity dialog. Not found → create reagent dialog.
 
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+import '/backups/backup_service.dart';
 import '/theme/theme.dart';
 import '/resources/reagents/reagent_model.dart';
 
@@ -161,7 +163,7 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
                   color: context.appTextPrimary,
                   fontWeight: FontWeight.w600)),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(r.name,
+            Text(r.name ?? '—',
                 style: GoogleFonts.spaceGrotesk(
                     color: context.appTextSecondary, fontSize: 14)),
             if (r.brand != null)
@@ -208,6 +210,7 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
                 DateTime.now().toUtc().toIso8601String(),
           })
           .eq('reagent_id', r.id);
+      unawaited(BackupService.instance.notifyCrudChange('reagents'));
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -347,6 +350,7 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
         if (lotCtrl.text.isNotEmpty)
           'reagent_lot_number': lotCtrl.text.trim(),
       });
+      unawaited(BackupService.instance.notifyCrudChange('reagents'));
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -731,7 +735,7 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(r.name,
+                Text(r.name ?? '—',
                     style: GoogleFonts.spaceGrotesk(
                         color: context.appTextPrimary,
                         fontSize: 14,

@@ -2,6 +2,7 @@
 // filter panel, inline editing, CSV export.
 // Widget and dialog classes in reagents_widgets.dart (part).
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '/theme/module_permission.dart';
 import '/theme/grid_widgets.dart';
@@ -13,29 +14,33 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '/core/data_cache.dart';
 import '/supabase/supabase_manager.dart';
 import '/theme/theme.dart';
+import '../../backups/backup_service.dart';
 import '../../camera/qr_scanner/qr_code_rules.dart';
 import 'reagent_model.dart';
 import 'reagent_detail_page.dart';
+import 'reagent_excel_import_page.dart';
 import '../../requests/requests_page.dart';
 
 part 'reagents_widgets.dart';
 
 // ── Column widths ─────────────────────────────────────────────────────────────
-const _colBtn   = 72.0;
-const _colCode  = 90.0;
-const _colName  = 210.0;
-const _colSupp  = 140.0;
-const _colBrand = 130.0;
-const _colRef   = 120.0;
-const _colType  = 110.0;
-const _colLoc   = 130.0;
-const _colSize  = 90.0;
-const _colUnit  = 70.0;
-const _colAmt   = 80.0;
-const _colMin   = 80.0;
-const _tableW   = _colBtn + _colCode + _colName + _colSupp + _colBrand +
-                  _colRef + _colType + _colLoc + _colSize + _colUnit +
-                  _colAmt + _colMin;
+const _colBtn     = 60.0;
+const _colCode    = 90.0;
+const _colType    = 200.0;
+const _colName    = 190.0;
+const _colState   = 80.0;
+const _colFormula = 150.0;
+const _colOpened  = 100.0;
+const _colLoc     = 130.0;
+const _colAmt     = 80.0;
+const _colMin     = 80.0;
+const _colUnit    = 70.0;
+const _colSize    = 100.0;
+const _colBrand   = 120.0;
+const _colSupp    = 130.0;
+const _tableW     = _colBtn + _colCode + _colType + _colName + _colState +
+                    _colFormula + _colOpened + _colLoc + _colAmt + _colMin +
+                    _colUnit + _colSize + _colBrand + _colSupp;
 
 class ReagentsPage extends StatefulWidget {
   const ReagentsPage({super.key});
@@ -52,7 +57,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
   String _typeFilter = 'all';
   String _statusFilter = 'all';
   bool _showFilters = false;
-  String _sortKey = 'name';
+  String _sortKey = 'code';
   bool _sortAsc = true;
   final _searchCtrl = TextEditingController();
   Map<String, dynamic>? _editingCell;
@@ -128,7 +133,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
       if (_statusFilter == 'expiring' && !r.isExpiringSoon) return false;
       if (_statusFilter == 'low' && !r.isLowStock) return false;
       if (q.isEmpty) return true;
-      return r.name.toLowerCase().contains(q) ||
+      return (r.name?.toLowerCase().contains(q) ?? false) ||
           (r.code?.toLowerCase().contains(q) ?? false) ||
           (r.brand?.toLowerCase().contains(q) ?? false) ||
           (r.reference?.toLowerCase().contains(q) ?? false) ||
@@ -136,25 +141,43 @@ class _ReagentsPageState extends State<ReagentsPage> {
           (r.supplier?.toLowerCase().contains(q) ?? false);
     }).toList();
 
+    // Natural sort for code: splits "BR0001" into prefix "BR" + number 1,
+    // so BR0002 < BR0010 instead of lexicographic BR0010 < BR0002.
+    int naturalCode(String a, String b) {
+      final re = RegExp(r'^([A-Za-z]*)(\d*)(.*)$');
+      final ma = re.firstMatch(a);
+      final mb = re.firstMatch(b);
+      final prefixCmp = (ma?.group(1) ?? '').compareTo(mb?.group(1) ?? '');
+      if (prefixCmp != 0) return prefixCmp;
+      final na = int.tryParse(ma?.group(2) ?? '') ?? 0;
+      final nb = int.tryParse(mb?.group(2) ?? '') ?? 0;
+      if (na != nb) return na.compareTo(nb);
+      return (ma?.group(3) ?? '').compareTo(mb?.group(3) ?? '');
+    }
+
     result.sort((a, b) {
-      dynamic av, bv;
+      int c;
       switch (_sortKey) {
-        case 'code':          av = a.code ?? '';          bv = b.code ?? '';          break;
-        case 'name':          av = a.name;                bv = b.name;                break;
-        case 'supplier':      av = a.supplier ?? '';      bv = b.supplier ?? '';      break;
-        case 'brand':         av = a.brand ?? '';         bv = b.brand ?? '';         break;
-        case 'reference':     av = a.reference ?? '';     bv = b.reference ?? '';     break;
-        case 'type':          av = a.type;                bv = b.type;                break;
-        case 'location':      av = a.locationName ?? '';  bv = b.locationName ?? '';  break;
-        case 'concentration': av = a.concentration ?? ''; bv = b.concentration ?? ''; break;
-        case 'unit':          av = a.unit ?? '';          bv = b.unit ?? '';          break;
-        case 'quantity':      av = a.quantity ?? -1.0;    bv = b.quantity ?? -1.0;    break;
-        case 'quantityMin':   av = a.quantityMin ?? -1.0; bv = b.quantityMin ?? -1.0; break;
-        default:              av = a.name;                bv = b.name;
+        case 'code':
+          // Rows without a code sort to the end.
+          if (a.code == null && b.code == null) { c = 0; break; }
+          if (a.code == null) { c = 1; break; }
+          if (b.code == null) { c = -1; break; }
+          c = naturalCode(a.code!, b.code!);
+        case 'name':          c = (a.name ?? '').compareTo(b.name ?? '');
+        case 'supplier':      c = (a.supplier ?? '').compareTo(b.supplier ?? '');
+        case 'brand':         c = (a.brand ?? '').compareTo(b.brand ?? '');
+        case 'type':          c = a.type.compareTo(b.type);
+        case 'location':      c = (a.locationName ?? '').compareTo(b.locationName ?? '');
+        case 'concentration': c = (a.concentration ?? '').compareTo(b.concentration ?? '');
+        case 'unit':          c = (a.unit ?? '').compareTo(b.unit ?? '');
+        case 'quantity':      c = (a.quantity ?? -1.0).compareTo(b.quantity ?? -1.0);
+        case 'quantityMin':   c = (a.quantityMin ?? -1.0).compareTo(b.quantityMin ?? -1.0);
+        case 'physicalState': c = (a.physicalState ?? '').compareTo(b.physicalState ?? '');
+        case 'openedDate':    c = (a.openedDate ?? DateTime(0)).compareTo(b.openedDate ?? DateTime(0));
+        case 'formula':       c = (a.formula ?? '').compareTo(b.formula ?? '');
+        default:              c = (a.name ?? '').compareTo(b.name ?? '');
       }
-      final c = (av is num && bv is num)
-          ? av.compareTo(bv)
-          : av.toString().compareTo(bv.toString());
       return _sortAsc ? c : -c;
     });
 
@@ -211,7 +234,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
     String? dbCol;
     dynamic dbVal;
     switch (key) {
-      case 'name':          dbCol = 'reagent_name';          dbVal = v.isEmpty ? r.name : v; break;
+      case 'name':          dbCol = 'reagent_name';          dbVal = v.isEmpty ? null : v; break;
       case 'code':          dbCol = 'reagent_code';          dbVal = v.isEmpty ? null : v; break;
       case 'supplier':      dbCol = 'reagent_supplier';      dbVal = v.isEmpty ? null : v; break;
       case 'brand':         dbCol = 'reagent_brand';         dbVal = v.isEmpty ? null : v; break;
@@ -228,6 +251,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
           .from('reagents')
           .update({dbCol: dbVal, 'reagent_updated_at': DateTime.now().toUtc().toIso8601String()})
           .eq('reagent_id', r.id);
+      unawaited(BackupService.instance.notifyCrudChange('reagents'));
       if (mounted) _load();
     } catch (e) {
       if (mounted) {
@@ -277,7 +301,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
         'ID,Code,Name,Supplier,Brand,Reference,CAS,Type,Quantity,Unit,Storage,Location,Lot,Expiry,Responsible');
     for (final r in _filtered) {
       buf.writeln(
-          '${r.id},"${r.code ?? ''}","${r.name}","${r.supplier ?? ''}","${r.brand ?? ''}","${r.reference ?? ''}","${r.casNumber ?? ''}","${r.type}","${r.quantity ?? ''}","${r.unit ?? ''}","${r.storageTemp ?? ''}","${r.locationName ?? ''}","${r.lotNumber ?? ''}","${r.expiryDate != null ? r.expiryDate!.toIso8601String().substring(0, 10) : ''}","${r.responsible ?? ''}"');
+          '${r.id},"${r.code ?? ''}","${r.name ?? ''}","${r.supplier ?? ''}","${r.brand ?? ''}","${r.reference ?? ''}","${r.casNumber ?? ''}","${r.type}","${r.quantity ?? ''}","${r.unit ?? ''}","${r.storageTemp ?? ''}","${r.locationName ?? ''}","${r.lotNumber ?? ''}","${r.expiryDate != null ? r.expiryDate!.toIso8601String().substring(0, 10) : ''}","${r.responsible ?? ''}"');
     }
     try {
       final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
@@ -393,6 +417,22 @@ class _ReagentsPageState extends State<ReagentsPage> {
                   ),
                 ),
             ]),
+          ),
+          Tooltip(
+            message: 'Import from Excel',
+            child: IconButton(
+              icon: Icon(Icons.upload_file_outlined,
+                  color: context.appTextSecondary, size: 18),
+              onPressed: () async {
+                if (!context.canEditModule) { context.warnReadOnly(); return; }
+                final imported = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ReagentExcelImportPage()),
+                );
+                if (imported == true) _load();
+              },
+            ),
           ),
           Tooltip(
             message: 'Export CSV',
@@ -531,11 +571,25 @@ class _ReagentsPageState extends State<ReagentsPage> {
                       ],
                     ),
                   )
-                : Column(children: [
+                : Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                  child: Column(children: [
                     Expanded(
                       child: Row(children: [
                         Expanded(
-                          child: NotificationListener<ScrollNotification>(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: context.appSurface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: context.appBorder),
+                              boxShadow: [BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              )],
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: NotificationListener<ScrollNotification>(
                             onNotification: (n) {
                               if (n is ScrollUpdateNotification) {
                                 if (n.metrics.axis == Axis.horizontal) {
@@ -559,27 +613,25 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                   // ── Header ─────────────────────────────
                                   Container(
                                     height: AppDS.tableHeaderH,
-                                    decoration: BoxDecoration(
-                                      color: context.appHeaderBg,
-                                      border: Border(
-                                          bottom: BorderSide(
-                                              color: context.appBorder)),
-                                    ),
+                                    color: context.appHeaderBg,
                                     child: Row(children: [
                                       const SizedBox(width: _colBtn),
-                                      SizedBox(width: _colCode,  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'CODE', 'code'))),
-                                      SizedBox(width: _colName,  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'NAME', 'name'))),
-                                      SizedBox(width: _colSupp,  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'SUPPLIER', 'supplier'))),
-                                      SizedBox(width: _colBrand, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'BRAND', 'brand'))),
-                                      SizedBox(width: _colRef,   child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'REFERENCE', 'reference'))),
-                                      SizedBox(width: _colType,  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'TYPE', 'type'))),
-                                      SizedBox(width: _colLoc,   child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'LOCATION', 'location'))),
-                                      SizedBox(width: _colSize,  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'SIZE', 'concentration'))),
-                                      SizedBox(width: _colUnit,  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'UNIT', 'unit'))),
-                                      SizedBox(width: _colAmt,   child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'AMOUNT', 'quantity'))),
-                                      SizedBox(width: _colMin,   child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'MIN QTY', 'quantityMin'))),
+                                      SizedBox(width: _colCode,    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'CODE',     'code'))),
+                                      SizedBox(width: _colType,    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'TYPE',     'type'))),
+                                      SizedBox(width: _colName,    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'NAME',     'name'))),
+                                      SizedBox(width: _colState,   child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'STATE',    'physicalState'))),
+                                      SizedBox(width: _colFormula, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'FORMULA',  'formula'))),
+                                      SizedBox(width: _colOpened,  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'OPENED',   'openedDate'))),
+                                      SizedBox(width: _colLoc,     child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'LOCATION', 'location'))),
+                                      SizedBox(width: _colAmt,     child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'AMOUNT',   'quantity'))),
+                                      SizedBox(width: _colMin,     child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'MIN QTY',  'quantityMin'))),
+                                      SizedBox(width: _colUnit,    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'UNIT',     'unit'))),
+                                      SizedBox(width: _colSize,    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'CONC.',    'concentration'))),
+                                      SizedBox(width: _colBrand,   child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'BRAND',    'brand'))),
+                                      SizedBox(width: _colSupp,    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'SUPPLIER', 'supplier'))),
                                     ]),
                                   ),
+                                  Container(height: 1, color: context.appBorder),
                                   // ── Rows ───────────────────────────────
                                   Expanded(
                                     child: ListView.builder(
@@ -602,7 +654,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                               showQuickRequestDialog(
                                             context,
                                             type: 'reagents',
-                                            prefillTitle: r.name,
+                                            prefillTitle: r.name ?? '',
                                           ),
                                           editingCell: _editingCell,
                                           editController: _editController,
@@ -616,6 +668,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                               ),
                             ),
                           ),
+                        ),
                         ),
                         // ── Vertical thumb ──────────────────────────────
                         AppVerticalThumb(
@@ -648,6 +701,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                       },
                     ),
                   ]),
+                ),
       ),
     ]);
   }

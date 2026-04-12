@@ -168,6 +168,51 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
     }
   }
 
+  Future<void> _delete() async {
+    final name = _loc?.name ?? 'this location';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.appSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Delete Location?',
+            style: GoogleFonts.spaceGrotesk(
+                color: ctx.appTextPrimary, fontWeight: FontWeight.w600)),
+        content: Text(
+          'This will permanently delete "$name". This cannot be undone.',
+          style: GoogleFonts.spaceGrotesk(
+              color: ctx.appTextSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel',
+                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppDS.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete', style: GoogleFonts.spaceGrotesk()),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await Supabase.instance.client
+          .from('storage_locations')
+          .delete()
+          .eq('location_id', widget.locationId);
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      _snack('Delete failed: $e');
+    }
+  }
+
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -203,6 +248,11 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
               icon: const Icon(Icons.qr_code, size: 20),
               tooltip: 'QR Code',
               onPressed: () => _showQr(loc),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20, color: AppDS.red),
+              tooltip: 'Delete',
+              onPressed: _delete,
             ),
             // Save
             _saving

@@ -2,11 +2,14 @@
 // maintenance, cryopreservation, molecular data, bioactivity.
 // Widget classes in strain_detail_widgets.dart (part).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../samples/sample_detail_page.dart';
+import '../../backups/backup_service.dart';
 import '/theme/theme.dart';
 import '/supabase/supabase_manager.dart';
 import '../../camera/qr_scanner/qr_code_rules.dart';
@@ -435,6 +438,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
           .from('strains')
           .update(update)
           .eq('strain_id', widget.strainId);
+      unawaited(BackupService.instance.notifyCrudChange('strains'));
       widget.onSaved?.call();
       _snack('Saved successfully.');
     } catch (e) {
@@ -487,6 +491,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
           .from('strains')
           .delete()
           .eq('strain_id', widget.strainId);
+      unawaited(BackupService.instance.notifyCrudChange('strains'));
       widget.onSaved?.call();
       if (mounted) Navigator.pop(context);
     } catch (e) {

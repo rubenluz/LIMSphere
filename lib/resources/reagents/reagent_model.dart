@@ -4,7 +4,7 @@
 class ReagentModel {
   final int id;
   final String? code;
-  final String name;
+  final String? name;
   final String? brand;
   final String? reference;
   final String? casNumber;
@@ -24,15 +24,17 @@ class ReagentModel {
   final String? supplier;
   final String? hazard;
   final String? responsible;
+  final String? formula;
   final String? notes;
+  final String? physicalState;
   final String? qrcode;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
   const ReagentModel({
     required this.id,
-    required this.name,
     required this.type,
+    this.name,
     this.code,
     this.brand,
     this.reference,
@@ -52,7 +54,9 @@ class ReagentModel {
     this.supplier,
     this.hazard,
     this.responsible,
+    this.formula,
     this.notes,
+    this.physicalState,
     this.qrcode,
     this.createdAt,
     this.updatedAt,
@@ -61,8 +65,8 @@ class ReagentModel {
   factory ReagentModel.fromMap(Map<String, dynamic> m) => ReagentModel(
         id: (m['reagent_id'] as num).toInt(),
         code: m['reagent_code'] as String?,
-        name: m['reagent_name'] as String,
-        type: (m['reagent_type'] as String?) ?? 'chemical',
+        name: m['reagent_name'] as String?,
+        type: (m['reagent_type'] as String?) ?? 'biological',
         brand: m['reagent_brand'] as String?,
         reference: m['reagent_reference'] as String?,
         casNumber: m['reagent_cas_number'] as String?,
@@ -93,7 +97,9 @@ class ReagentModel {
         supplier: m['reagent_supplier'] as String?,
         hazard: m['reagent_hazard'] as String?,
         responsible: m['reagent_responsible'] as String?,
+        formula: m['reagent_formula'] as String?,
         notes: m['reagent_notes'] as String?,
+        physicalState: m['reagent_physical_state'] as String?,
         qrcode: m['reagent_qrcode'] as String?,
         createdAt: m['reagent_created_at'] != null
             ? DateTime.tryParse(m['reagent_created_at'].toString())
@@ -104,7 +110,7 @@ class ReagentModel {
       );
 
   Map<String, dynamic> toInsertMap() => {
-        'reagent_name': name,
+        if (name != null) 'reagent_name': name,
         'reagent_type': type,
         if (code != null) 'reagent_code': code,
         if (brand != null) 'reagent_brand': brand,
@@ -129,7 +135,9 @@ class ReagentModel {
         if (supplier != null) 'reagent_supplier': supplier,
         if (hazard != null) 'reagent_hazard': hazard,
         if (responsible != null) 'reagent_responsible': responsible,
+        if (formula != null) 'reagent_formula': formula,
         if (notes != null) 'reagent_notes': notes,
+        if (physicalState != null) 'reagent_physical_state': physicalState,
       };
 
   bool get isExpired =>
@@ -150,22 +158,42 @@ class ReagentModel {
   }
 
   static const typeOptions = [
-    'chemical',
     'biological',
-    'kit',
-    'media',
-    'gas',
-    'consumable'
+    'consumables',
+    'ppe',
+    'bioactivity_assays',
+    'analytical_chemistry',
+    'media_preparation',
+    'cleaning_maintenance',
+    'standards',
   ];
   static const tempOptions = ['RT', '4°C', '-20°C', '-80°C', 'liquid N2'];
+  static const physicalStateOptions = ['liquid', 'solid', 'gas'];
+
+  static String physicalStateLabel(String s) => switch (s) {
+        'liquid' => 'Liquid',
+        'solid'  => 'Solid',
+        'gas'    => 'Gas',
+        _        => s,
+      };
 
   static String typeLabel(String t) => switch (t) {
-        'chemical' => 'Chemical',
-        'biological' => 'Biological',
-        'kit' => 'Kit',
-        'media' => 'Media',
-        'gas' => 'Gas',
-        'consumable' => 'Consumable',
-        _ => t,
+        'chemicals_general'    => 'Chemicals (General)',
+        'biological'           => 'Biological',
+        'consumables'          => 'Consumables',
+        'ppe'                  => 'PPE',
+        'bioactivity_assays'   => 'Assays',
+        'analytical_chemistry' => 'Analytical & Chemistry',
+        'media_preparation'    => 'Media Preparation',
+        'cleaning_maintenance' => 'Cleaning & Maintenance',
+        'standards'            => 'Standarts',
+        'standarts'            => 'Standarts',
+        // legacy fallbacks
+        'chemical'   => 'Chemicals (General)',
+        'kit'        => 'Assays',
+        'media'      => 'Media Preparation',
+        'gas'        => 'Chemicals (General)',
+        'consumable' => 'Consumables',
+        _            => t,
       };
 }

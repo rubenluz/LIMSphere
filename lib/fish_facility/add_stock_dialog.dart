@@ -1,10 +1,13 @@
 // add_stock_dialog.dart - Dialog for adding a new fish stock to a tank:
 // line selector, rack/row/column position picker, male/female/juvenile counts.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'stocks/stocks_connection_model.dart';
+import '../backups/backup_service.dart';
 import '/theme/theme.dart';
 import '/supabase/supabase_manager.dart';
 import '/camera/qr_scanner/qr_code_rules.dart';
@@ -273,6 +276,7 @@ class _AddStockDialogState extends State<AddStockDialog> {
           .from('fish_stocks')
           .update({'fish_stocks_qrcode': qrcode})
           .eq('fish_stocks_id', stockId);
+      unawaited(BackupService.instance.notifyCrudChange('fish_stocks'));
 
       widget.onAdd(FishStock(
         stockId:     resp['fish_stocks_id'].toString(),

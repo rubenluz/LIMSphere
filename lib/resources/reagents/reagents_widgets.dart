@@ -26,9 +26,32 @@ class _ReagentRow extends StatelessWidget {
     required this.onCommitEdit,
   });
 
+  static String _fmtQty(double v) =>
+      v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
+
+  static String _unitDisplay(String? u) {
+    if (u == null) return '—';
+    return switch (u.trim().toLowerCase()) {
+      'gr'  => 'grams',
+      'l'   => 'liters',
+      'ml'  => 'mililiters',
+      'kg'  => 'kilograms',
+      _     => u,
+    };
+  }
+
   static const _typeAccent = {
+    'biological':           Color(0xFF22C55E),
+    'consumables':          Color(0xFFF59E0B),
+    'ppe':                  Color(0xFFF97316),
+    'bioactivity_assays':   Color(0xFF8B5CF6),
+    'analytical_chemistry': Color(0xFF06B6D4),
+    'media_preparation':    Color(0xFF10B981),
+    'cleaning_maintenance': Color(0xFF94A3B8),
+    'standards':            Color(0xFF475569),
+    'standarts':            Color(0xFF475569),
+    // legacy
     'chemical':   Color(0xFF38BDF8),
-    'biological': Color(0xFF22C55E),
     'kit':        Color(0xFF8B5CF6),
     'media':      Color(0xFF10B981),
     'gas':        Color(0xFF64748B),
@@ -87,7 +110,7 @@ class _ReagentRow extends StatelessWidget {
     final tsMuted    = GoogleFonts.spaceGrotesk(fontSize: 12.5, color: muted);
     final tsMonoMut  = GoogleFonts.jetBrainsMono(fontSize: 12,  color: muted);
 
-    Color bg = rowIndex.isEven ? context.appBg : context.appSurface;
+    Color bg = rowIndex.isEven ? context.appSurface : context.appSurface2;
     if (r.isExpired) bg = AppDS.red.withValues(alpha: 0.08);
 
     return Container(
@@ -99,12 +122,12 @@ class _ReagentRow extends StatelessWidget {
       child: Row(children: [
         // ── Action buttons ────────────────────────────────────────────────
         SizedBox(
-          width: 36,
+          width: 30,
           child: _RowBtn(Icons.open_in_new, 'View detail', onViewMore,
               color: muted),
         ),
         SizedBox(
-          width: 36,
+          width: 30,
           child: _RowBtn(Icons.outbox_outlined, 'Quick Request', onRequest,
               color: muted),
         ),
@@ -114,90 +137,15 @@ class _ReagentRow extends StatelessWidget {
           width: _colCode,
           child: _editCell(context, 'code', r.code ?? '',
             r.code != null && r.code!.isNotEmpty
-                ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: context.appSurface2,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(r.code!,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.jetBrainsMono(
-                            color: context.appTextPrimary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700)),
-                  )
+                ? Text(r.code!,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.jetBrainsMono(
+                        color: context.appTextPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700))
                 : const SizedBox.shrink(),
             GoogleFonts.jetBrainsMono(fontSize: 12, color: primary),
           ),
-        ),
-
-        // ── Name ──────────────────────────────────────────────────────────
-        SizedBox(
-          width: _colName,
-          child: _isEditing('name')
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  child: _textField(context, 'name', tsName),
-                )
-              : GestureDetector(
-                  onDoubleTap: () => onStartEdit(r.id, 'name', r.name),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    child: Row(children: [
-                      Flexible(
-                        child: Text(r.name,
-                            overflow: TextOverflow.ellipsis, style: tsName),
-                      ),
-                      if (r.isExpired) ...[
-                        const SizedBox(width: 4),
-                        _Badge(label: 'Expired', color: AppDS.red),
-                      ] else if (r.isExpiringSoon) ...[
-                        const SizedBox(width: 4),
-                        _Badge(label: 'Expiring', color: AppDS.yellow),
-                      ],
-                      if (r.isLowStock) ...[
-                        const SizedBox(width: 4),
-                        _Badge(label: 'Low', color: AppDS.orange),
-                      ],
-                      if (r.hazard != null && r.hazard!.isNotEmpty) ...[
-                        const SizedBox(width: 4),
-                        Tooltip(
-                          message: 'Hazard: ${r.hazard}',
-                          child: const Icon(Icons.warning_amber_outlined,
-                              size: 13, color: AppDS.yellow),
-                        ),
-                      ],
-                    ]),
-                  ),
-                ),
-        ),
-
-        // ── Supplier ──────────────────────────────────────────────────────
-        SizedBox(
-          width: _colSupp,
-          child: _editCell(context, 'supplier', r.supplier ?? '',
-              Text(r.supplier ?? '—', overflow: TextOverflow.ellipsis,
-                  style: r.supplier != null ? tsCell : tsMuted),
-              tsCell),
-        ),
-
-        // ── Brand ─────────────────────────────────────────────────────────
-        SizedBox(
-          width: _colBrand,
-          child: _editCell(context, 'brand', r.brand ?? '',
-              Text(r.brand ?? '—', overflow: TextOverflow.ellipsis,
-                  style: r.brand != null ? tsCell : tsMuted),
-              tsCell),
-        ),
-
-        // ── Reference ─────────────────────────────────────────────────────
-        SizedBox(
-          width: _colRef,
-          child: _editCell(context, 'reference', r.reference ?? '',
-              Text(r.reference ?? '—', overflow: TextOverflow.ellipsis,
-                  style: r.reference != null ? tsCell : tsMuted),
-              tsCell),
         ),
 
         // ── Type ──────────────────────────────────────────────────────────
@@ -233,6 +181,94 @@ class _ReagentRow extends StatelessWidget {
           ),
         ),
 
+        // ── Name ──────────────────────────────────────────────────────────
+        SizedBox(
+          width: _colName,
+          child: _isEditing('name')
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  child: _textField(context, 'name', tsName),
+                )
+              : GestureDetector(
+                  onDoubleTap: () => onStartEdit(r.id, 'name', r.name ?? ''),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    child: Row(children: [
+                      Flexible(
+                        child: Text(
+                            (r.name == null || r.name!.isEmpty) ? '—' : r.name!,
+                            overflow: TextOverflow.ellipsis,
+                            style: (r.name == null || r.name!.isEmpty) ? tsMuted : tsName),
+                      ),
+                      if (r.isExpired) ...[
+                        const SizedBox(width: 4),
+                        _Badge(label: 'Expired', color: AppDS.red),
+                      ] else if (r.isExpiringSoon) ...[
+                        const SizedBox(width: 4),
+                        _Badge(label: 'Expiring', color: AppDS.yellow),
+                      ],
+                      if (r.isLowStock) ...[
+                        const SizedBox(width: 4),
+                        _Badge(label: 'Low', color: AppDS.orange),
+                      ],
+                      if (r.hazard != null && r.hazard!.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: 'Hazard: ${r.hazard}',
+                          child: const Icon(Icons.warning_amber_outlined,
+                              size: 13, color: AppDS.yellow),
+                        ),
+                      ],
+                    ]),
+                  ),
+                ),
+        ),
+
+        // ── Physical State ────────────────────────────────────────────────
+        SizedBox(
+          width: _colState,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: r.physicalState != null
+                ? _Badge(
+                    label: ReagentModel.physicalStateLabel(r.physicalState!),
+                    color: switch (r.physicalState!) {
+                      'liquid' => const Color(0xFF38BDF8),
+                      'solid'  => const Color(0xFF94A3B8),
+                      'gas'    => const Color(0xFFA78BFA),
+                      _        => const Color(0xFF64748B),
+                    },
+                  )
+                : Text('—', style: tsMuted),
+          ),
+        ),
+
+        // ── Formula ───────────────────────────────────────────────────────
+        SizedBox(
+          width: _colFormula,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Text(r.formula ?? '—',
+                overflow: TextOverflow.ellipsis,
+                style: r.formula != null ? tsMono : tsMonoMut),
+          ),
+        ),
+
+        // ── Opened Date ───────────────────────────────────────────────────
+        SizedBox(
+          width: _colOpened,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Text(
+              r.openedDate != null
+                  ? '${r.openedDate!.year}-${r.openedDate!.month.toString().padLeft(2, '0')}-${r.openedDate!.day.toString().padLeft(2, '0')}'
+                  : '—',
+              overflow: TextOverflow.ellipsis,
+              style: r.openedDate != null ? tsMono : tsMonoMut,
+            ),
+          ),
+        ),
+
         // ── Location (read-only in row) ───────────────────────────────────
         SizedBox(
           width: _colLoc,
@@ -244,29 +280,12 @@ class _ReagentRow extends StatelessWidget {
           ),
         ),
 
-        // ── Size (concentration) ──────────────────────────────────────────
-        SizedBox(
-          width: _colSize,
-          child: _editCell(context, 'concentration', r.concentration ?? '',
-              Text(r.concentration ?? '—', overflow: TextOverflow.ellipsis,
-                  style: r.concentration != null ? tsMono : tsMonoMut),
-              tsMono),
-        ),
-
-        // ── Unit ──────────────────────────────────────────────────────────
-        SizedBox(
-          width: _colUnit,
-          child: _editCell(context, 'unit', r.unit ?? '',
-              Text(r.unit ?? '—', overflow: TextOverflow.ellipsis,
-                  style: r.unit != null ? tsCell : tsMuted),
-              tsCell),
-        ),
-
         // ── Amount ────────────────────────────────────────────────────────
         SizedBox(
           width: _colAmt,
           child: _editCell(context, 'quantity', r.quantity?.toString() ?? '',
-              Text(r.quantity?.toString() ?? '—', overflow: TextOverflow.ellipsis,
+              Text(r.quantity != null ? _fmtQty(r.quantity!) : '—',
+                  overflow: TextOverflow.ellipsis,
                   style: r.isLowStock
                       ? GoogleFonts.jetBrainsMono(fontSize: 12, color: AppDS.orange)
                       : (r.quantity != null ? tsMono : tsMonoMut)),
@@ -277,11 +296,48 @@ class _ReagentRow extends StatelessWidget {
         SizedBox(
           width: _colMin,
           child: _editCell(context, 'quantityMin', r.quantityMin?.toString() ?? '',
-              Text(r.quantityMin?.toString() ?? '—', overflow: TextOverflow.ellipsis,
+              Text(r.quantityMin != null ? _fmtQty(r.quantityMin!) : '—',
+                  overflow: TextOverflow.ellipsis,
                   style: r.quantityMin != null
                       ? GoogleFonts.jetBrainsMono(fontSize: 12, color: context.appTextMuted)
                       : tsMonoMut),
               tsMonoMut),
+        ),
+
+        // ── Unit ──────────────────────────────────────────────────────────
+        SizedBox(
+          width: _colUnit,
+          child: _editCell(context, 'unit', r.unit ?? '',
+              Text(_unitDisplay(r.unit), overflow: TextOverflow.ellipsis,
+                  style: r.unit != null ? tsCell : tsMuted),
+              tsCell),
+        ),
+
+        // ── Concentration ─────────────────────────────────────────────────
+        SizedBox(
+          width: _colSize,
+          child: _editCell(context, 'concentration', r.concentration ?? '',
+              Text(r.concentration ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.concentration != null ? tsMono : tsMonoMut),
+              tsMono),
+        ),
+
+        // ── Brand ─────────────────────────────────────────────────────────
+        SizedBox(
+          width: _colBrand,
+          child: _editCell(context, 'brand', r.brand ?? '',
+              Text(r.brand ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.brand != null ? tsCell : tsMuted),
+              tsCell),
+        ),
+
+        // ── Supplier ──────────────────────────────────────────────────────
+        SizedBox(
+          width: _colSupp,
+          child: _editCell(context, 'supplier', r.supplier ?? '',
+              Text(r.supplier ?? '—', overflow: TextOverflow.ellipsis,
+                  style: r.supplier != null ? tsCell : tsMuted),
+              tsCell),
         ),
       ]),
     );
@@ -390,7 +446,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
   late final TextEditingController _responsibleCtrl;
   late final TextEditingController _notesCtrl;
   late final TextEditingController _positionCtrl;
-  String _type = 'chemical';
+  String _type = 'biological';
   String? _storageTemp;
   int? _locationId;
   DateTime? _expiryDate;
@@ -418,7 +474,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
     _responsibleCtrl = TextEditingController(text: e?.responsible ?? '');
     _notesCtrl = TextEditingController(text: e?.notes ?? '');
     _positionCtrl = TextEditingController(text: e?.position ?? '');
-    _type = e?.type ?? 'chemical';
+    _type = e?.type ?? 'biological';
     _storageTemp = e?.storageTemp;
     _locationId = e?.locationId;
     _expiryDate = e?.expiryDate;
@@ -495,6 +551,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
                 SupabaseManager.projectRef ?? 'local', 'reagents', newId)})
             .eq('reagent_id', newId);
       }
+      unawaited(BackupService.instance.notifyCrudChange('reagents'));
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -579,7 +636,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
                     DropdownMenuItem(value: t,
                       child: Text(ReagentModel.typeLabel(t),
                         style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13)))).toList(),
-                  onChanged: (v) => setState(() => _type = v ?? 'chemical'),
+                  onChanged: (v) => setState(() => _type = v ?? 'biological'),
                 )),
               ]),
               const SizedBox(height: 10),

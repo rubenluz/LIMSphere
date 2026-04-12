@@ -41,9 +41,27 @@ const _kQl570PrintableDots300 = <int, int>{
   38: 413, 50: 554, 54: 590, 58: 618, 62: 696,
 };
 
-const _kQl570MediaTypeContinuous = 0x0A;
-const _kQl570MediaTypeDieCut = 0x0B;
-const _kQl570PrintInfoFlags = 0x0E;
+const _kQl570MediaTypeContinuous = 0x0B;
+const _kQl570MediaTypeDieCut = 0x0A;
+// 0x02 = verify media type only (bit 1 set); tape width and label length are
+// auto-detected by the printer's gap sensor.
+//
+// Why not 0x0E (all three checked)?
+//   Genuine Brother DK rolls carry identification marks that tell the printer
+//   their exact width and length. Third-party rolls often lack these marks, so
+//   the printer auto-detects different (or no) dimensions → mismatch → error.
+//
+// Why not 0x00 (none checked)?
+//   With 0x00 the printer auto-detects EVERYTHING including media type. Without
+//   identification marks it falls back to "continuous tape" mode: gap detection
+//   is disabled, the printer doesn't align to label boundaries, and it overshoots
+//   the cut position.
+//
+// 0x02: the printer verifies our media type (die-cut = 0x0A) using the physical
+// gap sensor — which does work with properly cut third-party labels — then uses
+// gap detection for correct start alignment and cut position, while ignoring the
+// tape width and label length fields (auto-detected from the gap sensor instead).
+const _kQl570PrintInfoFlags = 0x02;
 const _kQl570AutoCutFlag = 0x40;
 const _kQl570CutAtEndFlag = 0x08;
 
@@ -265,8 +283,13 @@ void _ql570WriteRasterRows(
   required int imageWidth,
   required int imageHeight,
   required int leftMarginDots,
+  int startRow = 0,
+  int? printLines,
 }) {
-  for (int row = 0; row < imageHeight; row++) {
+  final endRow = printLines != null
+      ? (startRow + printLines).clamp(0, imageHeight)
+      : imageHeight;
+  for (int row = startRow; row < endRow; row++) {
     final line = List<int>.filled(_kQl570BytesPerLine, 0);
     for (int dot = 0; dot < imageWidth; dot++) {
       final idx = (row * imageWidth + dot) * 4;
@@ -342,21 +365,42 @@ Future<Uint8List> _ql570DieCut(
       final iw = image.width;
       final ih = image.height;
 
-      final expectedDots = (spec.labelLengthMm * _kQl570Dpi / 25.4).round();
-      debugPrint('[QL570] expectedDots=$expectedDots vs rasterLines=$ih');
+      // QL-570 does NOT clip to label height in raster mode — it prints exactly
+      // the number of lines you send, then cuts. We must enforce the correct
+      // line count ourselves: strip leading empty rows, cap at targetLines,
+      // then pad at the bottom so the cut lands at the right position.
+      final targetLines = (spec.labelLengthMm * _kQl570Dpi / 25.4).round();
+
+      // Find the first row that contains any black dot.
+      int firstContentRow = 0;
+      rowSearch:
+      for (int row = 0; row < ih; row++) {
+        for (int dot = 0; dot < iw; dot++) {
+          final idx = (row * iw + dot) * 4;
+          final gray = (rgba[idx] * 0.299 + rgba[idx + 1] * 0.587 + rgba[idx + 2] * 0.114).round();
+          if (gray < 128) {
+            firstContentRow = row;
+            break rowSearch;
+          }
+        }
+      }
+
+      final contentLines = (ih - firstContentRow).clamp(0, targetLines);
+      final padLines = targetLines - contentLines;
+
+      debugPrint('[QL570] die-cut copy=${c + 1} image=$iw×${ih}px '
+          'firstContentRow=$firstContentRow contentLines=$contentLines '
+          'padLines=$padLines targetLines=$targetLines '
+          'endByte=0x${_kQl570DieCutEndByte.toRadixString(16).toUpperCase()}');
 
       buf.add(_ql570PageHeader(
         tpl,
         cfg,
         spec,
-        rasterLines: ih,
+        rasterLines: targetLines,
         pageIdx: pageIdx,
         totalPages: totalPages,
       ));
-
-      debugPrint('[QL570] die-cut copy=${c + 1} image=$iw×${ih}px '
-          '(${(iw/(_kQl570Dpi/25.4)).toStringAsFixed(1)}×${(ih/(_kQl570Dpi/25.4)).toStringAsFixed(1)}mm) '
-          'rasterLines=$ih endByte=0x${_kQl570DieCutEndByte.toRadixString(16).toUpperCase()}');
 
       _ql570WriteRasterRows(
         buf,
@@ -364,7 +408,18 @@ Future<Uint8List> _ql570DieCut(
         imageWidth: iw,
         imageHeight: ih,
         leftMarginDots: spec.leftMarginDots,
+        startRow: firstContentRow,
+        printLines: contentLines,
       );
+
+      if (padLines > 0) {
+        final emptyLine = List<int>.filled(_kQl570BytesPerLine, 0);
+        for (int i = 0; i < padLines; i++) {
+          buf.add(const [0x67, 0x00, _kQl570BytesPerLine]);
+          buf.add(emptyLine);
+        }
+      }
+
       buf.addByte(_kQl570DieCutEndByte);
       pageIdx++;
     }

@@ -3,12 +3,14 @@
 // Standalone widget classes extracted to excel_import_widgets.dart (part).
 
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../backups/backup_service.dart';
 
 part 'excel_import_widgets.dart';
 
@@ -441,6 +443,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     final db = Supabase.instance.client;
     final importSamples = _importMode != 'strains';
     final importStrains = _importMode != 'samples';
+    var changedStrains = false;
 
     try {
   // ── Get next available sample number ────────────────────────────────
@@ -511,6 +514,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         await db.from('strains').upsert(
             _strainRowFromMap(strain, null),
             onConflict: 'strain_code');
+        changedStrains = true;
         sb.writeln('✓ Strain $code imported (no sample link).');
         continue;
       }
@@ -520,14 +524,20 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         await db.from('strains').upsert(
             _strainRowFromMap(strain, sampleId),
             onConflict: 'strain_code');
+        changedStrains = true;
         sb.writeln('✓ Strain $code → Sample $sampleId imported.');
       } else {
         sb.writeln('⚠ Sample "$linkVal" not found — strain inserted without sample link.');
         await db.from('strains').upsert(
             _strainRowFromMap(strain, null),
             onConflict: 'strain_code');
+        changedStrains = true;
       }
     }
+  }
+
+  if (changedStrains) {
+    unawaited(BackupService.instance.notifyCrudChange('strains'));
   }
 
   sb.writeln('\n✅ Import complete.');
