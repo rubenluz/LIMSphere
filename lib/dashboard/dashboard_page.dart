@@ -24,6 +24,12 @@ import 'dashboard_widgets/to_do_widget.dart';
 import 'dashboard_widgets/transfer_timeline_widget.dart';
 import 'dashboard_widgets/tank_cleaning_timeline_widget.dart';
 import 'dashboard_widgets/maintenance_overview_widget.dart';
+import 'dashboard_widgets/low_stock_widget.dart';
+import 'dashboard_widgets/reagents_by_type_widget.dart';
+import 'dashboard_widgets/breeding_activity_widget.dart';
+import 'dashboard_widgets/open_requests_widget.dart';
+import 'dashboard_widgets/today_reservations_widget.dart';
+import 'dashboard_widgets/pending_users_widget.dart';
 
 const int _kProfileCount = 5;
 
@@ -43,6 +49,7 @@ const _availableWidgets = [
   {'id': 'tank_cleaning',       'name': 'Tank Cleaning',            'icon': Icons.cleaning_services_outlined, 'cat': 'Fish Facility'},
   {'id': 'cleaning_timeline',   'name': 'Cleaning Timeline',        'icon': Icons.timeline_rounded,           'cat': 'Fish Facility'},
   {'id': 'maintenance_overview','name': 'Fish Facility Maintenance', 'icon': Icons.build_circle_outlined,      'cat': 'Fish Facility'},
+  {'id': 'breeding_activity',  'name': 'Breeding Activity',        'icon': Icons.egg_outlined,               'cat': 'Fish Facility'},
   // ── Culture Collection ───────────────────────────────────────────────────
   {'id': 'next_transfer',       'name': 'Next Transfers',           'icon': Icons.schedule,                   'cat': 'Culture Collection'},
   {'id': 'transfer_status',     'name': 'Transfer Status',          'icon': Icons.warning_amber,              'cat': 'Culture Collection'},
@@ -50,8 +57,15 @@ const _availableWidgets = [
   {'id': 'in_care',             'name': 'In Care',                  'icon': Icons.medical_services,           'cat': 'Culture Collection'},
   {'id': 'strains_by_origin',   'name': 'Strains by Origin',        'icon': Icons.pie_chart,                  'cat': 'Culture Collection'},
   {'id': 'strains_by_medium',   'name': 'Strains by Medium',        'icon': Icons.water_drop,                 'cat': 'Culture Collection'},
+  // ── Resources ────────────────────────────────────────────────────────────
+  {'id': 'low_stock',           'name': 'Low Stock Alerts',         'icon': Icons.inventory_2_outlined,       'cat': 'Resources'},
+  {'id': 'reagents_by_type',    'name': 'Reagents by Type',         'icon': Icons.donut_small_outlined,       'cat': 'Resources'},
+  {'id': 'today_reservations',  'name': "Today's Reservations",     'icon': Icons.calendar_today_outlined,    'cat': 'Resources'},
+  // ── Requests ────────────────────────────────────────────────────────────
+  {'id': 'open_requests',       'name': 'Open Requests',            'icon': Icons.assignment_outlined,        'cat': 'Requests'},
   // ── General ──────────────────────────────────────────────────────────────
   {'id': 'to_do',               'name': 'To-Do',                   'icon': Icons.checklist_rounded,          'cat': 'General'},
+  {'id': 'pending_users',       'name': 'Pending Users',            'icon': Icons.person_add_outlined,        'cat': 'General', 'role': 'admin'},
 ];
 
 class DashboardPage extends StatefulWidget {
@@ -85,6 +99,15 @@ class _DashboardPageState extends State<DashboardPage> {
   // Convenience getters pointing at the active profile's maps.
   Map<int, String?> get _desktopSlots => _profileSlots[_activeProfile];
   Map<int, int>    get _desktopSpans  => _profileSpans[_activeProfile];
+
+  bool get _isAdmin {
+    final role = widget.userInfo['user_role'] as String? ?? '';
+    return role == 'admin' || role == 'superadmin';
+  }
+
+  List<Map<String, dynamic>> get _visibleWidgets => _availableWidgets
+      .where((w) => w['role'] == null || _isAdmin)
+      .toList();
 
   // ── Profile title editing ─────────────────────────────────────────────────
   bool _editingTitle = false;
@@ -372,6 +395,12 @@ class _DashboardPageState extends State<DashboardPage> {
       case 'transfer_timeline':    return const TransferTimelineWidget();
       case 'cleaning_timeline':    return const TankCleaningTimelineWidget();
       case 'maintenance_overview': return const MaintenanceOverviewWidget();
+      case 'breeding_activity':    return const BreedingActivityWidget();
+      case 'low_stock':            return const LowStockWidget();
+      case 'reagents_by_type':     return const ReagentsByTypeWidget();
+      case 'open_requests':        return const OpenRequestsWidget();
+      case 'today_reservations':   return const TodayReservationsWidget();
+      case 'pending_users':        return const PendingUsersWidget();
       default:                     return const SizedBox.shrink();
     }
   }
@@ -423,7 +452,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     children: [
                       for (final cat in _widgetCategories) ...[
                         ...() {
-                          final ws = _availableWidgets
+                          final ws = _visibleWidgets
                               .where((w) => w['cat'] == cat)
                               .toList();
                           if (ws.isEmpty) return <Widget>[];
@@ -837,7 +866,7 @@ class _DashboardPageState extends State<DashboardPage> {
   // ══════════════════════════════════════════════════════════════════════════
 
   void _showMobileWidgetPicker() {
-    final available = _availableWidgets
+    final available = _visibleWidgets
         .where((w) => !_mobileWidgets.contains(w['id']))
         .toList();
 
@@ -970,7 +999,7 @@ class _DashboardPageState extends State<DashboardPage> {
         }
 
         final widgetId = _mobileWidgets[i];
-        final meta = _availableWidgets.firstWhere(
+        final meta = _visibleWidgets.firstWhere(
           (w) => w['id'] == widgetId,
           orElse: () =>
               {'id': widgetId, 'name': widgetId, 'icon': Icons.widgets},

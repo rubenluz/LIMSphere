@@ -371,7 +371,9 @@ class _TankDetailPageState extends State<TankDetailPage> {
         if (_computedKeys.contains(f.key)) continue;
         if (f.key == 'fish_stocks_breeders') continue;
         final raw  = _data[f.key];
-        final text = raw != null ? _fmtDate(raw.toString()) : '';
+        final text = raw != null
+            ? (_datePickers.contains(f.key) ? _fmtDate(raw.toString()) : raw.toString())
+            : '';
         if (_ctrl.containsKey(f.key)) {
           _ctrl[f.key]!.text = text;
         } else {

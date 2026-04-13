@@ -455,7 +455,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
             ),
             onPressed: () => _showAddEditDialog(),
             icon: const Icon(Icons.add, size: 16),
-            label: Text('Add Reagent',
+            label: Text('Add',
                 style: GoogleFonts.spaceGrotesk(fontSize: 13)),
           ),
         ]),
