@@ -48,8 +48,7 @@ class _ReagentRow extends StatelessWidget {
     'analytical_chemistry': Color(0xFF06B6D4),
     'media_preparation':    Color(0xFF10B981),
     'cleaning_maintenance': Color(0xFF94A3B8),
-    'standards':            Color(0xFF475569),
-    'standarts':            Color(0xFF475569),
+    'standards':            Color(0xFF75b1e3),
     // legacy
     'chemical':   Color(0xFF38BDF8),
     'kit':        Color(0xFF8B5CF6),

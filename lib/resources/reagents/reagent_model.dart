@@ -186,8 +186,7 @@ class ReagentModel {
         'analytical_chemistry' => 'Analytical & Chemistry',
         'media_preparation'    => 'Media Preparation',
         'cleaning_maintenance' => 'Cleaning & Maintenance',
-        'standards'            => 'Standarts',
-        'standarts'            => 'Standarts',
+        'standards'            => 'Standards',
         // legacy fallbacks
         'chemical'   => 'Chemicals (General)',
         'kit'        => 'Assays',
