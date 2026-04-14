@@ -72,6 +72,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
     ('feedingAmountUnit', 'Unit',         75.0, false),
     ('foodType',          'Food Type',   130.0, false),
     ('lastBreeding',      'Last Breed',  105.0, false),
+    ('breedReady',        'Breed',        80.0, false),
     ('ageDays',           'Age (d)',      80.0, true),
     ('ageMonths',         'Age (mo)',     85.0, true),
     ('maturity',          'Maturity',     90.0, true),
@@ -861,6 +862,7 @@ class _FishStocksPageState extends State<FishStocksPage> {
             _dropdownCell(stock, 'foodType', 130, stock.foodType,
               ['GEMMA 75', 'GEMMA 150', 'GEMMA 300', 'SPAROS 400-600']),
             _dateCell(stock, 'lastBreeding', 105),
+            _breedReadyCell(stock, 80),
             _cell(stock, 'ageDays',      80, mono: true),
             _cell(stock, 'ageMonths',    85, mono: true),
             _maturityCell(stock,          90),
@@ -1151,6 +1153,44 @@ class _FishStocksPageState extends State<FishStocksPage> {
           child: Text(display ?? '—',
               style: display != null ? _tsMono : _tsMonoMut,
               overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    );
+  }
+
+  Widget _breedReadyCell(FishStock s, double width) {
+    if (s.lastBreeding == null) {
+      return SizedBox(
+        width: width,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: Text('—', style: _tsMonoMut),
+        ),
+      );
+    }
+    final days = DateTime.now().difference(s.lastBreeding!).inDays;
+    final Color color;
+    if (days >= 7) {
+      color = AppDS.green;
+    } else if (days == 6) {
+      color = AppDS.yellow;
+    } else {
+      color = AppDS.red;
+    }
+    return SizedBox(
+      width: width,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.4)),
+          ),
+          child: Text('${days}d',
+            style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+            textAlign: TextAlign.center),
         ),
       ),
     );

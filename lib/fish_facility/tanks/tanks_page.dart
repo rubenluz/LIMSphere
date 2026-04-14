@@ -50,7 +50,7 @@ const _rowBECount = 10;    // 2.4 L
 const _labelW     = 44.0;  // row-label column width
 const _gap        = 3.0;   // inner padding per cell (each side)
 const _rowHTop    = 72.0;  // row A cell height
-const _rowHMain   = 96.0;  // rows B-E cell height
+const _rowHMain   = 116.0; // rows B-E cell height
 
 // ─── Tank state helpers ───────────────────────────────────────────────────────
 bool _isOccupied(ZebrafishTank t) =>
@@ -255,6 +255,8 @@ class _FishTanksPageState extends State<FishTanksPage> {
       zebraPh:           (r['fish_stocks_ph'] as num?)?.toDouble(),
       zebraLastTankCleaning: r['fish_stocks_last_tank_cleaning'] != null
           ? DateTime.tryParse(r['fish_stocks_last_tank_cleaning'] as String) : null,
+      zebraLastBreeding: r['fish_stocks_last_breeding'] != null
+          ? DateTime.tryParse(r['fish_stocks_last_breeding'] as String) : null,
     );
   }
 
@@ -310,6 +312,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
         'fish_stocks_experiment_id':        t.zebraExperimentId,
         'fish_stocks_notes':                t.zebraNotes,
         'fish_stocks_last_tank_cleaning':   t.zebraLastTankCleaning?.toIso8601String().substring(0, 10),
+        'fish_stocks_last_breeding':       t.zebraLastBreeding?.toIso8601String().substring(0, 10),
       };
       if (t.zebraId != null) {
         await Supabase.instance.client
@@ -697,8 +700,8 @@ class _FishTanksPageState extends State<FishTanksPage> {
           break;
         case 'active':
           if (hasFish) {
-            bg     = AppDS.green.withValues(alpha: dark ? 0.45 : 0.30);
-            border = AppDS.green.withValues(alpha: dark ? 0.80 : 0.65);
+            bg     = (dark ? AppDS.green : const Color(0xFF4D7C0F)).withValues(alpha: dark ? 0.45 : 0.22);
+            border = (dark ? AppDS.green : const Color(0xFF4D7C0F)).withValues(alpha: dark ? 0.80 : 0.55);
           } else {
             bg     = AppDS.accent.withValues(alpha: dark ? 0.22 : 0.12);
             border = AppDS.accent.withValues(alpha: dark ? 0.55 : 0.40);
@@ -782,24 +785,58 @@ class _FishTanksPageState extends State<FishTanksPage> {
                             fontSize: 9.0, color: AppDS.accent,
                             fontStyle: FontStyle.italic)),
                       if (tank.zebraFoodType?.isNotEmpty == true) ...[
-                        Text(
-                          tank.zebraFoodType!,
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 8.0, fontWeight: FontWeight.w600, color: dark ? AppDS.yellow : const Color(0xFF9B6B1A)),
-                          overflow: TextOverflow.ellipsis, maxLines: 1),
+                        Text.rich(TextSpan(children: [
+                          TextSpan(text: 'FEED: ', style: GoogleFonts.spaceGrotesk(
+                            fontSize: 8.0, fontWeight: FontWeight.w700, color: kTextCol)),
+                          TextSpan(text: tank.zebraFoodType!, style: GoogleFonts.spaceGrotesk(
+                            fontSize: 8.0, fontWeight: FontWeight.w600, color: dark ? AppDS.yellow : const Color(0xFF9B6B1A))),
+                        ]), overflow: TextOverflow.ellipsis, maxLines: 1),
                         if (tank.zebraFeedingSchedule?.isNotEmpty == true ||
                             tank.zebraFoodAmount != null)
-                          Text(
-                            [
+                          Text.rich(TextSpan(children: [
+                            TextSpan(text: 'AMT: ', style: GoogleFonts.spaceGrotesk(
+                              fontSize: 8.0, fontWeight: FontWeight.w700, color: kTextCol)),
+                            TextSpan(text: [
                               if (tank.zebraFeedingSchedule?.isNotEmpty == true)
                                 tank.zebraFeedingSchedule!,
                               if (tank.zebraFoodAmount != null)
                                 '(${tank.zebraFoodAmount! % 1 == 0 ? tank.zebraFoodAmount!.toInt() : tank.zebraFoodAmount}${tank.zebraFeedingAmountUnit != null ? ' ${tank.zebraFeedingAmountUnit}' : ''})',
-                            ].join(' '),
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 8.0, fontWeight: FontWeight.w600, color: dark ? AppDS.yellow : const Color(0xFF9B6B1A)),
-                            overflow: TextOverflow.ellipsis, maxLines: 1),
+                            ].join(' '), style: GoogleFonts.spaceGrotesk(
+                              fontSize: 8.0, fontWeight: FontWeight.w600, color: dark ? AppDS.yellow : const Color(0xFF9B6B1A))),
+                          ]), overflow: TextOverflow.ellipsis, maxLines: 1),
                       ],
+                      if (tank.zebraLastBreeding != null)
+                        Builder(builder: (_) {
+                          final days = DateTime.now().difference(tank.zebraLastBreeding!).inDays;
+                          final Color c;
+                          if (days >= 7)      { c = const Color(0xFF22C55E); }
+                          else if (days == 6) { c = AppDS.yellow; }
+                          else                { c = const Color(0xFFFF6B6B); }
+                          final d = tank.zebraLastBreeding!;
+                          return Text.rich(
+                            TextSpan(children: [
+                              TextSpan(text: 'BRED: ', style: GoogleFonts.spaceGrotesk(
+                                fontSize: 7.5, fontWeight: FontWeight.w700, color: kTextCol)),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                                  decoration: BoxDecoration(
+                                    color: c.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: c.withValues(alpha: 0.4), width: 0.5),
+                                  ),
+                                  child: Text('${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}',
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 7.5, fontWeight: FontWeight.w600, color: c)),
+                                ),
+                              ),
+                            ]),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          );
+                        }),
                       if (tank.zebraResponsible?.isNotEmpty == true)
                         Text(tank.zebraResponsible!,
                           style: GoogleFonts.spaceGrotesk(

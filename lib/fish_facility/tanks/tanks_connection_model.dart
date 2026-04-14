@@ -37,6 +37,7 @@ class ZebrafishTank {
   final String? zebraTreatment;
   final String? zebraExperimentId;
   final String? zebraEthicsApproval;
+  final DateTime? zebraLastBreeding;
   final String? zebraNotes;
   final DateTime? zebraCreatedAt;
 
@@ -78,6 +79,7 @@ class ZebrafishTank {
     this.zebraTreatment,
     this.zebraExperimentId,
     this.zebraEthicsApproval,
+    this.zebraLastBreeding,
     this.zebraNotes,
     this.zebraCreatedAt,
     this.isEightLiter = false,
@@ -120,6 +122,8 @@ class ZebrafishTank {
     zebraTreatment:        m[FishSch.stockTreatment] as String?,
     zebraExperimentId:     m[FishSch.stockExperimentId] as String?,
     zebraEthicsApproval:   m[FishSch.stockEthicsApproval] as String?,
+    zebraLastBreeding:     m[FishSch.stockLastBreeding] != null
+        ? DateTime.tryParse(m[FishSch.stockLastBreeding]) : null,
     zebraNotes:            m[FishSch.stockNotes] as String?,
     zebraCreatedAt:        m[FishSch.stockCreatedAt] != null
         ? DateTime.tryParse(m[FishSch.stockCreatedAt]) : null,
@@ -157,6 +161,7 @@ class ZebrafishTank {
     FishSch.stockTreatment:        zebraTreatment,
     FishSch.stockExperimentId:     zebraExperimentId,
     FishSch.stockEthicsApproval:   zebraEthicsApproval,
+    FishSch.stockLastBreeding:     zebraLastBreeding?.toIso8601String(),
     FishSch.stockNotes:            zebraNotes,
   };
 
@@ -172,6 +177,7 @@ class ZebrafishTank {
     String? zebraTreatment, String? zebraFoodType, String? zebraFoodSource,
     double? zebraFoodAmount, String? zebraFeedingAmountUnit, String? zebraFeedingSchedule,
     String? zebraNotes, bool? isEightLiter, DateTime? zebraLastTankCleaning,
+    DateTime? zebraLastBreeding,
   }) => ZebrafishTank(
     zebraId:               zebraId ?? this.zebraId,
     zebraTankId:           zebraTankId ?? this.zebraTankId,
@@ -204,6 +210,7 @@ class ZebrafishTank {
     zebraTreatment:        zebraTreatment ?? this.zebraTreatment,
     zebraExperimentId:     zebraExperimentId ?? this.zebraExperimentId,
     zebraEthicsApproval:   zebraEthicsApproval,
+    zebraLastBreeding:     zebraLastBreeding ?? this.zebraLastBreeding,
     zebraNotes:            zebraNotes ?? this.zebraNotes,
     zebraCreatedAt:        zebraCreatedAt,
     isEightLiter:          isEightLiter ?? this.isEightLiter,

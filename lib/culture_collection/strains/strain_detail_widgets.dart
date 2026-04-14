@@ -18,22 +18,23 @@ class _StatusDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
       initialValue: _options.contains(value) ? value : null,
+      dropdownColor: context.appSurface2,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(fontSize: 12, color: _DS.labelColor),
-        isDense: true, filled: true, fillColor: const Color(0xFFFAFAFC),
+        labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
+        isDense: true, filled: true, fillColor: context.appSurface3,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _DS.cardBorder)),
+            borderSide: BorderSide(color: context.appBorder)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _DS.cardBorder)),
+            borderSide: BorderSide(color: context.appBorder)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(color: _DS.accent, width: 1.5)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
       items: [
-        const DropdownMenuItem(value: null,
+        DropdownMenuItem(value: null,
             child: Text('— not set —',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13))),
+                style: TextStyle(color: context.appTextSecondary, fontSize: 13))),
         ..._options.map((s) => DropdownMenuItem(
           value: s,
           child: Row(children: [

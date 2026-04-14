@@ -29,6 +29,7 @@ class _EditTankDialogState extends State<_EditTankDialog> {
   String? _foodFrequency;
   String? _foodSource;
   DateTime? _lastCleaning;
+  DateTime? _lastBreeding;
   List<String> _lines = [];
   Map<String, int> _lineIdByName = {};
   bool _loadingLines = true;
@@ -68,6 +69,7 @@ class _EditTankDialogState extends State<_EditTankDialog> {
     _foodFrequency = _frequencies.contains(t.zebraFeedingSchedule) ? t.zebraFeedingSchedule : null;
     _foodSource   = _sources.contains(t.zebraFoodSource) ? t.zebraFoodSource : null;
     _lastCleaning = t.zebraLastTankCleaning;
+    _lastBreeding = t.zebraLastBreeding;
     _rack = t.zebraRack   ?? 'R1';
     _row  = t.zebraRow    ?? 'B';
     _col  = int.tryParse(t.zebraColumn ?? '1') ?? 1;
@@ -199,6 +201,15 @@ class _EditTankDialogState extends State<_EditTankDialog> {
               Expanded(child: _f('Amount (g)', _foodAmount, mono: true)),
             ]),
             const SizedBox(height: 12),
+            _label('Last Breeding'),
+            const SizedBox(height: 4),
+            _buildDateRow(
+              value: _lastBreeding,
+              onPicked: (d) => setState(() => _lastBreeding = d),
+              onToday: () => setState(() => _lastBreeding = DateTime.now()),
+              onClear: () => setState(() => _lastBreeding = null),
+            ),
+            const SizedBox(height: 12),
             _label('Last Cleaning'),
             const SizedBox(height: 4),
             _buildCleaningRow(),
@@ -256,6 +267,7 @@ class _EditTankDialogState extends State<_EditTankDialog> {
               zebraExperimentId:     _exp.text.trim().isEmpty ? null : _exp.text.trim(),
               zebraNotes:            _notes.text.trim().isEmpty ? null : _notes.text.trim(),
               zebraLastTankCleaning: _lastCleaning,
+              zebraLastBreeding:    _lastBreeding,
             ));
             Navigator.pop(context);
           },
@@ -264,11 +276,16 @@ class _EditTankDialogState extends State<_EditTankDialog> {
     );
   }
 
-  Widget _buildCleaningRow() {
-    final label = _lastCleaning != null
-        ? '${_lastCleaning!.day.toString().padLeft(2, '0')}/'
-          '${_lastCleaning!.month.toString().padLeft(2, '0')}/'
-          '${_lastCleaning!.year}'
+  Widget _buildDateRow({
+    required DateTime? value,
+    required ValueChanged<DateTime> onPicked,
+    required VoidCallback onToday,
+    required VoidCallback onClear,
+  }) {
+    final label = value != null
+        ? '${value.day.toString().padLeft(2, '0')}/'
+          '${value.month.toString().padLeft(2, '0')}/'
+          '${value.year}'
         : '—';
     return Row(children: [
       Expanded(
@@ -276,7 +293,7 @@ class _EditTankDialogState extends State<_EditTankDialog> {
           onTap: () async {
             final picked = await showDatePicker(
               context: context,
-              initialDate: _lastCleaning ?? DateTime.now(),
+              initialDate: value ?? DateTime.now(),
               firstDate: DateTime(2000),
               lastDate: DateTime.now(),
               builder: (ctx, child) => Theme(
@@ -289,7 +306,7 @@ class _EditTankDialogState extends State<_EditTankDialog> {
                 child: child!,
               ),
             );
-            if (picked != null) setState(() => _lastCleaning = picked);
+            if (picked != null) onPicked(picked);
           },
           borderRadius: BorderRadius.circular(6),
           child: Container(
@@ -300,18 +317,18 @@ class _EditTankDialogState extends State<_EditTankDialog> {
               border: Border.all(color: context.appBorder)),
             child: Row(children: [
               Icon(Icons.calendar_today_outlined, size: 13,
-                color: _lastCleaning != null ? AppDS.accent : context.appTextMuted),
+                color: value != null ? AppDS.accent : context.appTextMuted),
               const SizedBox(width: 8),
               Text(label, style: GoogleFonts.jetBrainsMono(
                 fontSize: 13,
-                color: _lastCleaning != null ? context.appTextPrimary : context.appTextMuted)),
+                color: value != null ? context.appTextPrimary : context.appTextMuted)),
             ]),
           ),
         ),
       ),
       const SizedBox(width: 8),
       OutlinedButton(
-        onPressed: () => setState(() => _lastCleaning = DateTime.now()),
+        onPressed: onToday,
         style: OutlinedButton.styleFrom(
           foregroundColor: AppDS.green,
           side: BorderSide(color: AppDS.green.withValues(alpha: 0.5)),
@@ -320,10 +337,10 @@ class _EditTankDialogState extends State<_EditTankDialog> {
         child: Text('Today', style: GoogleFonts.spaceGrotesk(
           fontSize: 12, fontWeight: FontWeight.w600)),
       ),
-      if (_lastCleaning != null) ...[
+      if (value != null) ...[
         const SizedBox(width: 6),
         InkWell(
-          onTap: () => setState(() => _lastCleaning = null),
+          onTap: onClear,
           borderRadius: BorderRadius.circular(4),
           child: Padding(
             padding: const EdgeInsets.all(6),
@@ -332,6 +349,13 @@ class _EditTankDialogState extends State<_EditTankDialog> {
       ],
     ]);
   }
+
+  Widget _buildCleaningRow() => _buildDateRow(
+    value: _lastCleaning,
+    onPicked: (d) => setState(() => _lastCleaning = d),
+    onToday: () => setState(() => _lastCleaning = DateTime.now()),
+    onClear: () => setState(() => _lastCleaning = null),
+  );
 
   Widget _label(String t) => Text(t, style: GoogleFonts.spaceGrotesk(
     fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700));

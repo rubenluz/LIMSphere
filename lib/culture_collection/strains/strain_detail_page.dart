@@ -21,25 +21,13 @@ part 'strain_detail_widgets.dart';
 // Design tokens
 // ─────────────────────────────────────────────────────────────────────────────
 class _DS {
-  static const Color accent     = Color(0xFF3B82F6);
-  static const Color sectionBg  = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color labelColor = Color(0xFF64748B);
-  static const Color titleColor = Color(0xFF0F172A);
-
-  static const TextStyle sectionTitle = TextStyle(
-    fontSize: 12, fontWeight: FontWeight.w700,
-    color: Color(0xFF64748B), letterSpacing: 0.8,
-  );
+  static const Color accent = Color(0xFF3B82F6);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Field group definitions
 // ─────────────────────────────────────────────────────────────────────────────
 typedef _Field = ({String key, String label, int lines});
-
-_Field _f(String key, String label, {int lines = 1}) =>
-    (key: key, label: label, lines: lines);
 
 const _groups = <({String title, String icon, List<_Field> fields})>[
   (
@@ -296,8 +284,9 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: context.appSurface,
         title: Text(_data['strain_code']?.toString() ?? 'QR Code',
-            style: const TextStyle(fontSize: 15, color: _DS.titleColor)),
+            style: TextStyle(fontSize: 15, color: context.appTextPrimary)),
         content: SizedBox(
           width: 260,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -308,8 +297,8 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
           ),
           const SizedBox(height: 10),
           Text(data,
-              style: const TextStyle(
-                  fontSize: 10, color: _DS.labelColor, fontFamily: 'monospace'),
+              style: TextStyle(
+                  fontSize: 10, color: context.appTextMuted, fontFamily: 'monospace'),
               textAlign: TextAlign.center),
         ]),
         ),
@@ -454,16 +443,18 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: context.appSurface,
         icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 40),
-        title: const Text('Delete Strain?', textAlign: TextAlign.center),
+        title: Text('Delete Strain?', textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
         content: RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
-            style: const TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.5),
+            style: TextStyle(fontSize: 14, color: context.appTextSecondary, height: 1.5),
             children: [
               const TextSpan(text: 'You are about to permanently delete\n'),
               TextSpan(text: code,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: context.appTextPrimary)),
               const TextSpan(text: '.\n\nThis action cannot be undone.'),
             ],
           ),
@@ -531,7 +522,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
     final status = _data['strain_status']?.toString();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: context.appBg,
       appBar: _buildMobileAppBar(code, status),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -657,7 +648,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        color: const Color(0xFFEFF6FF),
+        color: _DS.accent.withValues(alpha: context.isDark ? 0.08 : 0.06),
         child: Row(children: [
           const Icon(Icons.colorize_outlined, size: 14, color: _DS.accent),
           const SizedBox(width: 8),
@@ -668,10 +659,10 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
                 const TextSpan(text: 'Origin: ',
                     style: TextStyle(color: _DS.accent, fontWeight: FontWeight.w600)),
                 TextSpan(text: code?.toString() ?? '—',
-                    style: const TextStyle(color: _DS.titleColor, fontWeight: FontWeight.w600)),
+                    style: TextStyle(color: context.appTextPrimary, fontWeight: FontWeight.w600)),
                 if (parts.isNotEmpty)
                   TextSpan(text: '  $parts',
-                      style: const TextStyle(color: _DS.labelColor)),
+                      style: TextStyle(color: context.appTextMuted)),
               ],
             ),
           )),
@@ -684,7 +675,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
   // ── Mobile: horizontal scrollable section tab bar ─────────────────────────
   Widget _buildMobileSectionBar() {
     return Container(
-      color: Colors.white,
+      color: context.appSurface,
       height: 48,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
@@ -699,22 +690,22 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
               margin: const EdgeInsets.only(right: 6),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: isActive ? _DS.accent : const Color(0xFFF1F5F9),
+                color: isActive ? _DS.accent : context.appSurface2,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isActive ? _DS.accent : const Color(0xFFE2E8F0),
+                  color: isActive ? _DS.accent : context.appBorder,
                 ),
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(_sectionIcon(_groups[i].icon),
                     size: 13,
-                    color: isActive ? Colors.white : const Color(0xFF64748B)),
+                    color: isActive ? Colors.white : context.appTextMuted),
                 const SizedBox(width: 5),
                 Text(_groups[i].title,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: isActive ? Colors.white : const Color(0xFF475569),
+                      color: isActive ? Colors.white : context.appTextSecondary,
                     )),
               ]),
             ),
@@ -742,7 +733,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
     final status = _data['strain_status']?.toString();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: context.appBg,
       appBar: _buildDesktopAppBar(code, status),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -833,10 +824,10 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
         SizedBox(
           width: 240,
           child: Container(
-            color: Colors.white,
+            color: context.appSurface,
             child: Column(children: [
               if (_sampleData.isNotEmpty) _buildSampleCard(),
-              const Divider(height: 1),
+              Divider(height: 1, color: context.appBorder),
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -848,15 +839,15 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
                       dense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                       leading: Icon(_sectionIcon(group.icon), size: 18,
-                          color: isExp ? _DS.accent : const Color(0xFF94A3B8)),
+                          color: isExp ? _DS.accent : context.appTextSecondary),
                       title: Text(group.title,
                           style: TextStyle(fontSize: 12,
                               fontWeight: isExp ? FontWeight.w600 : FontWeight.normal,
-                              color: isExp ? _DS.accent : const Color(0xFF475569))),
+                              color: isExp ? _DS.accent : context.appTextSecondary)),
                       trailing: Icon(
                           isExp ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
                           size: 16,
-                          color: isExp ? _DS.accent : const Color(0xFF94A3B8)),
+                          color: isExp ? _DS.accent : context.appTextSecondary),
                       onTap: () => setState(() {
                         if (isExp) {
                           _expanded.remove(i);
@@ -908,7 +899,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      color: const Color(0xFFEFF6FF),
+      color: _DS.accent.withValues(alpha: context.isDark ? 0.08 : 0.06),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           const Icon(Icons.colorize_outlined, size: 15, color: _DS.accent),
@@ -919,11 +910,11 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
         ]),
         const SizedBox(height: 6),
         Text(code?.toString() ?? 'Sample #${_data['strain_sample_code']}',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _DS.titleColor)),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.appTextPrimary)),
         if (subtitle.isNotEmpty) ...[
           const SizedBox(height: 3),
           Text(subtitle,
-              style: const TextStyle(fontSize: 11, color: _DS.labelColor),
+              style: TextStyle(fontSize: 11, color: context.appTextMuted),
               maxLines: 2, overflow: TextOverflow.ellipsis),
         ],
         const SizedBox(height: 10),
@@ -950,9 +941,9 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.appSurface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _DS.cardBorder),
+          border: Border.all(color: context.appBorder),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha:0.03), blurRadius: 6, offset: const Offset(0, 2)),
           ],
@@ -962,10 +953,10 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
-              color: _DS.sectionBg,
+              color: context.appSurface2,
               borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(12), topRight: Radius.circular(12)),
-              border: const Border(bottom: BorderSide(color: _DS.cardBorder)),
+              border: Border(bottom: BorderSide(color: context.appBorder)),
             ),
             child: Row(children: [
               Container(
@@ -977,7 +968,9 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
                 child: Icon(_sectionIcon(iconKey), size: 16, color: _DS.accent),
               ),
               const SizedBox(width: 10),
-              Text(title.toUpperCase(), style: _DS.sectionTitle),
+              Text(title.toUpperCase(), style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w700,
+                color: context.appTextMuted, letterSpacing: 0.8)),
               const Spacer(),
               GestureDetector(
                 onTap: () => setState(() {
@@ -987,7 +980,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
                     _expanded.add(index);
                   }
                 }),
-                child: Icon(Icons.keyboard_arrow_up_rounded, size: 20, color: const Color(0xFF94A3B8)),
+                child: Icon(Icons.keyboard_arrow_up_rounded, size: 20, color: context.appTextSecondary),
               ),
             ]),
           ),
@@ -1025,18 +1018,18 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
         controller: ctrl,
         readOnly: true,
         onTap: _showLastTransferDatePicker,
-        style: const TextStyle(fontSize: 13, color: _DS.titleColor),
+        style: TextStyle(fontSize: 13, color: context.appTextPrimary),
         decoration: InputDecoration(
           labelText: f.label,
-          labelStyle: const TextStyle(fontSize: 12, color: _DS.labelColor),
+          labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
           isDense: true,
           filled: true,
-          fillColor: const Color(0xFFFAFAFC),
-          suffixIcon: const Icon(Icons.calendar_today_outlined, size: 16, color: _DS.labelColor),
+          fillColor: context.appSurface3,
+          suffixIcon: Icon(Icons.calendar_today_outlined, size: 16, color: context.appTextMuted),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _DS.cardBorder)),
+              borderSide: BorderSide(color: context.appBorder)),
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _DS.cardBorder)),
+              borderSide: BorderSide(color: context.appBorder)),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: _DS.accent, width: 1.5)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1048,16 +1041,16 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
       return TextFormField(
         controller: ctrl,
         readOnly: true,
-        style: const TextStyle(fontSize: 13, color: _DS.titleColor),
+        style: TextStyle(fontSize: 13, color: context.appTextPrimary),
         decoration: InputDecoration(
           labelText: f.label,
-          labelStyle: const TextStyle(fontSize: 12, color: _DS.labelColor),
+          labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
           isDense: true,
           filled: true,
-          fillColor: const Color(0xFFF0F9FF),
+          fillColor: _DS.accent.withValues(alpha: context.isDark ? 0.08 : 0.05),
           suffixIcon: const Icon(Icons.auto_awesome_outlined, size: 16, color: _DS.accent),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _DS.cardBorder)),
+              borderSide: BorderSide(color: context.appBorder)),
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: _DS.accent.withValues(alpha: 0.35))),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
@@ -1071,19 +1064,19 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
       return TextFormField(
         controller: ctrl,
         readOnly: true,
-        style: const TextStyle(fontSize: 11, color: _DS.labelColor, fontFamily: 'monospace'),
+        style: TextStyle(fontSize: 11, color: context.appTextMuted, fontFamily: 'monospace'),
         decoration: InputDecoration(
           labelText: f.label,
-          labelStyle: const TextStyle(fontSize: 12, color: _DS.labelColor),
+          labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
           isDense: true,
           filled: true,
-          fillColor: const Color(0xFFF8FAFC),
+          fillColor: context.appSurface3,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _DS.cardBorder)),
+              borderSide: BorderSide(color: context.appBorder)),
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _DS.cardBorder)),
+              borderSide: BorderSide(color: context.appBorder)),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _DS.cardBorder)),
+              borderSide: BorderSide(color: context.appBorder)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           suffixIcon: IconButton(
             icon: const Icon(Icons.qr_code_outlined, size: 18, color: _DS.accent),
@@ -1098,17 +1091,17 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
       return TextFormField(
         controller: ctrl,
         maxLines: 1,
-        style: const TextStyle(fontSize: 13, color: _DS.titleColor),
+        style: TextStyle(fontSize: 13, color: context.appTextPrimary),
         decoration: InputDecoration(
           labelText: f.label,
-          labelStyle: const TextStyle(fontSize: 12, color: _DS.labelColor),
+          labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
           isDense: true,
           filled: true,
-          fillColor: const Color(0xFFFAFAFC),
+          fillColor: context.appSurface3,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _DS.cardBorder)),
+              borderSide: BorderSide(color: context.appBorder)),
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _DS.cardBorder)),
+              borderSide: BorderSide(color: context.appBorder)),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: _DS.accent, width: 1.5)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1120,20 +1113,20 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
     return TextFormField(
       controller: ctrl,
       maxLines: f.lines,
-      style: const TextStyle(fontSize: 13, color: _DS.titleColor),
+      style: TextStyle(fontSize: 13, color: context.appTextPrimary),
       decoration: InputDecoration(
         labelText: f.label,
-        labelStyle: const TextStyle(fontSize: 12, color: _DS.labelColor),
+        labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
         isDense: true,
         filled: true,
-        fillColor: const Color(0xFFFAFAFC),
+        fillColor: context.appSurface3,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _DS.cardBorder),
+          borderSide: BorderSide(color: context.appBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _DS.cardBorder),
+          borderSide: BorderSide(color: context.appBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

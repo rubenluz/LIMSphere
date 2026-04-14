@@ -1,8 +1,9 @@
 // register_page.dart - User registration form: email, password, display name;
-// creates Supabase auth user and inserts a pending users-table row.
+// creates Supabase auth user, inserts users-table row, logs in, navigates to menu.
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+import '../core/local_storage.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -67,7 +68,8 @@ class _RegisterPageState extends State<RegisterPage> {
         'user_name':        name,
         'user_email':       email,
         'user_role':        'researcher',
-        'user_status':      'pending',
+        'user_status':      'active',
+        'user_last_login':  DateTime.now().toIso8601String(),
         if (_phoneCtrl.text.trim().isNotEmpty)
           'user_phone': _phoneCtrl.text.trim(),
         if (_institutionCtrl.text.trim().isNotEmpty)
@@ -76,32 +78,10 @@ class _RegisterPageState extends State<RegisterPage> {
           'user_group': _groupCtrl.text.trim(),
       });
 
-      // Sign out immediately — account needs admin approval first
-      await Supabase.instance.client.auth.signOut();
+      await LocalStorage.saveSessionExpiry(0);
 
       if (!mounted) return;
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          icon: const Icon(Icons.check_circle_outline, size: 48, color: Colors.green),
-          title: const Text('Registration submitted'),
-          content: const Text(
-            'Your account has been created and is awaiting admin approval.\n\n'
-            'You will be able to login once an admin activates your account.',
-            textAlign: TextAlign.center,
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Go to Login'),
-            ),
-          ],
-        ),
-      );
-
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/login');
+      Navigator.pushReplacementNamed(context, '/menu');
     } on AuthException catch (e) {
       _snack('Error: ${e.message}');
     } catch (e) {
@@ -145,7 +125,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   const Text(
-                    'Your account will need admin approval before you can log in.',
+                    'Create your account to get started.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 13, color: Colors.grey),
                   ),

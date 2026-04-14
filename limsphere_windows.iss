@@ -1,6 +1,6 @@
 #define MyAppName "LIMSphere"
 #define MyAppFileName "LIMSphere"
-#define MyAppVersion "0.2.2"
+#define MyAppVersion "0.2.3"
 #define MyAppPublisher "Rúben Luz"
 #define MyAppExeName "limsphere"
 
