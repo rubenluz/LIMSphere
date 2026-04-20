@@ -266,16 +266,25 @@ class _StrainsPageState extends State<StrainsPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final cacheKey = widget.filterSampleId != null ? 'strains_${widget.filterSampleId}' : 'strains';
-    final cached = await DataCache.read(cacheKey);
-    if (cached != null && mounted) {
-      _rows = await compute(_parseStrainRows, cached);
-      if (!mounted) return;
-      if (_hideEmpty) { _detectEmptyCols(); } else { _emptyColKeys = {}; }
-      _buildPeriodicityOptions();
-      _applyFilter();
-      setState(() => _loading = false);
+    List<dynamic>? cached;
+    try {
+      cached = await DataCache.read(cacheKey);
+      if (cached != null && mounted) {
+        debugPrint('[StrainsPage] cache hit: ${cached.length} rows');
+        _rows = await compute(_parseStrainRows, cached);
+        if (!mounted) return;
+        if (_hideEmpty) { _detectEmptyCols(); } else { _emptyColKeys = {}; }
+        _buildPeriodicityOptions();
+        _applyFilter();
+        setState(() => _loading = false);
+      }
+    } catch (e, st) {
+      debugPrint('[StrainsPage] cache parse ERROR: $e');
+      debugPrint(st.toString());
+      if (mounted) setState(() => _loading = false);
     }
     try {
+      debugPrint('[StrainsPage] fetching strains from Supabase…');
       var q = Supabase.instance.client.from('strains').select('''
         *,
         samples (
@@ -290,7 +299,8 @@ class _StrainsPageState extends State<StrainsPage> {
       ''');
       if (widget.filterSampleId != null) q = q.eq('strain_sample_code', widget.filterSampleId);
       final res = await q.order('strain_code', ascending: true);
-      await DataCache.write(cacheKey, res as List<dynamic>);
+      debugPrint('[StrainsPage] fetch OK: ${(res as List).length} rows');
+      await DataCache.write(cacheKey, res);
       if (!mounted) return;
       _rows = await compute(_parseStrainRows, res);
       if (!mounted) return;
@@ -299,7 +309,9 @@ class _StrainsPageState extends State<StrainsPage> {
       _applyFilter();
       _syncNextTransferDates(); // background — no await
       setState(() => _loading = false);
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[StrainsPage] _load ERROR: $e');
+      debugPrint(st.toString());
       if (cached == null) _snack('Error loading strains: $e');
       if (mounted) setState(() => _loading = false);
     }
@@ -591,7 +603,126 @@ class _StrainsPageState extends State<StrainsPage> {
         .then((_) => _load());
   }
 
+  Future<void> _onRowActionSelected(String action, Map<String, dynamic> row) async {
+    switch (action) {
+      case 'need_transfer':
+        if (!context.canEditModule) { context.warnReadOnly(); return; }
+        await _toggleNeedNewTransfer(row);
+        break;
+      case 'request':
+        await showQuickRequestDialog(
+          context,
+          type: 'strains',
+          prefillTitle: row['strain_code']?.toString() ?? '',
+        );
+        break;
+      case 'print':
+        await showQuickPrintDialog(
+          context,
+          category: 'Strains',
+          entityId: row['strain_id']?.toString(),
+          data: {
+            'strain_code':           row['strain_code']?.toString() ?? '',
+            'strain_scientific_name':row['strain_scientific_name']?.toString() ?? '',
+            'strain_status':         row['strain_status']?.toString() ?? '',
+            'strain_origin':         row['strain_origin']?.toString() ?? '',
+            'strain_subspecies':     row['strain_subspecies']?.toString() ?? '',
+            'strain_variety':        row['strain_variety']?.toString() ?? '',
+          },
+        );
+        break;
+      case 'delete':
+        if (!context.canEditModule) { context.warnReadOnly(); return; }
+        await _deleteStrain(row);
+        break;
+    }
+  }
+
+  Future<void> _toggleNeedNewTransfer(Map<String, dynamic> row) async {
+    final id = row['strain_id'];
+    final current = row['strain_need_new_transfer'] == true;
+    final next = !current;
+    final idx = _rows.indexWhere((r) => r['strain_id'] == id);
+
+    setState(() {
+      if (idx != -1) _rows[idx]['strain_need_new_transfer'] = next;
+      row['strain_need_new_transfer'] = next;
+    });
+    _applyFilter();
+
+    try {
+      await Supabase.instance.client
+          .from('strains')
+          .update({'strain_need_new_transfer': next})
+          .eq('strain_id', id);
+      unawaited(BackupService.instance.notifyCrudChange('strains'));
+      _snack(next
+          ? 'Marked ${row['strain_code'] ?? ''} as needing new transfer'
+          : 'Removed need-new-transfer mark for ${row['strain_code'] ?? ''}');
+    } catch (e, st) {
+      debugPrint(st.toString());
+      setState(() {
+        if (idx != -1) _rows[idx]['strain_need_new_transfer'] = current;
+        row['strain_need_new_transfer'] = current;
+      });
+      _applyFilter();
+      _snack('Error: $e');
+    }
+  }
+
+  Future<void> _deleteStrain(Map<String, dynamic> row) async {
+    final code = row['strain_code']?.toString() ?? row['strain_id'].toString();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: context.appSurface,
+        icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 40),
+        title: Text('Delete Strain?', textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
+        content: RichText(
+          textAlign: TextAlign.center,
+          text: TextSpan(
+            style: TextStyle(fontSize: 14, color: context.appTextSecondary, height: 1.5),
+            children: [
+              const TextSpan(text: 'You are about to permanently delete\n'),
+              TextSpan(text: code,
+                  style: TextStyle(fontWeight: FontWeight.bold, color: context.appTextPrimary)),
+              const TextSpan(text: '.\n\nThis action cannot be undone.'),
+            ],
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          OutlinedButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            icon: const Icon(Icons.delete_forever_rounded, size: 16),
+            label: const Text('Delete'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await Supabase.instance.client
+          .from('strains')
+          .delete()
+          .eq('strain_id', row['strain_id']);
+      unawaited(BackupService.instance.notifyCrudChange('strains'));
+      _rows.removeWhere((r) => r['strain_id'] == row['strain_id']);
+      _applyFilter();
+      _snack('Deleted $code');
+    } catch (e, st) {
+      debugPrint(st.toString());
+      _snack('Delete error: $e');
+    }
+  }
+
   void _snack(String m) {
+    debugPrint('[StrainsPage] $m');
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(m), behavior: SnackBarBehavior.floating,
@@ -688,11 +819,35 @@ class _StrainsPageState extends State<StrainsPage> {
     List<Map<String, dynamic>> samples = [];
     try {
       samples = List<Map<String, dynamic>>.from(await Supabase.instance.client
-          .from('samples').select('sample_id, sample_rebeca, sample_ccpi, sample_number')
-          .order('sample_number'));
-    } catch (e) { _snack('Could not load samples: $e'); return; }
+          .from('samples').select('sample_id, sample_code, sample_rebeca, sample_ccpi')
+          .order('sample_code'));
+    } catch (e, st) {
+      debugPrint(st.toString());
+      _snack('Could not load samples: $e');
+      return;
+    }
     if (!mounted) return;
+
     dynamic selId = preselectedSampleId;
+    debugPrint('[StrainsPage] _showAddStrainDialog '
+        'preselect=$preselectedSampleId (${preselectedSampleId?.runtimeType}) '
+        'samplesLoaded=${samples.length}');
+
+    if (selId != null) {
+      final byCode = samples.where((s) => s['sample_code'] == selId).toList();
+      if (byCode.isEmpty) {
+        final byId = samples.where((s) => s['sample_id'] == selId).toList();
+        if (byId.isNotEmpty) {
+          debugPrint('[StrainsPage] preselect $selId matched sample_id; '
+              'coercing to sample_code=${byId.first['sample_code']}');
+          selId = byId.first['sample_code'];
+        } else {
+          debugPrint('[StrainsPage] preselect $selId matched neither '
+              'sample_code nor sample_id — clearing preselect');
+          selId = null;
+        }
+      }
+    }
     final codeCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -711,7 +866,7 @@ class _StrainsPageState extends State<StrainsPage> {
                     items: samples.map((s) {
                       final lbl = [s['sample_code']?.toString()]
                           .where((v) => v != null && v.isNotEmpty).join(' — ');
-                      return DropdownMenuItem(value: s['sample_id'],
+                      return DropdownMenuItem(value: s['sample_code'],
                           child: Text(lbl, overflow: TextOverflow.ellipsis));
                     }).toList(),
                     onChanged: (v) => setDs(() => selId = v),
@@ -729,17 +884,39 @@ class _StrainsPageState extends State<StrainsPage> {
               )),
     );
     if (ok != true || selId == null) return;
+
+    final match = samples.where((s) => s['sample_code'] == selId).toList();
+    if (match.isEmpty) {
+      debugPrint('[StrainsPage] CREATE BLOCKED: selId=$selId not found in '
+          'loaded samples (${samples.length}). Refusing to insert to avoid FK error.');
+      _snack('Selected sample not found — please reopen and pick again.');
+      return;
+    }
+
+    final payload = {
+      'strain_sample_code': selId,
+      'strain_code': codeCtrl.text.isEmpty ? null : codeCtrl.text,
+    };
+    debugPrint('[StrainsPage] inserting strain: $payload');
+
     try {
-      final res = await Supabase.instance.client.from('strains')
-          .insert({'strain_sample_code': selId, 'strain_code': codeCtrl.text.isEmpty ? null : codeCtrl.text})
-          .select().single();
+      final res = await Supabase.instance.client
+          .from('strains')
+          .insert(payload)
+          .select()
+          .single();
+      debugPrint('[StrainsPage] insert OK: strain_id=${res['strain_id']} '
+          'strain_code=${res['strain_code']}');
       unawaited(BackupService.instance.notifyCrudChange('strains'));
       if (mounted) {
         Navigator.push(context, MaterialPageRoute(builder: (_) =>
-            StrainDetailPage(strainId: res['strain_code'], onSaved: _load)))
+            StrainDetailPage(strainId: res['strain_id'], onSaved: _load)))
             .then((_) => _load());
       }
-    } catch (e) { _snack('Error creating strain: $e'); }
+    } catch (e, st) {
+      debugPrint(st.toString());
+      _snack('Error creating strain: $e');
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1080,19 +1257,26 @@ class _StrainsPageState extends State<StrainsPage> {
   // ── Data row ──────────────────────────────────────────────────────────────
   Widget _buildDataRow(Map<String, dynamic> row, int index, List<StrainColDef> cols,
       {bool highlight = false}) {
-    final urgency    = calculateStrainUrgency(row);
     final isSelected = _selectedRowIds.contains(row['strain_id']);
     final isDark     = Theme.of(context).brightness == Brightness.dark;
     final baseEven   = context.appSurface;
     final baseOdd    = context.appSurface2;
     final selColor   = isDark ? const Color(0xFF1E3A5F) : AppDS.tableRowSel;
+    final status     = row['strain_status']?.toString().toUpperCase();
+    final needNewTransfer = row['strain_need_new_transfer'] == true;
+    Color? statusBg;
+    if (status == 'DEAD') {
+      statusBg = isDark ? AppDS.red.withValues(alpha: 0.22) : const Color(0xFFFECACA);
+    } else if (status == 'INCARE') {
+      statusBg = isDark ? AppDS.yellow.withValues(alpha: 0.18) : const Color(0xFFFEF3C7);
+    } else if (needNewTransfer) {
+      statusBg = isDark ? AppDS.orange.withValues(alpha: 0.20) : const Color(0xFFFED7AA);
+    }
     Color rowBg = isSelected ? selColor
         : highlight ? (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFDEF1FF))
-        : urgency == StrainTransferUrgency.overdue ? (isDark ? AppDS.red.withValues(alpha: 0.18) : AppDS.tableRowUrgent)
-        : urgency == StrainTransferUrgency.soon    ? (isDark ? AppDS.yellow.withValues(alpha: 0.12) : AppDS.tableRowSoon)
-        : index.isEven ? baseEven : baseOdd;
+        : statusBg ?? (index.isEven ? baseEven : baseOdd);
     final cellBase = isSelected ? selColor
-        : index.isEven ? baseEven : baseOdd;
+        : statusBg ?? (index.isEven ? baseEven : baseOdd);
 
     return GestureDetector(
       onTap: _selectionMode ? () => _toggleRowSelection(row['strain_id']) : null,
@@ -1117,35 +1301,57 @@ class _StrainsPageState extends State<StrainsPage> {
                   style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                   onPressed: _selectionMode ? null : () => _openDetail(row),
                 ),
-                IconButton(
-                  icon: Icon(Icons.outbox_outlined, size: 14,
-                      color: _selectionMode ? AppDS.textSecondary : AppDS.textSecondary),
-                  tooltip: 'Quick Request', padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16, maxWidth: 16),
-                  style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                  onPressed: _selectionMode ? null : () => showQuickRequestDialog(
-                    context,
-                    type: 'strains',
-                    prefillTitle: row['strain_code']?.toString() ?? '',
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.print_outlined, size: 14,
-                      color: _selectionMode ? AppDS.textSecondary : AppDS.textSecondary),
-                  tooltip: 'Quick Print', padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16, maxWidth: 16),
-                  style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                  onPressed: _selectionMode ? null : () => showQuickPrintDialog(
-                    context,
-                    category: 'Strains',
-                    entityId: row['strain_id']?.toString(),
-                    data: {
-                      'strain_code':           row['strain_code']?.toString() ?? '',
-                      'strain_scientific_name':row['strain_scientific_name']?.toString() ?? '',
-                      'strain_status':         row['strain_status']?.toString() ?? '',
-                      'strain_origin':         row['strain_origin']?.toString() ?? '',
-                      'strain_subspecies':     row['strain_subspecies']?.toString() ?? '',
-                      'strain_variety':        row['strain_variety']?.toString() ?? '',
+                SizedBox(
+                  width: 16, height: 16,
+                  child: PopupMenuButton<String>(
+                    tooltip: 'More actions',
+                    padding: EdgeInsets.zero,
+                    enabled: !_selectionMode,
+                    icon: Icon(Icons.more_vert_rounded, size: 16, color: AppDS.textSecondary),
+                    iconSize: 16,
+                    splashRadius: 12,
+                    position: PopupMenuPosition.under,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    onSelected: (v) => _onRowActionSelected(v, row),
+                    itemBuilder: (ctx) {
+                      final marked = row['strain_need_new_transfer'] == true;
+                      return [
+                    PopupMenuItem(
+                      value: 'need_transfer',
+                      child: Row(children: [
+                        Icon(marked ? Icons.event_available_rounded : Icons.event_repeat_rounded,
+                            size: 16, color: AppDS.orange),
+                        const SizedBox(width: 10),
+                        Text(marked ? 'Remove need new transfer mark' : 'Mark needs new transfer',
+                            style: const TextStyle(fontSize: 13)),
+                      ]),
+                    ),
+                    PopupMenuItem(
+                      value: 'request',
+                      child: Row(children: [
+                        Icon(Icons.outbox_outlined, size: 16, color: AppDS.textSecondary),
+                        const SizedBox(width: 10),
+                        const Text('Quick request', style: TextStyle(fontSize: 13)),
+                      ]),
+                    ),
+                    PopupMenuItem(
+                      value: 'print',
+                      child: Row(children: [
+                        Icon(Icons.print_outlined, size: 16, color: AppDS.textSecondary),
+                        const SizedBox(width: 10),
+                        const Text('Quick print', style: TextStyle(fontSize: 13)),
+                      ]),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(children: [
+                        Icon(Icons.delete_forever_rounded, size: 16, color: AppDS.red),
+                        const SizedBox(width: 10),
+                        Text('Delete', style: TextStyle(fontSize: 13, color: AppDS.red)),
+                      ]),
+                    ),
+                    ];
                     },
                   ),
                 ),

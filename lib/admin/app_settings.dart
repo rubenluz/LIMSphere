@@ -7,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 /// Changes are immediately visible to all users.
 class AppSettings {
   static const _defaultVisible = {
-    'dashboard', 'labels', 'chat', 'requests', 'culture_collection', 'fish_facility', 'resources',
+    'dashboard', 'labels', 'chat', 'requests', 'tools', 'culture_collection', 'fish_facility', 'resources',
     'reservations',
   };
 

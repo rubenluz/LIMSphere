@@ -147,10 +147,10 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
     if (mounted) setState(() { _step = _Step.results; _searched = true; });
   }
 
-  // ── Update quantity dialog ──────────────────────────────────────────────────
+  // ── Update container count dialog ───────────────────────────────────────────
   Future<void> _showUpdateQuantity(ReagentModel r) async {
     final ctrl =
-        TextEditingController(text: r.quantity?.toString() ?? '');
+        TextEditingController(text: r.containerCount?.toString() ?? '');
     try {
       final saved = await showDialog<bool>(
         context: context,
@@ -158,7 +158,7 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
           backgroundColor: context.appSurface,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Text('Update Quantity',
+          title: Text('Update Container Count',
               style: GoogleFonts.spaceGrotesk(
                   color: context.appTextPrimary,
                   fontWeight: FontWeight.w600)),
@@ -171,10 +171,8 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
                   style: GoogleFonts.spaceGrotesk(
                       color: context.appTextMuted, fontSize: 12)),
             const SizedBox(height: 16),
-            _field(ctx, ctrl,
-                r.unit != null ? 'Quantity (${r.unit})' : 'Quantity',
-                keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true),
+            _field(ctx, ctrl, 'Containers on hand',
+                keyboardType: TextInputType.number,
                 autofocus: true),
           ]),
           actions: [
@@ -199,13 +197,13 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
       );
 
       if (saved != true || !mounted) return;
-      final newQty = double.tryParse(ctrl.text.trim());
-      if (newQty == null) return;
+      final newCount = int.tryParse(ctrl.text.trim());
+      if (newCount == null) return;
 
       await Supabase.instance.client
           .from('reagents')
           .update({
-            'reagent_quantity': newQty,
+            'reagent_container_count': newCount,
             'reagent_updated_at':
                 DateTime.now().toUtc().toIso8601String(),
           })
@@ -214,7 +212,7 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Quantity updated',
+        content: Text('Container count updated',
             style: GoogleFonts.spaceGrotesk(color: Colors.white)),
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppDS.green,
@@ -242,9 +240,10 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
   Future<void> _showCreateReagent() async {
     final nameCtrl = TextEditingController();
     final lotCtrl = TextEditingController();
-    final qtyCtrl = TextEditingController();
+    final packSizeCtrl = TextEditingController();
+    final countCtrl = TextEditingController();
     final unitCtrl = TextEditingController();
-    String type = 'chemical';
+    String category = 'chemical';
 
     try {
       final saved = await showDialog<bool>(
@@ -276,24 +275,24 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
                       ]),
                       const SizedBox(height: 10),
                       _dropdownField(ctx,
-                        label: 'Type',
-                        value: type,
-                        items: ReagentModel.typeOptions
-                            .map((t) => DropdownMenuItem(
-                                  value: t,
-                                  child: Text(ReagentModel.typeLabel(t),
+                        label: 'Category',
+                        value: category,
+                        items: ReagentModel.categoryOptions
+                            .map((c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(ReagentModel.categoryLabel(c),
                                       style: GoogleFonts.spaceGrotesk(
                                           color: context.appTextPrimary,
                                           fontSize: 13)),
                                 ))
                             .toList(),
                         onChanged: (v) =>
-                            setS(() => type = v ?? 'chemical'),
+                            setS(() => category = v ?? 'chemical'),
                       ),
                       const SizedBox(height: 10),
                       Row(children: [
                         Expanded(
-                          child: _field(ctx, qtyCtrl, 'Quantity',
+                          child: _field(ctx, packSizeCtrl, 'Package size',
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                       decimal: true)),
@@ -302,6 +301,9 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
                         Expanded(
                             child: _field(ctx, unitCtrl, 'Unit')),
                       ]),
+                      const SizedBox(height: 10),
+                      _field(ctx, countCtrl, 'Containers on hand',
+                          keyboardType: TextInputType.number),
                       const SizedBox(height: 10),
                       _field(ctx, lotCtrl, 'Lot Number'),
                     ]),
@@ -337,14 +339,17 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
 
       await Supabase.instance.client.from('reagents').insert({
         'reagent_name': nameCtrl.text.trim(),
-        'reagent_type': type,
+        'reagent_category': category,
         if (_brandCtrl.text.isNotEmpty)
           'reagent_brand': _brandCtrl.text.trim(),
         if (_refCtrl.text.isNotEmpty)
           'reagent_reference': _refCtrl.text.trim(),
-        if (qtyCtrl.text.isNotEmpty)
-          'reagent_quantity':
-              double.tryParse(qtyCtrl.text.trim()),
+        if (packSizeCtrl.text.isNotEmpty)
+          'reagent_package_size':
+              double.tryParse(packSizeCtrl.text.trim()),
+        if (countCtrl.text.isNotEmpty)
+          'reagent_container_count':
+              int.tryParse(countCtrl.text.trim()),
         if (unitCtrl.text.isNotEmpty)
           'reagent_unit': unitCtrl.text.trim(),
         if (lotCtrl.text.isNotEmpty)
@@ -376,7 +381,8 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
     } finally {
       nameCtrl.dispose();
       lotCtrl.dispose();
-      qtyCtrl.dispose();
+      packSizeCtrl.dispose();
+      countCtrl.dispose();
       unitCtrl.dispose();
     }
   }
@@ -750,8 +756,8 @@ class _ItemRegisterPageState extends State<ItemRegisterPage> {
                         color: context.appTextSecondary,
                         fontSize: 12),
                   ),
-                if (r.displayQuantity != '—')
-                  Text('In stock: ${r.displayQuantity}',
+                if (r.displayTotalStock != '—')
+                  Text('In stock: ${r.displayTotalStock}',
                       style: GoogleFonts.jetBrainsMono(
                           color: context.appTextMuted,
                           fontSize: 11)),

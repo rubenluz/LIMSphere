@@ -1,5 +1,5 @@
 // reagent_detail_page.dart - Reagent editor: inline fields for all reagent
-// properties, date pickers, location & type dropdowns, QR code display.
+// properties, date pickers, location & category dropdowns, QR code display.
 // Pushed via Navigator with its own Scaffold + AppBar.
 // Light and dark theme
 
@@ -30,7 +30,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   List<Map<String, dynamic>> _allLocations = [];
   bool _loading = true;
   bool _saving  = false;
-  final Set<int> _expanded = {0, 1, 2, 3, 4};
+  final Set<int> _expanded = {0, 1, 2, 3, 4, 5};
 
   // Controllers
   late final TextEditingController _codeCtrl;
@@ -44,61 +44,65 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   late final TextEditingController _concentrationCtrl;
   late final TextEditingController _formulaCtrl;
   late final TextEditingController _hazardCtrl;
-  late final TextEditingController _quantityCtrl;
+  late final TextEditingController _packSizeCtrl;
+  late final TextEditingController _containerCountCtrl;
+  late final TextEditingController _containerMinCtrl;
+  late final TextEditingController _remainingCtrl;
   late final TextEditingController _unitCtrl;
-  late final TextEditingController _quantityMinCtrl;
   late final TextEditingController _positionCtrl;
   late final TextEditingController _notesCtrl;
+  late final TextEditingController _contamNotesCtrl;
+  late final TextEditingController _tagsCtrl;
 
   // Dropdown / date state
-  String  _type          = 'biological';
+  String  _category      = 'chemical';
+  String? _subcategory;
+  String  _contamination = 'none';
   String? _physicalState;
   String? _storageTemp;
   int?    _locationId;
   DateTime? _expiryDate;
   DateTime? _receivedDate;
   DateTime? _openedDate;
+  DateTime? _contaminationDate;
 
   @override
   void initState() {
     super.initState();
-    _codeCtrl          = TextEditingController();
-    _nameCtrl          = TextEditingController();
-    _brandCtrl         = TextEditingController();
-    _supplierCtrl      = TextEditingController();
-    _responsibleCtrl   = TextEditingController();
-    _referenceCtrl     = TextEditingController();
-    _casCtrl           = TextEditingController();
-    _lotCtrl           = TextEditingController();
-    _concentrationCtrl = TextEditingController();
-    _formulaCtrl       = TextEditingController();
-    _hazardCtrl        = TextEditingController();
-    _quantityCtrl      = TextEditingController();
-    _unitCtrl          = TextEditingController();
-    _quantityMinCtrl   = TextEditingController();
-    _positionCtrl      = TextEditingController();
-    _notesCtrl         = TextEditingController();
+    _codeCtrl           = TextEditingController();
+    _nameCtrl           = TextEditingController();
+    _brandCtrl          = TextEditingController();
+    _supplierCtrl       = TextEditingController();
+    _responsibleCtrl    = TextEditingController();
+    _referenceCtrl      = TextEditingController();
+    _casCtrl            = TextEditingController();
+    _lotCtrl            = TextEditingController();
+    _concentrationCtrl  = TextEditingController();
+    _formulaCtrl        = TextEditingController();
+    _hazardCtrl         = TextEditingController();
+    _packSizeCtrl       = TextEditingController();
+    _containerCountCtrl = TextEditingController();
+    _containerMinCtrl   = TextEditingController();
+    _remainingCtrl      = TextEditingController();
+    _unitCtrl           = TextEditingController();
+    _positionCtrl       = TextEditingController();
+    _notesCtrl          = TextEditingController();
+    _contamNotesCtrl    = TextEditingController();
+    _tagsCtrl           = TextEditingController();
     _load();
   }
 
   @override
   void dispose() {
-    _codeCtrl.dispose();
-    _nameCtrl.dispose();
-    _brandCtrl.dispose();
-    _supplierCtrl.dispose();
-    _responsibleCtrl.dispose();
-    _referenceCtrl.dispose();
-    _casCtrl.dispose();
-    _lotCtrl.dispose();
-    _concentrationCtrl.dispose();
-    _formulaCtrl.dispose();
-    _hazardCtrl.dispose();
-    _quantityCtrl.dispose();
-    _unitCtrl.dispose();
-    _quantityMinCtrl.dispose();
-    _positionCtrl.dispose();
-    _notesCtrl.dispose();
+    for (final c in [
+      _codeCtrl, _nameCtrl, _brandCtrl, _supplierCtrl, _responsibleCtrl,
+      _referenceCtrl, _casCtrl, _lotCtrl, _concentrationCtrl, _formulaCtrl,
+      _hazardCtrl, _packSizeCtrl, _containerCountCtrl, _containerMinCtrl,
+      _remainingCtrl, _unitCtrl, _positionCtrl, _notesCtrl,
+      _contamNotesCtrl, _tagsCtrl,
+    ]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -135,29 +139,36 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
       });
 
       if (mounted) {
-        _codeCtrl.text          = reagent.code ?? '';
-        _nameCtrl.text          = reagent.name ?? '';
-        _brandCtrl.text         = reagent.brand ?? '';
-        _supplierCtrl.text      = reagent.supplier ?? '';
-        _responsibleCtrl.text   = reagent.responsible ?? '';
-        _referenceCtrl.text     = reagent.reference ?? '';
-        _casCtrl.text           = reagent.casNumber ?? '';
-        _lotCtrl.text           = reagent.lotNumber ?? '';
-        _concentrationCtrl.text = reagent.concentration ?? '';
-        _formulaCtrl.text       = reagent.formula ?? '';
-        _hazardCtrl.text        = reagent.hazard ?? '';
-        _quantityCtrl.text      = reagent.quantity?.toString() ?? '';
-        _unitCtrl.text          = reagent.unit ?? '';
-        _quantityMinCtrl.text   = reagent.quantityMin?.toString() ?? '';
-        _positionCtrl.text      = reagent.position ?? '';
-        _notesCtrl.text         = reagent.notes ?? '';
-        _type          = reagent.type;
-        _physicalState = reagent.physicalState;
-        _storageTemp   = reagent.storageTemp;
-        _locationId  = reagent.locationId;
-        _expiryDate  = reagent.expiryDate;
-        _receivedDate = reagent.receivedDate;
-        _openedDate  = reagent.openedDate;
+        _codeCtrl.text           = reagent.code ?? '';
+        _nameCtrl.text           = reagent.name ?? '';
+        _brandCtrl.text          = reagent.brand ?? '';
+        _supplierCtrl.text       = reagent.supplier ?? '';
+        _responsibleCtrl.text    = reagent.responsible ?? '';
+        _referenceCtrl.text      = reagent.reference ?? '';
+        _casCtrl.text            = reagent.casNumber ?? '';
+        _lotCtrl.text            = reagent.lotNumber ?? '';
+        _concentrationCtrl.text  = reagent.concentration ?? '';
+        _formulaCtrl.text        = reagent.formula ?? '';
+        _hazardCtrl.text         = reagent.hazard ?? '';
+        _packSizeCtrl.text       = reagent.packageSize?.toString() ?? '';
+        _containerCountCtrl.text = reagent.containerCount?.toString() ?? '';
+        _containerMinCtrl.text   = reagent.containerMin?.toString() ?? '';
+        _remainingCtrl.text      = reagent.remainingAmount?.toString() ?? '';
+        _unitCtrl.text           = reagent.unit ?? '';
+        _positionCtrl.text       = reagent.position ?? '';
+        _notesCtrl.text          = reagent.notes ?? '';
+        _contamNotesCtrl.text    = reagent.contaminationNotes ?? '';
+        _tagsCtrl.text           = reagent.tagList.join('; ');
+        _category          = reagent.category;
+        _subcategory       = reagent.subcategory;
+        _contamination     = reagent.contamination;
+        _physicalState     = reagent.physicalState;
+        _storageTemp       = reagent.storageTemp;
+        _locationId        = reagent.locationId;
+        _expiryDate        = reagent.expiryDate;
+        _receivedDate      = reagent.receivedDate;
+        _openedDate        = reagent.openedDate;
+        _contaminationDate = reagent.contaminationDate;
 
         setState(() {
           _reagent      = reagent;
@@ -166,6 +177,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         });
       }
     } catch (e) {
+      debugPrint('ReagentDetailPage load error: $e');
       if (mounted) {
         setState(() => _loading = false);
         _snack('Failed to load: $e');
@@ -178,30 +190,37 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     setState(() => _saving = true);
     try {
       final data = <String, dynamic>{
-        'reagent_code':         _codeCtrl.text.trim(),
-        'reagent_name':         _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
-        'reagent_type':           _type,
-        'reagent_physical_state': _physicalState,
-        'reagent_brand':          _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
-        'reagent_supplier':     _supplierCtrl.text.trim().isEmpty     ? null : _supplierCtrl.text.trim(),
-        'reagent_responsible':  _responsibleCtrl.text.trim().isEmpty  ? null : _responsibleCtrl.text.trim(),
-        'reagent_reference':    _referenceCtrl.text.trim().isEmpty    ? null : _referenceCtrl.text.trim(),
-        'reagent_cas_number':   _casCtrl.text.trim().isEmpty          ? null : _casCtrl.text.trim(),
-        'reagent_lot_number':   _lotCtrl.text.trim().isEmpty          ? null : _lotCtrl.text.trim(),
-        'reagent_concentration':_concentrationCtrl.text.trim().isEmpty? null : _concentrationCtrl.text.trim(),
-        'reagent_formula':      _formulaCtrl.text.trim().isEmpty      ? null : _formulaCtrl.text.trim(),
-        'reagent_hazard':       _hazardCtrl.text.trim().isEmpty       ? null : _hazardCtrl.text.trim(),
-        'reagent_quantity':     double.tryParse(_quantityCtrl.text.trim()),
-        'reagent_unit':         _unitCtrl.text.trim().isEmpty         ? null : _unitCtrl.text.trim(),
-        'reagent_quantity_min': double.tryParse(_quantityMinCtrl.text.trim()),
-        'reagent_storage_temp': _storageTemp,
-        'reagent_location_id':  _locationId,
-        'reagent_position':     _positionCtrl.text.trim().isEmpty     ? null : _positionCtrl.text.trim(),
-        'reagent_expiry_date':  _expiryDate?.toIso8601String().substring(0, 10),
-        'reagent_received_date':_receivedDate?.toIso8601String().substring(0, 10),
-        'reagent_opened_date':  _openedDate?.toIso8601String().substring(0, 10),
-        'reagent_notes':        _notesCtrl.text.trim().isEmpty        ? null : _notesCtrl.text.trim(),
-        'reagent_qrcode':       QrRules.build(SupabaseManager.projectRef ?? 'local', 'reagents', widget.reagentId),
+        'reagent_code':            _codeCtrl.text.trim(),
+        'reagent_name':            _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
+        'reagent_category':        _category,
+        'reagent_subcategory':     _subcategory,
+        'reagent_physical_state':  _physicalState,
+        'reagent_brand':           _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
+        'reagent_supplier':        _supplierCtrl.text.trim().isEmpty ? null : _supplierCtrl.text.trim(),
+        'reagent_responsible':     _responsibleCtrl.text.trim().isEmpty ? null : _responsibleCtrl.text.trim(),
+        'reagent_reference':       _referenceCtrl.text.trim().isEmpty ? null : _referenceCtrl.text.trim(),
+        'reagent_cas_number':      _casCtrl.text.trim().isEmpty ? null : _casCtrl.text.trim(),
+        'reagent_lot_number':      _lotCtrl.text.trim().isEmpty ? null : _lotCtrl.text.trim(),
+        'reagent_concentration':   _concentrationCtrl.text.trim().isEmpty ? null : _concentrationCtrl.text.trim(),
+        'reagent_formula':         _formulaCtrl.text.trim().isEmpty ? null : _formulaCtrl.text.trim(),
+        'reagent_hazard':          _hazardCtrl.text.trim().isEmpty ? null : _hazardCtrl.text.trim(),
+        'reagent_package_size':    double.tryParse(_packSizeCtrl.text.trim()),
+        'reagent_container_count': int.tryParse(_containerCountCtrl.text.trim()),
+        'reagent_container_min':   int.tryParse(_containerMinCtrl.text.trim()),
+        'reagent_remaining_amount':double.tryParse(_remainingCtrl.text.trim()),
+        'reagent_unit':            _unitCtrl.text.trim().isEmpty ? null : _unitCtrl.text.trim(),
+        'reagent_storage_temp':    _storageTemp,
+        'reagent_location_id':     _locationId,
+        'reagent_position':        _positionCtrl.text.trim().isEmpty ? null : _positionCtrl.text.trim(),
+        'reagent_expiry_date':     _expiryDate?.toIso8601String().substring(0, 10),
+        'reagent_received_date':   _receivedDate?.toIso8601String().substring(0, 10),
+        'reagent_opened_date':     _openedDate?.toIso8601String().substring(0, 10),
+        'reagent_notes':           _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+        'reagent_contamination':   _contamination,
+        'reagent_contamination_notes': _contamNotesCtrl.text.trim().isEmpty ? null : _contamNotesCtrl.text.trim(),
+        'reagent_contamination_date':  _contaminationDate?.toIso8601String().substring(0, 10),
+        'reagent_tags':            ReagentModel.joinTags(_tagsCtrl.text.split(';')),
+        'reagent_qrcode':          QrRules.build(SupabaseManager.projectRef ?? 'local', 'reagents', widget.reagentId),
       };
       await Supabase.instance.client
           .from('reagents')
@@ -211,6 +230,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
       await _load();
       _snack('Saved');
     } catch (e) {
+      debugPrint('ReagentDetailPage save error: $e');
       _snack('Save failed: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -261,9 +281,26 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
       unawaited(BackupService.instance.notifyCrudChange('reagents'));
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
+      debugPrint('ReagentDetailPage delete error: $e');
       _snack('Delete failed: $e');
     }
   }
+
+  static const _categoryAccent = <String, Color>{
+    'chemical':   Color(0xFF38BDF8),
+    'biological': Color(0xFF22C55E),
+    'consumable': Color(0xFFF59E0B),
+    'kit':        Color(0xFF8B5CF6),
+    'standard':   Color(0xFF75B1E3),
+  };
+
+  static const _contamColor = <String, Color>{
+    'none':      Color(0xFF22C55E),
+    'bacteria':  Color(0xFFEF4444),
+    'fungi':     Color(0xFFA855F7),
+    'both':      Color(0xFFEC4899),
+    'suspected': Color(0xFFEAB308),
+  };
 
   Color _physicalStateColor(String s) => switch (s) {
         'liquid' => const Color(0xFF38BDF8),
@@ -341,31 +378,12 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   }
 
   Widget _buildBody(BuildContext context, ReagentModel r) {
-    final typeAccentMap = <String, Color>{
-      'biological':           const Color(0xFF22C55E),
-      'consumables':          const Color(0xFFF59E0B),
-      'ppe':                  const Color(0xFFF97316),
-      'bioactivity_assays':   const Color(0xFF8B5CF6),
-      'analytical_chemistry': const Color(0xFF06B6D4),
-      'media_preparation':    const Color(0xFF10B981),
-      'cleaning_maintenance': const Color(0xFF94A3B8),
-      'standards':            const Color(0xFF86b0d3),
-      // legacy
-      'chemical': const Color(0xFF38BDF8),
-      'kit':      const Color(0xFF8B5CF6),
-      'media':    const Color(0xFF10B981),
-      'gas':      const Color(0xFF64748B),
-      'consumable': const Color(0xFFF59E0B),
-    };
-    final accent = typeAccentMap[r.type] ?? AppDS.accent;
+    final accent = _categoryAccent[r.category] ?? AppDS.accent;
     final qrData = 'bluelims://${SupabaseManager.projectRef ?? 'local'}/reagents/${r.id}';
 
     return SingleChildScrollView(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        // ── Header ────────────────────────────────────────────────────────────
         _buildHeader(context, r, accent, qrData),
-
-        // ── Sections ──────────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(children: [
@@ -394,24 +412,33 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
               expanded: _expanded.contains(2),
               onToggle: () => setState(() =>
                   _expanded.contains(2) ? _expanded.remove(2) : _expanded.add(2)),
-              child: _buildStockSection(context),
+              child: _buildStockSection(context, r),
             ),
             _Section(
               index: 3,
-              title: 'DATES',
-              icon: Icons.calendar_today_outlined,
+              title: 'CONTAMINATION',
+              icon: Icons.biotech_outlined,
               expanded: _expanded.contains(3),
               onToggle: () => setState(() =>
                   _expanded.contains(3) ? _expanded.remove(3) : _expanded.add(3)),
-              child: _buildDatesSection(context),
+              child: _buildContaminationSection(context),
             ),
             _Section(
               index: 4,
-              title: 'NOTES',
-              icon: Icons.notes_rounded,
+              title: 'DATES',
+              icon: Icons.calendar_today_outlined,
               expanded: _expanded.contains(4),
               onToggle: () => setState(() =>
                   _expanded.contains(4) ? _expanded.remove(4) : _expanded.add(4)),
+              child: _buildDatesSection(context),
+            ),
+            _Section(
+              index: 5,
+              title: 'NOTES',
+              icon: Icons.notes_rounded,
+              expanded: _expanded.contains(5),
+              onToggle: () => setState(() =>
+                  _expanded.contains(5) ? _expanded.remove(5) : _expanded.add(5)),
               child: _InlineField(
                   label: 'Notes', controller: _notesCtrl, maxLines: 4),
             ),
@@ -452,11 +479,21 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
             ],
             const SizedBox(height: 8),
             Wrap(spacing: 6, runSpacing: 4, children: [
-              _Badge(label: ReagentModel.typeLabel(r.type), color: accent),
+              _Badge(label: ReagentModel.categoryLabel(r.category), color: accent),
+              if (r.subcategory != null)
+                _Badge(
+                  label: ReagentModel.subcategoryLabel(r.subcategory!),
+                  color: accent.withValues(alpha: 0.7),
+                ),
               if (r.physicalState != null)
                 _Badge(
                   label: ReagentModel.physicalStateLabel(r.physicalState!),
                   color: _physicalStateColor(r.physicalState!),
+                ),
+              if (r.isContaminated)
+                _Badge(
+                  label: ReagentModel.contaminationLabel(r.contamination),
+                  color: _contamColor[r.contamination] ?? AppDS.red,
                 ),
               if (r.isExpired)      _Badge(label: 'Expired',       color: AppDS.red),
               if (r.isExpiringSoon && !r.isExpired)
@@ -465,6 +502,15 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
               if (r.hazard != null && r.hazard!.isNotEmpty)
                                     _Badge(label: r.hazard!,       color: AppDS.yellow),
             ]),
+            if (r.totalStock != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Total stock: ${r.displayTotalStock}'
+                '${r.containerCount != null ? " • ${r.containerCount} × ${r.displayPackageSize}" : ""}',
+                style: GoogleFonts.jetBrainsMono(
+                    color: context.appTextSecondary, fontSize: 11),
+              ),
+            ],
             const SizedBox(height: 6),
             GestureDetector(
               onTap: () async {
@@ -484,25 +530,52 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   // ── Section bodies ─────────────────────────────────────────────────────────
 
   Widget _buildDetailsSection(BuildContext context) {
+    final subOptions =
+        ReagentModel.subcategoryOptions[_category] ?? const <String>[];
+    if (_subcategory != null && !subOptions.contains(_subcategory)) {
+      _subcategory = null;
+    }
     return Column(children: [
       _FieldRow(children: [
         _InlineField(label: 'Name', controller: _nameCtrl),
         _InlineDropdown<String>(
-          label: 'Type',
-          value: _type,
-          items: ReagentModel.typeOptions
+          label: 'Category',
+          value: _category,
+          items: ReagentModel.categoryOptions
               .map((t) => DropdownMenuItem(
                     value: t,
-                    child: Text(ReagentModel.typeLabel(t),
+                    child: Text(ReagentModel.categoryLabel(t),
                         style: GoogleFonts.spaceGrotesk(
                             color: context.appTextPrimary, fontSize: 13)),
                   ))
               .toList(),
-          onChanged: (v) => setState(() => _type = v ?? 'biological'),
+          onChanged: (v) => setState(() {
+            _category = v ?? 'chemical';
+            _subcategory = null;
+          }),
         ),
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
+        _InlineDropdown<String?>(
+          label: 'Subcategory',
+          value: _subcategory,
+          items: [
+            DropdownMenuItem<String?>(
+              value: null,
+              child: Text('—',
+                  style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextMuted, fontSize: 13)),
+            ),
+            ...subOptions.map((s) => DropdownMenuItem<String?>(
+                  value: s,
+                  child: Text(ReagentModel.subcategoryLabel(s),
+                      style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextPrimary, fontSize: 13)),
+                )),
+          ],
+          onChanged: (v) => setState(() => _subcategory = v),
+        ),
         _InlineDropdown<String?>(
           label: 'Physical State',
           value: _physicalState,
@@ -522,13 +595,18 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
           ],
           onChanged: (v) => setState(() => _physicalState = v),
         ),
-        _InlineField(label: 'Brand', controller: _brandCtrl),
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
+        _InlineField(label: 'Brand', controller: _brandCtrl),
         _InlineField(label: 'Supplier', controller: _supplierCtrl),
         _InlineField(label: 'Responsible', controller: _responsibleCtrl),
       ]),
+      const SizedBox(height: 10),
+      _InlineField(
+        label: 'Tags (separated by ";")',
+        controller: _tagsCtrl,
+      ),
     ]);
   }
 
@@ -552,21 +630,32 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     ]);
   }
 
-  Widget _buildStockSection(BuildContext context) {
+  Widget _buildStockSection(BuildContext context, ReagentModel r) {
     return Column(children: [
       _FieldRow(children: [
         _InlineField(
-            label: 'Quantity',
-            controller: _quantityCtrl,
+            label: 'Package / flask size',
+            controller: _packSizeCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true)),
-        _InlineField(label: 'Unit', controller: _unitCtrl),
+        _InlineField(label: 'Unit (mL / g / …)', controller: _unitCtrl),
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
         _InlineField(
-            label: 'Reorder threshold',
-            controller: _quantityMinCtrl,
+            label: '# Containers on hand',
+            controller: _containerCountCtrl,
+            keyboardType: TextInputType.number),
+        _InlineField(
+            label: 'Min containers (reorder)',
+            controller: _containerMinCtrl,
+            keyboardType: TextInputType.number),
+        _InlineField(
+            label: 'Remaining in opened',
+            controller: _remainingCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+      ]),
+      const SizedBox(height: 10),
+      _FieldRow(children: [
         _InlineDropdown<String?>(
           label: 'Storage Temp',
           value: _storageTemp,
@@ -584,9 +673,6 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
           ],
           onChanged: (v) => setState(() => _storageTemp = v),
         ),
-      ]),
-      const SizedBox(height: 10),
-      _FieldRow(children: [
         _InlineDropdown<int?>(
           label: 'Location',
           value: _locationId,
@@ -607,6 +693,69 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         ),
         _InlineField(label: 'Position', controller: _positionCtrl),
       ]),
+      if (r.totalStock != null) ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: context.appSurface2,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: context.appBorder),
+          ),
+          child: Row(children: [
+            Icon(Icons.calculate_outlined, size: 14, color: context.appTextMuted),
+            const SizedBox(width: 8),
+            Text('Effective total stock: ',
+                style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextSecondary, fontSize: 12)),
+            Text(r.displayTotalStock,
+                style: GoogleFonts.jetBrainsMono(
+                    color: context.appTextPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ]),
+        ),
+      ],
+    ]);
+  }
+
+  Widget _buildContaminationSection(BuildContext context) {
+    return Column(children: [
+      _FieldRow(children: [
+        _InlineDropdown<String>(
+          label: 'Status',
+          value: _contamination,
+          items: ReagentModel.contaminationOptions
+              .map((c) => DropdownMenuItem(
+                    value: c,
+                    child: Text(ReagentModel.contaminationLabel(c),
+                        style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextPrimary, fontSize: 13)),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() {
+            _contamination = v ?? 'none';
+            if (_contamination != 'none' && _contaminationDate == null) {
+              _contaminationDate = DateTime.now();
+            }
+          }),
+        ),
+        _DateField(
+          label: 'Detected on',
+          date: _contaminationDate,
+          onTap: () => _pickDate(_contaminationDate,
+              (d) => setState(() => _contaminationDate = d)),
+          onClear: () => setState(() => _contaminationDate = null),
+        ),
+      ]),
+      if (_contamination != 'none') ...[
+        const SizedBox(height: 10),
+        _InlineField(
+          label: 'Contamination notes',
+          controller: _contamNotesCtrl,
+          maxLines: 2,
+        ),
+      ],
     ]);
   }
 

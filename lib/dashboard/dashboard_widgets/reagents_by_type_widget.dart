@@ -1,5 +1,5 @@
 // reagents_by_type_widget.dart – Dashboard donut chart showing reagent
-// distribution by type (chemicals, biologicals, consumables, etc.).
+// distribution by category (chemicals, biologicals, consumables, etc.).
 
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -50,11 +50,11 @@ class _ReagentsByTypeWidgetState extends State<ReagentsByTypeWidget> {
     try {
       final rows = await Supabase.instance.client
           .from('reagents')
-          .select('reagent_type');
+          .select('reagent_category');
 
       final Map<String, int> counts = {};
       for (final r in rows as List) {
-        final t = (r['reagent_type'] as String?)?.trim() ?? '';
+        final t = (r['reagent_category'] as String?)?.trim() ?? '';
         if (t.isEmpty) continue;
         counts[t] = (counts[t] ?? 0) + 1;
       }
@@ -164,7 +164,7 @@ class _ReagentsByTypeWidgetState extends State<ReagentsByTypeWidget> {
                   size: 20, color: AppDS.purple),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Reagents by Type',
+                child: Text('Reagents by Category',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,

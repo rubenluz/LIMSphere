@@ -325,21 +325,27 @@ class _SamplesPageState extends State<SamplesPage> {
   Future<void> _addRow() async {
     if (!context.canEditModule) { context.warnReadOnly(); return; }
     try {
-      final maxRes = await Supabase.instance.client
+      final allCodes = await Supabase.instance.client
           .from('samples')
-          .select('sample_code')
-          .order('sample_code', ascending: false)
-          .limit(1);
-      final nextNum = (maxRes as List).isNotEmpty && maxRes[0]['sample_code'] != null
-          ? (maxRes[0]['sample_code'] as num).toInt() + 1
-          : 1;
+          .select('sample_code');
+      int maxNum = 0;
+      for (final r in (allCodes as List)) {
+        final raw = r['sample_code'];
+        if (raw == null) continue;
+        final n = raw is num ? raw.toInt() : int.tryParse(raw.toString());
+        if (n != null && n > maxNum) maxNum = n;
+      }
+      final nextNum = maxNum + 1;
+      debugPrint('[SamplesPage] inserting sample_code=$nextNum (TEXT)');
       final res = await Supabase.instance.client
           .from('samples')
-          .insert({'sample_code': nextNum})
+          .insert({'sample_code': nextNum.toString()})
           .select()
           .single();
       final newRow = Map<String, dynamic>.from(res);
-      final newId = newRow['sample_id'] as int?;
+      final newId = newRow['sample_id'] is num
+          ? (newRow['sample_id'] as num).toInt()
+          : int.tryParse(newRow['sample_id']?.toString() ?? '');
       if (newId != null) {
         final qrcode = QrRules.build(
             SupabaseManager.projectRef ?? 'local', 'samples', newId);
@@ -352,7 +358,11 @@ class _SamplesPageState extends State<SamplesPage> {
       _rows.add(newRow);
       _detectEmptyCols();
       _applyFilter();
-    } catch (e) {
+      debugPrint('[SamplesPage] insert OK: sample_id=$newId '
+          'sample_code=${newRow['sample_code']}');
+    } catch (e, st) {
+      debugPrint('[SamplesPage] _addRow ERROR: $e');
+      debugPrint(st.toString());
       _snack('Error adding row: $e');
     }
   }
@@ -368,6 +378,7 @@ class _SamplesPageState extends State<SamplesPage> {
   }
 
   void _snack(String msg) {
+    debugPrint('[SamplesPage] $msg');
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(msg),

@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard_widgets/next_transfer_widget.dart';
+import 'dashboard_widgets/need_new_transfer_widget.dart';
 import 'dashboard_widgets/strains_by_origin_widget.dart';
 import 'dashboard_widgets/strains_by_medium_widget.dart';
 import 'dashboard_widgets/transfer_status_widget.dart';
@@ -52,6 +53,7 @@ const _availableWidgets = [
   {'id': 'breeding_activity',  'name': 'Breeding Activity',        'icon': Icons.egg_outlined,               'cat': 'Fish Facility'},
   // ── Culture Collection ───────────────────────────────────────────────────
   {'id': 'next_transfer',       'name': 'Next Transfers',           'icon': Icons.schedule,                   'cat': 'Culture Collection'},
+  {'id': 'need_new_transfer',   'name': 'Needs New Transfer',       'icon': Icons.event_repeat_rounded,       'cat': 'Culture Collection'},
   {'id': 'transfer_status',     'name': 'Transfer Status',          'icon': Icons.warning_amber,              'cat': 'Culture Collection'},
   {'id': 'transfer_timeline',   'name': 'Transfer Timeline',        'icon': Icons.timeline_rounded,           'cat': 'Culture Collection'},
   {'id': 'in_care',             'name': 'In Care',                  'icon': Icons.medical_services,           'cat': 'Culture Collection'},
@@ -193,9 +195,13 @@ class _DashboardPageState extends State<DashboardPage> {
       String? latestVer;
       String? latestUrl;
 
+      final pattern = Platform.isMacOS
+          ? RegExp(r'LIMSphere_installer_v(\d+\.\d+\.\d+)\.app\.zip$')
+          : RegExp(r'LIMSphere_installer_v(\d+\.\d+\.\d+)\.exe$');
+
       for (final file in files) {
         final name = (file as Map<String, dynamic>)['name'] as String? ?? '';
-        final m = RegExp(r'LIMSphere_installer_v(\d+\.\d+\.\d+)').firstMatch(name);
+        final m = pattern.firstMatch(name);
         if (m != null) {
           final ver = m.group(1)!;
           if (latestVer == null || _cmpVer(ver, latestVer) > 0) {
@@ -385,6 +391,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildWidget(String widgetType) {
     switch (widgetType) {
       case 'next_transfer':        return const NextTransferWidget();
+      case 'need_new_transfer':    return const NeedNewTransferWidget();
       case 'strains_by_origin':    return const StrainsByOriginWidget();
       case 'strains_by_medium':    return const StrainsByMediumWidget();
       case 'transfer_status':      return const TransferStatusWidget();

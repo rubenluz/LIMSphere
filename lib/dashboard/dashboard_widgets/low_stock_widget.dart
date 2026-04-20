@@ -1,5 +1,5 @@
 // low_stock_widget.dart – Dashboard widget showing reagents whose current
-// quantity is at or below the reorder threshold (reagent_quantity_min).
+// container count is at or below the reorder threshold (reagent_container_min).
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -35,30 +35,31 @@ class _LowStockWidgetState extends State<LowStockWidget> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      // Fetch reagents that have a minimum threshold set.
+      // Fetch reagents that have a container minimum threshold set.
       final rows = await Supabase.instance.client
           .from('reagents')
           .select(
-              'reagent_name, reagent_quantity, reagent_quantity_min, reagent_unit')
-          .not('reagent_quantity_min', 'is', null)
+              'reagent_name, reagent_container_count, reagent_container_min, reagent_package_size, reagent_unit')
+          .not('reagent_container_min', 'is', null)
           .order('reagent_name');
 
       final List<_LowItem> items = [];
       for (final r in rows as List) {
-        final qty = (r['reagent_quantity'] as num?)?.toDouble() ?? 0;
-        final min = (r['reagent_quantity_min'] as num?)?.toDouble();
+        final count = (r['reagent_container_count'] as num?)?.toInt() ?? 0;
+        final min = (r['reagent_container_min'] as num?)?.toInt();
         if (min == null || min <= 0) continue;
-        if (qty > min) continue;
+        if (count > min) continue;
         items.add(_LowItem(
           name: r['reagent_name'] as String? ?? '—',
-          qty: qty,
+          count: count,
           min: min,
+          packageSize: (r['reagent_package_size'] as num?)?.toDouble(),
           unit: r['reagent_unit'] as String? ?? '',
         ));
       }
 
       // Sort: lowest ratio first (most critical on top).
-      items.sort((a, b) => (a.qty / a.min).compareTo(b.qty / b.min));
+      items.sort((a, b) => (a.count / a.min).compareTo(b.count / b.min));
 
       if (!mounted) return;
       setState(() {
@@ -71,9 +72,9 @@ class _LowStockWidgetState extends State<LowStockWidget> {
     }
   }
 
-  Color _urgencyColor(double qty, double min) {
-    if (qty <= 0) return AppDS.red;
-    if (qty <= min * 0.5) return AppDS.orange;
+  Color _urgencyColor(int count, int min) {
+    if (count <= 0) return AppDS.red;
+    if (count <= min * 0.5) return AppDS.orange;
     return AppDS.yellow;
   }
 
@@ -107,8 +108,8 @@ class _LowStockWidgetState extends State<LowStockWidget> {
       separatorBuilder: (_, _) => const SizedBox(height: 6),
       itemBuilder: (_, i) {
         final it = _items[i];
-        final color = _urgencyColor(it.qty, it.min);
-        final pct = (it.qty / it.min).clamp(0.0, 1.0);
+        final color = _urgencyColor(it.count, it.min);
+        final pct = (it.count / it.min).clamp(0.0, 1.0);
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
@@ -141,7 +142,9 @@ class _LowStockWidgetState extends State<LowStockWidget> {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  '${_fmt(it.qty)} / ${_fmt(it.min)} ${it.unit}',
+                  it.packageSize != null
+                      ? '${it.count} / ${it.min} × ${_fmt(it.packageSize!)} ${it.unit}'
+                      : '${it.count} / ${it.min} containers',
                   style: AppDS.mono(size: 11, color: color),
                 ),
               ]),
@@ -204,12 +207,14 @@ class _LowStockWidgetState extends State<LowStockWidget> {
 
 class _LowItem {
   final String name;
-  final double qty;
-  final double min;
+  final int count;
+  final int min;
+  final double? packageSize;
   final String unit;
   const _LowItem(
       {required this.name,
-      required this.qty,
+      required this.count,
       required this.min,
+      required this.packageSize,
       required this.unit});
 }

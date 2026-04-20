@@ -1,5 +1,5 @@
 // reagents_widgets.dart - Part of reagents_page.dart.
-// _ReagentRow: list tile with expiry/stock indicators.
+// _ReagentRow: list tile with expiry/stock/contamination indicators.
 // _RowBtn, _Badge, _FilterChip: small UI atoms.
 // _ReagentFormDialog: add/edit reagent form dialog.
 part of 'reagents_page.dart';
@@ -12,8 +12,19 @@ class _ReagentRow extends StatelessWidget {
   final VoidCallback onRequest;
   final Map<String, dynamic>? editingCell;
   final TextEditingController editController;
+  final FocusNode editFocus;
   final void Function(int id, String key, String initial) onStartEdit;
-  final void Function(ReagentModel r, String key, String raw) onCommitEdit;
+  final VoidCallback onAdvance;
+  final VoidCallback onAdvanceBack;
+  final VoidCallback onCancel;
+  final VoidCallback onAddNewRow;
+  final void Function(int id, String value) onCommitCategory;
+  final void Function(int id, String value) onCommitSubcategory;
+  final void Function(int id, String? value) onCommitPhysicalState;
+  final void Function(int id, String value) onCommitContamination;
+  final void Function(int id, int? value) onCommitLocation;
+  final Future<void> Function(int id, DateTime? current) onPickOpenedDate;
+  final List<Map<String, dynamic>> locations;
 
   const _ReagentRow({
     required this.reagent,
@@ -22,12 +33,20 @@ class _ReagentRow extends StatelessWidget {
     required this.onRequest,
     required this.editingCell,
     required this.editController,
+    required this.editFocus,
     required this.onStartEdit,
-    required this.onCommitEdit,
+    required this.onAdvance,
+    required this.onAdvanceBack,
+    required this.onCancel,
+    required this.onAddNewRow,
+    required this.onCommitCategory,
+    required this.onCommitSubcategory,
+    required this.onCommitPhysicalState,
+    required this.onCommitContamination,
+    required this.onCommitLocation,
+    required this.onPickOpenedDate,
+    required this.locations,
   });
-
-  static String _fmtQty(double v) =>
-      v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
 
   static String _unitDisplay(String? u) {
     if (u == null) return '—';
@@ -40,21 +59,20 @@ class _ReagentRow extends StatelessWidget {
     };
   }
 
-  static const _typeAccent = {
-    'biological':           Color(0xFF22C55E),
-    'consumables':          Color(0xFFF59E0B),
-    'ppe':                  Color(0xFFF97316),
-    'bioactivity_assays':   Color(0xFF8B5CF6),
-    'analytical_chemistry': Color(0xFF06B6D4),
-    'media_preparation':    Color(0xFF10B981),
-    'cleaning_maintenance': Color(0xFF94A3B8),
-    'standards':            Color(0xFF75b1e3),
-    // legacy
+  static const _categoryAccent = {
     'chemical':   Color(0xFF38BDF8),
-    'kit':        Color(0xFF8B5CF6),
-    'media':      Color(0xFF10B981),
-    'gas':        Color(0xFF64748B),
+    'biological': Color(0xFF22C55E),
     'consumable': Color(0xFFF59E0B),
+    'kit':        Color(0xFF8B5CF6),
+    'standard':   Color(0xFF75B1E3),
+  };
+
+  static const _contamColor = {
+    'none':      Color(0xFF22C55E),
+    'bacteria':  Color(0xFFEF4444),
+    'fungi':     Color(0xFFA855F7),
+    'both':      Color(0xFFEC4899),
+    'suspected': Color(0xFFEAB308),
   };
 
   bool _isEditing(String key) =>
@@ -62,42 +80,54 @@ class _ReagentRow extends StatelessWidget {
       editingCell!['id'] == reagent.id &&
       editingCell!['key'] == key;
 
-  Widget _textField(BuildContext ctx, String key, TextStyle ts) => TextField(
-    controller: editController,
-    autofocus: true,
-    style: ts,
-    decoration: InputDecoration(
-      isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      filled: true,
-      fillColor: ctx.appSurface2,
-      border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
-      enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
-      focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
-    ),
-    onSubmitted: (v) => onCommitEdit(reagent, key, v),
-    onTapOutside: (_) => onCommitEdit(reagent, key, editController.text),
-  );
+  Widget _editField(BuildContext ctx, String key, TextStyle ts,
+      {TextInputType? keyboardType}) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.tab):         onAdvance,
+        const SingleActivator(LogicalKeyboardKey.tab, shift: true): onAdvanceBack,
+        const SingleActivator(LogicalKeyboardKey.enter):       onAdvance,
+        const SingleActivator(LogicalKeyboardKey.enter, control: true): onAddNewRow,
+        const SingleActivator(LogicalKeyboardKey.escape):      onCancel,
+      },
+      child: TextField(
+        controller: editController,
+        focusNode: editFocus,
+        keyboardType: keyboardType,
+        style: ts,
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          filled: true,
+          fillColor: ctx.appSurface2,
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
+        ),
+      ),
+    );
+  }
 
-  Widget _editCell(BuildContext ctx, String key, String initial, Widget display, TextStyle ts) =>
+  Widget _editCell(BuildContext ctx, String key, String initial, Widget display, TextStyle ts,
+      {TextInputType? keyboardType}) =>
       GestureDetector(
         onDoubleTap: () => onStartEdit(reagent.id, key, initial),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-          child: _isEditing(key) ? _textField(ctx, key, ts) : display,
+          child: _isEditing(key) ? _editField(ctx, key, ts, keyboardType: keyboardType) : display,
         ),
       );
 
   @override
   Widget build(BuildContext context) {
     final r = reagent;
-    final accent = _typeAccent[r.type] ?? const Color(0xFF94A3B8);
+    final accent = _categoryAccent[r.category] ?? const Color(0xFF94A3B8);
 
     final primary   = context.appTextPrimary;
     final secondary = context.appTextSecondary;
@@ -111,6 +141,7 @@ class _ReagentRow extends StatelessWidget {
 
     Color bg = rowIndex.isEven ? context.appSurface : context.appSurface2;
     if (r.isExpired) bg = AppDS.red.withValues(alpha: 0.08);
+    if (r.isContaminated) bg = AppDS.purple.withValues(alpha: 0.06);
 
     return Container(
       height: AppDS.tableRowH,
@@ -147,36 +178,87 @@ class _ReagentRow extends StatelessWidget {
           ),
         ),
 
-        // ── Type ──────────────────────────────────────────────────────────
+        // ── Category ──────────────────────────────────────────────────────
         SizedBox(
-          width: _colType,
+          width: _colCategory,
           child: GestureDetector(
-            onDoubleTap: () => onStartEdit(r.id, 'type', r.type),
+            onDoubleTap: () => onStartEdit(r.id, 'category', r.category),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              child: _isEditing('type')
-                  ? DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: r.type,
-                        isDense: true,
-                        isExpanded: true,
-                        dropdownColor: context.appSurface,
-                        style: GoogleFonts.spaceGrotesk(color: primary, fontSize: 12),
-                        items: ReagentModel.typeOptions
-                            .map((t) => DropdownMenuItem(
-                                  value: t,
-                                  child: Text(ReagentModel.typeLabel(t),
-                                      style: GoogleFonts.spaceGrotesk(
-                                          color: primary, fontSize: 12)),
-                                ))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) onCommitEdit(r, 'type', v);
-                        },
-                      ),
+              child: _isEditing('category')
+                  ? _ArrowDropdown<String>(
+                      values: ReagentModel.categoryOptions,
+                      current: r.category,
+                      labelOf: ReagentModel.categoryLabel,
+                      onSelect: (v) => onCommitCategory(r.id, v),
+                      onCancel: onCancel,
                     )
-                  : _Badge(label: ReagentModel.typeLabel(r.type), color: accent),
+                  : _Badge(label: ReagentModel.categoryLabel(r.category), color: accent),
             ),
+          ),
+        ),
+
+        // ── Subcategory ───────────────────────────────────────────────────
+        SizedBox(
+          width: _colSubcat,
+          child: GestureDetector(
+            onDoubleTap: () =>
+                onStartEdit(r.id, 'subcategory', r.subcategory ?? ''),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: _isEditing('subcategory')
+                  ? _ArrowDropdown<String>(
+                      values: ReagentModel.subcategoryOptions[r.category]
+                              ?? const <String>[],
+                      current: r.subcategory ?? '',
+                      labelOf: ReagentModel.subcategoryLabel,
+                      onSelect: (v) => onCommitSubcategory(r.id, v),
+                      onCancel: onCancel,
+                    )
+                  : Text(
+                      r.subcategory != null
+                          ? ReagentModel.subcategoryLabel(r.subcategory!)
+                          : '—',
+                      overflow: TextOverflow.ellipsis,
+                      style: r.subcategory != null ? tsCell : tsMuted,
+                    ),
+            ),
+          ),
+        ),
+
+        // ── Tags (semicolon-separated) ────────────────────────────────────
+        SizedBox(
+          width: _colTags,
+          child: _editCell(
+            context,
+            'tags',
+            r.tags ?? '',
+            r.tagList.isEmpty
+                ? Text('—',
+                    overflow: TextOverflow.ellipsis, style: tsMuted)
+                : Wrap(
+                    spacing: 4,
+                    runSpacing: 2,
+                    children: [
+                      for (final t in r.tagList)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(3),
+                            border:
+                                Border.all(color: accent.withValues(alpha: 0.4)),
+                          ),
+                          child: Text(t,
+                              style: AppDS.ui(
+                                  size: 10,
+                                  color: accent,
+                                  weight: FontWeight.w600)),
+                        ),
+                    ],
+                  ),
+            tsCell,
           ),
         ),
 
@@ -186,7 +268,7 @@ class _ReagentRow extends StatelessWidget {
           child: _isEditing('name')
               ? Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  child: _textField(context, 'name', tsName),
+                  child: _editField(context, 'name', tsName),
                 )
               : GestureDetector(
                   onDoubleTap: () => onStartEdit(r.id, 'name', r.name ?? ''),
@@ -226,81 +308,120 @@ class _ReagentRow extends StatelessWidget {
         // ── Physical State ────────────────────────────────────────────────
         SizedBox(
           width: _colState,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            child: r.physicalState != null
-                ? _Badge(
-                    label: ReagentModel.physicalStateLabel(r.physicalState!),
-                    color: switch (r.physicalState!) {
-                      'liquid' => const Color(0xFF38BDF8),
-                      'solid'  => const Color(0xFF94A3B8),
-                      'gas'    => const Color(0xFFA78BFA),
-                      _        => const Color(0xFF64748B),
-                    },
-                  )
-                : Text('—', style: tsMuted),
+          child: GestureDetector(
+            onDoubleTap: () => onStartEdit(r.id, 'physicalState', r.physicalState ?? ''),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: _isEditing('physicalState')
+                  ? _ArrowDropdown<String?>(
+                      values: [null, ...ReagentModel.physicalStateOptions],
+                      current: r.physicalState,
+                      labelOf: (v) => v == null ? '—' : ReagentModel.physicalStateLabel(v),
+                      onSelect: (v) => onCommitPhysicalState(r.id, v),
+                      onCancel: onCancel,
+                    )
+                  : r.physicalState != null
+                      ? _Badge(
+                          label: ReagentModel.physicalStateLabel(r.physicalState!),
+                          color: switch (r.physicalState!) {
+                            'liquid' => const Color(0xFF38BDF8),
+                            'solid'  => const Color(0xFF94A3B8),
+                            'gas'    => const Color(0xFFA78BFA),
+                            _        => const Color(0xFF64748B),
+                          },
+                        )
+                      : Text('—', style: tsMuted),
+            ),
           ),
         ),
 
         // ── Formula ───────────────────────────────────────────────────────
         SizedBox(
           width: _colFormula,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            child: Text(r.formula ?? '—',
-                overflow: TextOverflow.ellipsis,
-                style: r.formula != null ? tsMono : tsMonoMut),
-          ),
+          child: _editCell(context, 'formula', r.formula ?? '',
+              Text(r.formula ?? '—',
+                  overflow: TextOverflow.ellipsis,
+                  style: r.formula != null ? tsMono : tsMonoMut),
+              tsMono),
         ),
 
         // ── Opened Date ───────────────────────────────────────────────────
         SizedBox(
           width: _colOpened,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            child: Text(
-              r.openedDate != null
-                  ? '${r.openedDate!.year}-${r.openedDate!.month.toString().padLeft(2, '0')}-${r.openedDate!.day.toString().padLeft(2, '0')}'
-                  : '—',
-              overflow: TextOverflow.ellipsis,
-              style: r.openedDate != null ? tsMono : tsMonoMut,
+          child: GestureDetector(
+            onDoubleTap: () => onPickOpenedDate(r.id, r.openedDate),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: Text(
+                r.openedDate != null
+                    ? '${r.openedDate!.year}-${r.openedDate!.month.toString().padLeft(2, '0')}-${r.openedDate!.day.toString().padLeft(2, '0')}'
+                    : '—',
+                overflow: TextOverflow.ellipsis,
+                style: r.openedDate != null ? tsMono : tsMonoMut,
+              ),
             ),
           ),
         ),
 
-        // ── Location (read-only in row) ───────────────────────────────────
+        // ── Location ─────────────────────────────────────────────────────
         SizedBox(
           width: _colLoc,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            child: Text(r.locationName ?? '—',
-                overflow: TextOverflow.ellipsis,
-                style: r.locationName != null ? tsCell : tsMuted),
+          child: GestureDetector(
+            onDoubleTap: () => onStartEdit(r.id, 'location', ''),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: _isEditing('location')
+                  ? DropdownButtonHideUnderline(
+                      child: DropdownButton<int?>(
+                        value: r.locationId,
+                        isDense: true,
+                        isExpanded: true,
+                        autofocus: true,
+                        dropdownColor: context.appSurface,
+                        style: GoogleFonts.spaceGrotesk(color: primary, fontSize: 12),
+                        items: [
+                          DropdownMenuItem<int?>(value: null,
+                            child: Text('None', style: GoogleFonts.spaceGrotesk(
+                                color: muted, fontSize: 12))),
+                          ...locations.map((l) => DropdownMenuItem<int?>(
+                            value: (l['location_id'] as num).toInt(),
+                            child: Text(l['location_name'] as String,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.spaceGrotesk(
+                                    color: primary, fontSize: 12)))),
+                        ],
+                        onChanged: (v) => onCommitLocation(r.id, v),
+                      ),
+                    )
+                  : Text(r.locationName ?? '—',
+                      overflow: TextOverflow.ellipsis,
+                      style: r.locationName != null ? tsCell : tsMuted),
+            ),
           ),
         ),
 
-        // ── Amount ────────────────────────────────────────────────────────
+        // ── Size (package/flask size) ─────────────────────────────────────
         SizedBox(
-          width: _colAmt,
-          child: _editCell(context, 'quantity', r.quantity?.toString() ?? '',
-              Text(r.quantity != null ? _fmtQty(r.quantity!) : '—',
+          width: _colPackSize,
+          child: _editCell(context, 'packageSize',
+              r.packageSize?.toString() ?? '',
+              Text(r.displayPackageSize,
                   overflow: TextOverflow.ellipsis,
-                  style: r.isLowStock
-                      ? GoogleFonts.jetBrainsMono(fontSize: 12, color: AppDS.orange)
-                      : (r.quantity != null ? tsMono : tsMonoMut)),
-              tsMono),
+                  style: r.packageSize != null ? tsMono : tsMonoMut),
+              tsMono,
+              keyboardType: TextInputType.number),
         ),
 
-        // ── Min Qty ───────────────────────────────────────────────────────
+        // ── Remaining (in opened container) ───────────────────────────────
         SizedBox(
-          width: _colMin,
-          child: _editCell(context, 'quantityMin', r.quantityMin?.toString() ?? '',
-              Text(r.quantityMin != null ? _fmtQty(r.quantityMin!) : '—',
+          width: _colRemaining,
+          child: _editCell(context, 'remainingAmount',
+              r.remainingAmount?.toString() ?? '',
+              Text(r.displayRemaining,
                   overflow: TextOverflow.ellipsis,
-                  style: r.quantityMin != null
-                      ? GoogleFonts.jetBrainsMono(fontSize: 12, color: context.appTextMuted)
-                      : tsMonoMut),
-              tsMonoMut),
+                  style: r.remainingAmount != null ? tsMono : tsMonoMut),
+              tsMono,
+              keyboardType: TextInputType.number),
         ),
 
         // ── Unit ──────────────────────────────────────────────────────────
@@ -312,13 +433,63 @@ class _ReagentRow extends StatelessWidget {
               tsCell),
         ),
 
+        // ── Container count ───────────────────────────────────────────────
+        SizedBox(
+          width: _colCount,
+          child: _editCell(context, 'containerCount',
+              r.containerCount?.toString() ?? '',
+              Text(r.containerCount?.toString() ?? '—',
+                  overflow: TextOverflow.ellipsis,
+                  style: r.isLowStock
+                      ? GoogleFonts.jetBrainsMono(fontSize: 12, color: AppDS.orange, fontWeight: FontWeight.w600)
+                      : (r.containerCount != null ? tsMono : tsMonoMut)),
+              tsMono,
+              keyboardType: TextInputType.number),
+        ),
+
+        // ── Container min ─────────────────────────────────────────────────
+        SizedBox(
+          width: _colMin,
+          child: _editCell(context, 'containerMin',
+              r.containerMin?.toString() ?? '',
+              Text(r.containerMin?.toString() ?? '—',
+                  overflow: TextOverflow.ellipsis,
+                  style: r.containerMin != null ? tsMonoMut : tsMonoMut),
+              tsMonoMut,
+              keyboardType: TextInputType.number),
+        ),
+
         // ── Concentration ─────────────────────────────────────────────────
         SizedBox(
-          width: _colSize,
+          width: _colConc,
           child: _editCell(context, 'concentration', r.concentration ?? '',
               Text(r.concentration ?? '—', overflow: TextOverflow.ellipsis,
                   style: r.concentration != null ? tsMono : tsMonoMut),
               tsMono),
+        ),
+
+        // ── Contamination ─────────────────────────────────────────────────
+        SizedBox(
+          width: _colContam,
+          child: GestureDetector(
+            onDoubleTap: () =>
+                onStartEdit(r.id, 'contamination', r.contamination),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: _isEditing('contamination')
+                  ? _ArrowDropdown<String>(
+                      values: ReagentModel.contaminationOptions,
+                      current: r.contamination,
+                      labelOf: ReagentModel.contaminationLabel,
+                      onSelect: (v) => onCommitContamination(r.id, v),
+                      onCancel: onCancel,
+                    )
+                  : _Badge(
+                      label: ReagentModel.contaminationLabel(r.contamination),
+                      color: _contamColor[r.contamination] ?? muted,
+                    ),
+            ),
+          ),
         ),
 
         // ── Brand ─────────────────────────────────────────────────────────
@@ -359,6 +530,117 @@ class _RowBtn extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       padding: const EdgeInsets.all(6),
       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+    );
+  }
+}
+
+// Arrow-key driven inline selector: Up/Down cycle through values,
+// Enter commits, Escape cancels. Autofocuses on mount.
+class _ArrowDropdown<T> extends StatefulWidget {
+  final List<T> values;
+  final T current;
+  final String Function(T) labelOf;
+  final void Function(T) onSelect;
+  final VoidCallback onCancel;
+  const _ArrowDropdown({
+    required this.values,
+    required this.current,
+    required this.labelOf,
+    required this.onSelect,
+    required this.onCancel,
+  });
+
+  @override
+  State<_ArrowDropdown<T>> createState() => _ArrowDropdownState<T>();
+}
+
+class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
+  late int _index;
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.values.indexOf(widget.current);
+    if (_index < 0) _index = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showMenu() async {
+    final box = context.findRenderObject() as RenderBox;
+    final pos = box.localToGlobal(Offset(0, box.size.height));
+    final picked = await showMenu<int>(
+      context: context,
+      position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + box.size.width, pos.dy),
+      color: context.appSurface,
+      items: [
+        for (var i = 0; i < widget.values.length; i++)
+          PopupMenuItem(
+            value: i,
+            height: 32,
+            child: Text(widget.labelOf(widget.values[i]),
+                style: GoogleFonts.spaceGrotesk(
+                    color: i == _index ? AppDS.accent : context.appTextPrimary,
+                    fontSize: 12,
+                    fontWeight: i == _index ? FontWeight.w600 : FontWeight.normal)),
+          ),
+      ],
+    );
+    if (!mounted) return;
+    if (picked != null) {
+      setState(() => _index = picked);
+      widget.onSelect(widget.values[picked]);
+    } else {
+      _focus.requestFocus();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () {
+          setState(() => _index = (_index + 1) % widget.values.length);
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () {
+          setState(() => _index = (_index - 1 + widget.values.length) % widget.values.length);
+        },
+        const SingleActivator(LogicalKeyboardKey.enter): _showMenu,
+        const SingleActivator(LogicalKeyboardKey.tab): () =>
+            widget.onSelect(widget.values[_index]),
+        const SingleActivator(LogicalKeyboardKey.escape): widget.onCancel,
+      },
+      child: Focus(
+        focusNode: _focus,
+        child: GestureDetector(
+          onTap: _showMenu,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: context.appSurface2,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: AppDS.accent, width: 1.5),
+            ),
+            child: Row(children: [
+              Expanded(
+                child: Text(widget.labelOf(widget.values[_index]),
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextPrimary, fontSize: 12)),
+              ),
+              Icon(Icons.unfold_more, size: 12, color: context.appTextMuted),
+            ]),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -422,7 +704,8 @@ class _FilterChip extends StatelessWidget {
 class _ReagentFormDialog extends StatefulWidget {
   final ReagentModel? existing;
   final List<Map<String, dynamic>> locations;
-  const _ReagentFormDialog({this.existing, required this.locations});
+  final String? nextCode;
+  const _ReagentFormDialog({this.existing, required this.locations, this.nextCode});
 
   @override
   State<_ReagentFormDialog> createState() => _ReagentFormDialogState();
@@ -436,8 +719,10 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
   late final TextEditingController _refCtrl;
   late final TextEditingController _casCtrl;
   late final TextEditingController _unitCtrl;
-  late final TextEditingController _qtyCtrl;
-  late final TextEditingController _qtyMinCtrl;
+  late final TextEditingController _packSizeCtrl;
+  late final TextEditingController _countCtrl;
+  late final TextEditingController _minCtrl;
+  late final TextEditingController _remainingCtrl;
   late final TextEditingController _concCtrl;
   late final TextEditingController _lotCtrl;
   late final TextEditingController _supplierCtrl;
@@ -445,27 +730,36 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
   late final TextEditingController _responsibleCtrl;
   late final TextEditingController _notesCtrl;
   late final TextEditingController _positionCtrl;
-  String _type = 'biological';
+  late final TextEditingController _contamNotesCtrl;
+  late final TextEditingController _tagsCtrl;
+  String? _subcategory;
+  String _category = 'chemical';
+  String _contamination = 'none';
   String? _storageTemp;
   int? _locationId;
   DateTime? _expiryDate;
   DateTime? _receivedDate;
+  DateTime? _contamDate;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     final e = widget.existing;
-    _codeCtrl = TextEditingController(text: e?.code ?? '');
+    _codeCtrl = TextEditingController(text: e?.code ?? widget.nextCode ?? '');
     _nameCtrl = TextEditingController(text: e?.name ?? '');
     _brandCtrl = TextEditingController(text: e?.brand ?? '');
     _refCtrl = TextEditingController(text: e?.reference ?? '');
     _casCtrl = TextEditingController(text: e?.casNumber ?? '');
     _unitCtrl = TextEditingController(text: e?.unit ?? '');
-    _qtyCtrl = TextEditingController(
-        text: e?.quantity != null ? e!.quantity.toString() : '');
-    _qtyMinCtrl = TextEditingController(
-        text: e?.quantityMin != null ? e!.quantityMin.toString() : '');
+    _packSizeCtrl = TextEditingController(
+        text: e?.packageSize != null ? e!.packageSize.toString() : '');
+    _countCtrl = TextEditingController(
+        text: e?.containerCount != null ? e!.containerCount.toString() : '1');
+    _minCtrl = TextEditingController(
+        text: e?.containerMin != null ? e!.containerMin.toString() : '');
+    _remainingCtrl = TextEditingController(
+        text: e?.remainingAmount != null ? e!.remainingAmount.toString() : '');
     _concCtrl = TextEditingController(text: e?.concentration ?? '');
     _lotCtrl = TextEditingController(text: e?.lotNumber ?? '');
     _supplierCtrl = TextEditingController(text: e?.supplier ?? '');
@@ -473,19 +767,26 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
     _responsibleCtrl = TextEditingController(text: e?.responsible ?? '');
     _notesCtrl = TextEditingController(text: e?.notes ?? '');
     _positionCtrl = TextEditingController(text: e?.position ?? '');
-    _type = e?.type ?? 'biological';
+    _contamNotesCtrl = TextEditingController(text: e?.contaminationNotes ?? '');
+    _tagsCtrl = TextEditingController(text: e?.tags ?? '');
+    _subcategory = e?.subcategory;
+    _category = e?.category ?? 'chemical';
+    _contamination = e?.contamination ?? 'none';
     _storageTemp = e?.storageTemp;
     _locationId = e?.locationId;
     _expiryDate = e?.expiryDate;
     _receivedDate = e?.receivedDate;
+    _contamDate = e?.contaminationDate;
   }
 
   @override
   void dispose() {
     for (final c in [
       _codeCtrl, _nameCtrl, _brandCtrl, _refCtrl, _casCtrl, _unitCtrl,
-      _qtyCtrl, _qtyMinCtrl, _concCtrl, _lotCtrl, _supplierCtrl,
+      _packSizeCtrl, _countCtrl, _minCtrl, _remainingCtrl,
+      _concCtrl, _lotCtrl, _supplierCtrl,
       _hazardCtrl, _responsibleCtrl, _notesCtrl, _positionCtrl,
+      _contamNotesCtrl, _tagsCtrl,
     ]) {
       c.dispose();
     }
@@ -498,16 +799,24 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
     try {
       final data = {
         'reagent_name': _nameCtrl.text.trim(),
-        'reagent_type': _type,
+        'reagent_category': _category,
+        'reagent_contamination': _contamination,
+        if (_subcategory != null) 'reagent_subcategory': _subcategory,
+        'reagent_tags':
+            ReagentModel.joinTags(_tagsCtrl.text.split(';')),
         'reagent_code': _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
         if (_brandCtrl.text.isNotEmpty) 'reagent_brand': _brandCtrl.text.trim(),
         if (_refCtrl.text.isNotEmpty) 'reagent_reference': _refCtrl.text.trim(),
         if (_casCtrl.text.isNotEmpty) 'reagent_cas_number': _casCtrl.text.trim(),
         if (_unitCtrl.text.isNotEmpty) 'reagent_unit': _unitCtrl.text.trim(),
-        if (_qtyCtrl.text.isNotEmpty)
-          'reagent_quantity': double.tryParse(_qtyCtrl.text.trim()),
-        if (_qtyMinCtrl.text.isNotEmpty)
-          'reagent_quantity_min': double.tryParse(_qtyMinCtrl.text.trim()),
+        if (_packSizeCtrl.text.isNotEmpty)
+          'reagent_package_size': double.tryParse(_packSizeCtrl.text.trim()),
+        if (_countCtrl.text.isNotEmpty)
+          'reagent_container_count': int.tryParse(_countCtrl.text.trim()),
+        if (_minCtrl.text.isNotEmpty)
+          'reagent_container_min': int.tryParse(_minCtrl.text.trim()),
+        if (_remainingCtrl.text.isNotEmpty)
+          'reagent_remaining_amount': double.tryParse(_remainingCtrl.text.trim()),
         if (_concCtrl.text.isNotEmpty)
           'reagent_concentration': _concCtrl.text.trim(),
         if (_storageTemp != null) 'reagent_storage_temp': _storageTemp,
@@ -529,6 +838,11 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
         if (_responsibleCtrl.text.isNotEmpty)
           'reagent_responsible': _responsibleCtrl.text.trim(),
         if (_notesCtrl.text.isNotEmpty) 'reagent_notes': _notesCtrl.text.trim(),
+        if (_contamNotesCtrl.text.isNotEmpty)
+          'reagent_contamination_notes': _contamNotesCtrl.text.trim(),
+        if (_contamDate != null)
+          'reagent_contamination_date':
+              _contamDate!.toIso8601String().substring(0, 10),
         'reagent_updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
@@ -554,6 +868,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
+      debugPrint('ReagentFormDialog save error: $e');
       setState(() => _saving = false);
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -562,11 +877,14 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
     }
   }
 
-  Future<void> _pickDate(bool isExpiry) async {
+  Future<void> _pickDate(String which) async {
     final now = DateTime.now();
-    final initial = isExpiry
-        ? (_expiryDate ?? now.add(const Duration(days: 365)))
-        : (_receivedDate ?? now);
+    final initial = switch (which) {
+      'expiry'   => _expiryDate ?? now.add(const Duration(days: 365)),
+      'received' => _receivedDate ?? now,
+      'contam'   => _contamDate ?? now,
+      _          => now,
+    };
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -584,10 +902,10 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
     );
     if (picked != null) {
       setState(() {
-        if (isExpiry) {
-          _expiryDate = picked;
-        } else {
-          _receivedDate = picked;
+        switch (which) {
+          case 'expiry':   _expiryDate = picked;
+          case 'received': _receivedDate = picked;
+          case 'contam':   _contamDate = picked;
         }
       });
     }
@@ -595,6 +913,13 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final subOptions =
+        ReagentModel.subcategoryOptions[_category] ?? const <String>[];
+    // If current subcategory isn't in the list for the selected category,
+    // null it out so the dropdown doesn't assert.
+    if (_subcategory != null && !subOptions.contains(_subcategory)) {
+      _subcategory = null;
+    }
     return AlertDialog(
       backgroundColor: context.appSurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -603,7 +928,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
           style: GoogleFonts.spaceGrotesk(
               color: context.appTextPrimary, fontWeight: FontWeight.w600)),
       content: SizedBox(
-        width: 560,
+        width: 620,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -620,38 +945,89 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
               ]),
               const SizedBox(height: 10),
               Row(children: [
-                Expanded(child: _field(context, _brandCtrl, 'Brand')),
-                const SizedBox(width: 10),
-                Expanded(child: _field(context, _refCtrl, 'Reference / Cat #')),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: _field(context, _casCtrl, 'CAS Number')),
-                const SizedBox(width: 10),
                 Expanded(child: _dropdownField<String>(context,
-                  label: 'Type',
-                  value: _type,
-                  items: ReagentModel.typeOptions.map((t) =>
+                  label: 'Category',
+                  value: _category,
+                  items: ReagentModel.categoryOptions.map((t) =>
                     DropdownMenuItem(value: t,
-                      child: Text(ReagentModel.typeLabel(t),
-                        style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13)))).toList(),
-                  onChanged: (v) => setState(() => _type = v ?? 'biological'),
+                      child: Text(ReagentModel.categoryLabel(t),
+                        style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextPrimary, fontSize: 13)))).toList(),
+                  onChanged: (v) => setState(() {
+                    _category = v ?? 'chemical';
+                    _subcategory = null;
+                  }),
+                )),
+                const SizedBox(width: 10),
+                Expanded(child: _dropdownField<String?>(context,
+                  label: 'Sub-category',
+                  value: _subcategory,
+                  items: [
+                    DropdownMenuItem<String?>(value: null,
+                      child: Text('—', style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextMuted, fontSize: 13))),
+                    ...subOptions.map((s) => DropdownMenuItem<String?>(
+                      value: s,
+                      child: Text(ReagentModel.subcategoryLabel(s),
+                          style: GoogleFonts.spaceGrotesk(
+                              color: context.appTextPrimary, fontSize: 13)))),
+                  ],
+                  onChanged: (v) => setState(() => _subcategory = v),
                 )),
               ]),
               const SizedBox(height: 10),
               Row(children: [
-                Expanded(child: _field(context, _qtyCtrl, 'Quantity',
+                Expanded(child: _field(context, _brandCtrl, 'Brand')),
+                const SizedBox(width: 10),
+                Expanded(child: _field(context, _refCtrl, 'Reference / Cat #')),
+                const SizedBox(width: 10),
+                Expanded(child: _field(context, _casCtrl, 'CAS Number')),
+              ]),
+              const SizedBox(height: 16),
+              // ── Stock section ───────────────────────────────────────────
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('STOCK',
+                    style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextMuted,
+                        fontSize: 10,
+                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 6),
+              Row(children: [
+                Expanded(child: _field(context, _packSizeCtrl, 'Package / flask size',
                     keyboardType: TextInputType.number)),
                 const SizedBox(width: 10),
                 Expanded(child: _field(context, _unitCtrl, 'Unit (mL / g / …)')),
                 const SizedBox(width: 10),
-                Expanded(child: _field(context, _qtyMinCtrl, 'Min Qty (reorder)',
-                    keyboardType: TextInputType.number)),
+                Expanded(child: _field(context, _concCtrl, 'Concentration')),
               ]),
               const SizedBox(height: 10),
               Row(children: [
-                Expanded(child: _field(context, _concCtrl, 'Concentration')),
+                Expanded(child: _field(context, _countCtrl, '# Containers',
+                    keyboardType: TextInputType.number)),
                 const SizedBox(width: 10),
+                Expanded(child: _field(context, _minCtrl, 'Min containers (reorder)',
+                    keyboardType: TextInputType.number)),
+                const SizedBox(width: 10),
+                Expanded(child: _field(context, _remainingCtrl,
+                    'Remaining in opened',
+                    keyboardType: TextInputType.number)),
+              ]),
+              const SizedBox(height: 16),
+              // ── Storage section ─────────────────────────────────────────
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('STORAGE',
+                    style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextMuted,
+                        fontSize: 10,
+                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 6),
+              Row(children: [
                 Expanded(child: _dropdownField<String?>(context,
                   label: 'Storage Temp',
                   value: _storageTemp,
@@ -666,9 +1042,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
                   ],
                   onChanged: (v) => setState(() => _storageTemp = v),
                 )),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
+                const SizedBox(width: 10),
                 Expanded(child: _dropdownField<int?>(context,
                   label: 'Location',
                   value: _locationId,
@@ -685,19 +1059,57 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
                   onChanged: (v) => setState(() => _locationId = v),
                 )),
                 const SizedBox(width: 10),
-                Expanded(child: _field(context, _positionCtrl, 'Position in location')),
+                Expanded(child: _field(context, _positionCtrl, 'Position')),
               ]),
               const SizedBox(height: 10),
               Row(children: [
                 Expanded(child: _field(context, _lotCtrl, 'Lot Number')),
                 const SizedBox(width: 10),
                 Expanded(child: _datePicker(context, 'Expiry Date', _expiryDate,
-                    () => _pickDate(true))),
+                    () => _pickDate('expiry'))),
                 const SizedBox(width: 10),
                 Expanded(child: _datePicker(context, 'Received Date', _receivedDate,
-                    () => _pickDate(false))),
+                    () => _pickDate('received'))),
               ]),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
+              // ── Contamination section ───────────────────────────────────
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('CONTAMINATION',
+                    style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextMuted,
+                        fontSize: 10,
+                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 6),
+              Row(children: [
+                Expanded(child: _dropdownField<String>(context,
+                  label: 'Status',
+                  value: _contamination,
+                  items: ReagentModel.contaminationOptions.map((c) =>
+                    DropdownMenuItem(value: c,
+                      child: Text(ReagentModel.contaminationLabel(c),
+                        style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextPrimary, fontSize: 13)))).toList(),
+                  onChanged: (v) => setState(() {
+                    _contamination = v ?? 'none';
+                    if (_contamination != 'none' && _contamDate == null) {
+                      _contamDate = DateTime.now();
+                    }
+                  }),
+                )),
+                const SizedBox(width: 10),
+                Expanded(child: _datePicker(context, 'Detected on', _contamDate,
+                    () => _pickDate('contam'))),
+              ]),
+              if (_contamination != 'none') ...[
+                const SizedBox(height: 10),
+                _field(context, _contamNotesCtrl, 'Contamination notes',
+                    maxLines: 2),
+              ],
+              const SizedBox(height: 16),
+              // ── Other ───────────────────────────────────────────────────
               Row(children: [
                 Expanded(child: _field(context, _supplierCtrl, 'Supplier')),
                 const SizedBox(width: 10),
@@ -705,6 +1117,9 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
               ]),
               const SizedBox(height: 10),
               _field(context, _hazardCtrl, 'Hazard codes (e.g. H225 H302)'),
+              const SizedBox(height: 10),
+              _field(context, _tagsCtrl,
+                  'Tags (separated by ";", e.g. "in-house; sterile")'),
               const SizedBox(height: 10),
               _field(context, _notesCtrl, 'Notes', maxLines: 3),
             ]),

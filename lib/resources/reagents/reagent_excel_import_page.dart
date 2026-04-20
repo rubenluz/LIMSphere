@@ -18,14 +18,17 @@ const _reagentDbFields = [
   '— ignore —',
   'reagent_name',
   'reagent_code',
-  'reagent_type',
+  'reagent_category',
+  'reagent_subcategory',
   'reagent_brand',
   'reagent_reference',
   'reagent_cas_number',
   'reagent_supplier',
   'reagent_unit',
-  'reagent_quantity',
-  'reagent_quantity_min',
+  'reagent_package_size',
+  'reagent_container_count',
+  'reagent_container_min',
+  'reagent_remaining_amount',
   'reagent_concentration',
   'reagent_storage_temp',
   'reagent_location_name',
@@ -39,6 +42,9 @@ const _reagentDbFields = [
   'reagent_notes',
   'reagent_physical_state',
   'reagent_formula',
+  'reagent_contamination',
+  'reagent_contamination_notes',
+  'reagent_contamination_date',
 ];
 
 // ── Auto-mapping: header (lowercase) → DB field ────────────────────────────
@@ -49,9 +55,15 @@ const Map<String, String> _autoMap = {
   'code': 'reagent_code',
   'reagent code': 'reagent_code',
   'reagent_code': 'reagent_code',
-  'type': 'reagent_type',
-  'reagent type': 'reagent_type',
-  'reagent_type': 'reagent_type',
+  'type': 'reagent_category',
+  'category': 'reagent_category',
+  'reagent type': 'reagent_category',
+  'reagent_type': 'reagent_category',
+  'reagent_category': 'reagent_category',
+  'subcategory': 'reagent_subcategory',
+  'sub category': 'reagent_subcategory',
+  'sub-category': 'reagent_subcategory',
+  'reagent_subcategory': 'reagent_subcategory',
   'brand': 'reagent_brand',
   'manufacturer': 'reagent_brand',
   'reference': 'reagent_reference',
@@ -66,17 +78,34 @@ const Map<String, String> _autoMap = {
   'vendor': 'reagent_supplier',
   'unit': 'reagent_unit',
   'units': 'reagent_unit',
-  'quantity': 'reagent_quantity',
-  'qty': 'reagent_quantity',
-  'amount': 'reagent_quantity',
-  'stock': 'reagent_quantity',
-  'min quantity': 'reagent_quantity_min',
-  'minimum quantity': 'reagent_quantity_min',
-  'min qty': 'reagent_quantity_min',
-  'min stock': 'reagent_quantity_min',
+  'package size': 'reagent_package_size',
+  'package_size': 'reagent_package_size',
+  'pack size': 'reagent_package_size',
+  'flask size': 'reagent_package_size',
+  'container size': 'reagent_package_size',
+  'quantity': 'reagent_package_size',
+  'qty': 'reagent_package_size',
+  'amount': 'reagent_package_size',
+  'size': 'reagent_package_size',
+  'containers': 'reagent_container_count',
+  'container count': 'reagent_container_count',
+  'flasks': 'reagent_container_count',
+  'flask count': 'reagent_container_count',
+  '# containers': 'reagent_container_count',
+  'stock': 'reagent_container_count',
+  'min containers': 'reagent_container_min',
+  'container min': 'reagent_container_min',
+  'min quantity': 'reagent_container_min',
+  'minimum quantity': 'reagent_container_min',
+  'min qty': 'reagent_container_min',
+  'min stock': 'reagent_container_min',
+  'reorder': 'reagent_container_min',
+  'remaining': 'reagent_remaining_amount',
+  'remaining amount': 'reagent_remaining_amount',
+  'opened amount': 'reagent_remaining_amount',
+  'left': 'reagent_remaining_amount',
   'concentration': 'reagent_concentration',
   'conc': 'reagent_concentration',
-  'size': 'reagent_concentration',
   'storage': 'reagent_storage_temp',
   'storage temp': 'reagent_storage_temp',
   'storage temperature': 'reagent_storage_temp',
@@ -116,6 +145,12 @@ const Map<String, String> _autoMap = {
   'chemical formula': 'reagent_formula',
   'molecular formula': 'reagent_formula',
   'reagent_formula': 'reagent_formula',
+  'contamination': 'reagent_contamination',
+  'contamination status': 'reagent_contamination',
+  'contaminated': 'reagent_contamination',
+  'contamination notes': 'reagent_contamination_notes',
+  'contamination date': 'reagent_contamination_date',
+  'contamination detected': 'reagent_contamination_date',
 };
 
 // ── CSV parser ─────────────────────────────────────────────────────────────
@@ -445,10 +480,16 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
       }
     }
 
+    void putInt(String col, String? val) {
+      if (val != null && val.isNotEmpty) {
+        final n = int.tryParse(val.trim()) ??
+            double.tryParse(val.replaceAll(',', '.'))?.toInt();
+        if (n != null) row[col] = n;
+      }
+    }
+
     void putDate(String col, String? val) {
       if (val == null || val.isEmpty) return;
-      // Values are already normalised to yyyy-mm-dd by _applyMapping,
-      // but run through _normaliseDate again as a safety net.
       final normalised = _normaliseDate(val);
       if (normalised.isNotEmpty) row[col] = normalised;
     }
@@ -456,10 +497,19 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
     if (r['reagent_name'] is String && (r['reagent_name'] as String).isNotEmpty) {
       row['reagent_name'] = r['reagent_name'];
     }
-    row['reagent_type'] = r['reagent_type'] ?? 'biological';
+
+    // Category: accept known values, else default to 'chemical'.
+    const cats = [
+      'chemical', 'biological', 'consumable', 'ppe',
+      'media', 'standard', 'assay_kit', 'cleaning',
+    ];
+    final cat = r['reagent_category']?.toLowerCase().trim();
+    row['reagent_category'] = (cat != null && cats.contains(cat)) ? cat : 'chemical';
+
     row['reagent_created_at'] = DateTime.now().toUtc().toIso8601String();
 
     putStr('reagent_code', r['reagent_code']);
+    putStr('reagent_subcategory', r['reagent_subcategory']);
     putStr('reagent_brand', r['reagent_brand']);
     putStr('reagent_reference', r['reagent_reference']);
     putStr('reagent_cas_number', r['reagent_cas_number']);
@@ -473,6 +523,7 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
     putStr('reagent_responsible', r['reagent_responsible']);
     putStr('reagent_notes', r['reagent_notes']);
     putStr('reagent_formula', r['reagent_formula']);
+    putStr('reagent_contamination_notes', r['reagent_contamination_notes']);
 
     // Physical state: only accept the three valid values (case-insensitive).
     final ps = r['reagent_physical_state']?.toLowerCase().trim();
@@ -480,12 +531,21 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
       row['reagent_physical_state'] = ps;
     }
 
-    putNum('reagent_quantity', r['reagent_quantity']);
-    putNum('reagent_quantity_min', r['reagent_quantity_min']);
+    // Contamination: accept known values, default to 'none'.
+    const contams = ['none', 'bacteria', 'fungi', 'both', 'suspected'];
+    final contam = r['reagent_contamination']?.toLowerCase().trim();
+    row['reagent_contamination'] =
+        (contam != null && contams.contains(contam)) ? contam : 'none';
+
+    putNum('reagent_package_size',    r['reagent_package_size']);
+    putInt('reagent_container_count', r['reagent_container_count']);
+    putInt('reagent_container_min',   r['reagent_container_min']);
+    putNum('reagent_remaining_amount',r['reagent_remaining_amount']);
 
     putDate('reagent_expiry_date', r['reagent_expiry_date']);
     putDate('reagent_received_date', r['reagent_received_date']);
     putDate('reagent_opened_date', r['reagent_opened_date']);
+    putDate('reagent_contamination_date', r['reagent_contamination_date']);
 
     final locName = r['reagent_location_name'];
     if (locName != null && locName.isNotEmpty) {
@@ -793,7 +853,14 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
   double _colWidth(String field) {
     if (field.contains('name') || field.contains('notes')) return 200;
     if (field.contains('date')) return 110;
-    if (field.contains('quantity') || field.contains('unit')) return 90;
+    if (field.contains('package_size') ||
+        field.contains('container_count') ||
+        field.contains('container_min') ||
+        field.contains('remaining') ||
+        field.contains('unit')) {
+      return 90;
+    }
+    if (field.contains('contamination')) return 130;
     return 130;
   }
 

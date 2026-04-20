@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS strains (
     strain_sample_code           TEXT REFERENCES samples(sample_code),  -- optional FK to samples(sample_code) for provenance
     strain_code                  TEXT UNIQUE,
     strain_status                TEXT,         -- alive | dead | lost | cryopreserved | transferred
+    strain_need_new_transfer     BOOLEAN DEFAULT FALSE,
     strain_origin                TEXT,
     strain_situation             TEXT,         -- in culture | deposited | lost | quarantine
     strain_toxins                TEXT,
@@ -281,6 +282,8 @@ CREATE TABLE IF NOT EXISTS strains (
     strain_created_at            TIMESTAMP DEFAULT NOW(),
     strain_updated_at            TIMESTAMP DEFAULT NOW()
 );
+-- Migrate existing installations: add strain_need_new_transfer if not present
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_need_new_transfer BOOLEAN DEFAULT FALSE;
 
 -- ── 6. requested_strains ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS requested_strains (
@@ -373,12 +376,19 @@ CREATE TABLE IF NOT EXISTS reagents (
     reagent_brand            TEXT,
     reagent_reference        TEXT,
     reagent_cas_number       TEXT,
-    reagent_type             TEXT,             -- chemicals_general | biological | consumables | ppe | bioactivity_assays | analytical_chemistry | media_preparation | cleaning_maintenance | standards
+    reagent_category         TEXT,             -- chemical | biological | consumable | kit | standard
+    reagent_subcategory      TEXT,             -- enumerated sub-classification scoped to the category (see ReagentModel.subcategoryOptions)
+    reagent_tags             TEXT,             -- semicolon-separated tags for filtering ("antibody; sterile; in-house")
     reagent_physical_state   TEXT    CHECK (reagent_physical_state IN ('liquid', 'solid', 'gas')),
-    reagent_unit             TEXT,             -- mL | g | L | mg | units
-    reagent_quantity         NUMERIC,
-    reagent_quantity_min     NUMERIC,          -- reorder threshold
+    reagent_unit             TEXT,             -- mL | g | L | mg | units — shared unit for package size & remaining amount
+    reagent_package_size     NUMERIC,          -- size of one container (flask/bottle) in `reagent_unit`
+    reagent_container_count  INT     DEFAULT 1,-- how many containers currently in stock
+    reagent_container_min    INT,              -- reorder threshold on container count
+    reagent_remaining_amount NUMERIC,          -- amount left in the currently-opened container, in `reagent_unit`
     reagent_concentration    TEXT,
+    reagent_contamination    TEXT    DEFAULT 'none' CHECK (reagent_contamination IN ('none','bacteria','fungi','both','suspected')),
+    reagent_contamination_notes TEXT,
+    reagent_contamination_date  DATE,
     reagent_formula          TEXT,             -- chemical formula e.g. H2O, NaCl
     reagent_purity           TEXT,
     reagent_solvent          TEXT,
@@ -759,8 +769,8 @@ CREATE INDEX IF NOT EXISTS idx_req_requester_email     ON requested_strains(requ
 
 -- reagents
 CREATE INDEX IF NOT EXISTS idx_reagents_expiry         ON reagents(reagent_expiry_date);
-CREATE INDEX IF NOT EXISTS idx_reagents_quantity       ON reagents(reagent_quantity);
-CREATE INDEX IF NOT EXISTS idx_reagents_type           ON reagents(reagent_type);
+CREATE INDEX IF NOT EXISTS idx_reagents_count          ON reagents(reagent_container_count);
+CREATE INDEX IF NOT EXISTS idx_reagents_category       ON reagents(reagent_category);
 CREATE INDEX IF NOT EXISTS idx_reagents_location       ON reagents(reagent_location_id);
 
 -- equipment
@@ -964,6 +974,7 @@ WITH CHECK (bucket_id = 'facility-sops');
 -- Migrations — add columns introduced after initial schema
 -- ═══════════════════════════════════════════════════════════════════════════════
 ALTER TABLE storage_locations ADD COLUMN IF NOT EXISTS location_parent_id  BIGINT REFERENCES storage_locations(location_id);
+ALTER TABLE storage_locations ADD COLUMN IF NOT EXISTS location_sort_order  INT;
 ALTER TABLE reagents          ADD COLUMN IF NOT EXISTS reagent_qrcode       TEXT;
 ALTER TABLE reagents          ADD COLUMN IF NOT EXISTS reagent_code         TEXT UNIQUE;
 ALTER TABLE equipment         ADD COLUMN IF NOT EXISTS equipment_qrcode     TEXT;
@@ -978,6 +989,48 @@ ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_path    TEXT
 ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_name    TEXT;
 ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_size    BIGINT;
 ALTER TABLE users             ADD COLUMN IF NOT EXISTS user_table_backups   TEXT DEFAULT 'none';
+
+-- Reagents — category/subcategory split, per-container stock model, contamination tracking
+DO \$\$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reagents' AND column_name='reagent_type') THEN
+    ALTER TABLE reagents RENAME COLUMN reagent_type TO reagent_category;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reagents' AND column_name='reagent_quantity') THEN
+    ALTER TABLE reagents RENAME COLUMN reagent_quantity TO reagent_package_size;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reagents' AND column_name='reagent_quantity_min') THEN
+    ALTER TABLE reagents RENAME COLUMN reagent_quantity_min TO reagent_container_min;
+    ALTER TABLE reagents ALTER COLUMN reagent_container_min TYPE INT USING CAST(reagent_container_min AS INT);
+  END IF;
+END \$\$;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_subcategory         TEXT;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_physical_state      TEXT;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_formula             TEXT;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_container_count     INT DEFAULT 1;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_remaining_amount    NUMERIC;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_contamination       TEXT DEFAULT 'none';
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_contamination_notes TEXT;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_contamination_date  DATE;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_tags                TEXT;
+
+-- Collapse legacy categories (ppe/media/assay_kit/cleaning) into the new
+-- 5-category model, preserving the distinction via subcategory.
+UPDATE reagents
+   SET reagent_subcategory = COALESCE(reagent_subcategory, 'ppe'),
+       reagent_category    = 'consumable'
+ WHERE reagent_category = 'ppe';
+UPDATE reagents
+   SET reagent_subcategory = COALESCE(reagent_subcategory, 'media'),
+       reagent_category    = 'biological'
+ WHERE reagent_category = 'media';
+UPDATE reagents
+   SET reagent_subcategory = COALESCE(reagent_subcategory, 'assay_kit'),
+       reagent_category    = 'kit'
+ WHERE reagent_category = 'assay_kit';
+UPDATE reagents
+   SET reagent_subcategory = COALESCE(reagent_subcategory, 'cleaning'),
+       reagent_category    = 'chemical'
+ WHERE reagent_category = 'cleaning';
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Shared To-Do list (dashboard widget)

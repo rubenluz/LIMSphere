@@ -10,7 +10,7 @@ import '/core/fish_db_schema.dart';
 import '/core/sop_db_schema.dart';
 import '../../resources/machines/machine_detail_page.dart';
 import '../../resources/reagents/reagent_detail_page.dart';
-import '../../locations/location_detail_page.dart';
+import '../../resources/locations/location_detail_page.dart';
 import '../../culture_collection/strains/strain_detail_page.dart';
 import '../../culture_collection/samples/sample_detail_page.dart';
 import '../../fish_facility/lines/fish_lines_detail_page.dart';

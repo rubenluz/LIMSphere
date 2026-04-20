@@ -11,25 +11,13 @@ import '/theme/theme.dart';
 // Design tokens
 // ─────────────────────────────────────────────────────────────────────────────
 class _DS {
-  static const Color accent     = Color(0xFF3B82F6);
-  static const Color sectionBg  = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color labelColor = Color(0xFF64748B);
-  static const Color titleColor = Color(0xFF0F172A);
-
-  static const TextStyle sectionTitle = TextStyle(
-    fontSize: 12, fontWeight: FontWeight.w700,
-    color: Color(0xFF64748B), letterSpacing: 0.8,
-  );
+  static const Color accent = Color(0xFF3B82F6);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Field model
 // ─────────────────────────────────────────────────────────────────────────────
 typedef _Field = ({String key, String label, bool readOnly, int lines});
-
-_Field _f(String key, String label, {bool readOnly = false, int lines = 1}) =>
-    (key: key, label: label, readOnly: readOnly, lines: lines);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Section definitions
@@ -181,9 +169,6 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
   final Map<String, TextEditingController> _ctrl = {};
 
-  // Total "tabs" on mobile = sections + 1 for strains
-  int get _mobileTotalTabs => _groups.length + 1;
-
   @override
   void initState() {
     super.initState();
@@ -267,17 +252,19 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        backgroundColor: context.appSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 40),
-        title: const Text('Delete Sample?', textAlign: TextAlign.center),
+        title: Text('Delete Sample?', textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
         content: RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
-            style: const TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.5),
+            style: TextStyle(fontSize: 14, color: context.appTextSecondary, height: 1.5),
             children: [
               const TextSpan(text: 'You are about to permanently delete\n'),
               TextSpan(text: label,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: context.appTextPrimary)),
               const TextSpan(
                   text: '.\n\nAll linked strains will be unlinked.\nThis action cannot be undone.'),
             ],
@@ -352,7 +339,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
     final isStrainTab = _mobileSection == _groups.length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: context.appBg,
       appBar: _buildMobileAppBar(code),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -490,17 +477,17 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      color: const Color(0xFFEFF6FF),
+      color: _DS.accent.withValues(alpha: context.isDark ? 0.08 : 0.06),
       child: Row(children: [
         const Icon(Icons.place_rounded, size: 14, color: _DS.accent),
         const SizedBox(width: 8),
         Expanded(
           child: parts.isNotEmpty
               ? Text(parts,
-                  style: const TextStyle(fontSize: 12, color: _DS.labelColor),
+                  style: TextStyle(fontSize: 12, color: context.appTextMuted),
                   overflow: TextOverflow.ellipsis)
-              : const Text('No location data',
-                  style: TextStyle(fontSize: 12, color: _DS.labelColor)),
+              : Text('No location data',
+                  style: TextStyle(fontSize: 12, color: context.appTextMuted)),
         ),
         const SizedBox(width: 8),
         GestureDetector(
@@ -528,7 +515,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   // ── Mobile: horizontal scrollable section + strains tab bar ──────────────
   Widget _buildMobileSectionBar() {
     return Container(
-      color: Colors.white,
+      color: context.appSurface,
       height: 48,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
@@ -555,19 +542,19 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                     ? (isStrainTab
                         ? const Color(0xFF16A34A)
                         : _DS.accent)
-                    : const Color(0xFFF1F5F9),
+                    : context.appSurface2,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
                       ? (isStrainTab
                           ? const Color(0xFF16A34A)
                           : _DS.accent)
-                      : const Color(0xFFE2E8F0),
+                      : context.appBorder,
                 ),
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(icon, size: 13,
-                    color: isActive ? Colors.white : const Color(0xFF64748B)),
+                    color: isActive ? Colors.white : context.appTextMuted),
                 const SizedBox(width: 5),
                 Text(label,
                     style: TextStyle(
@@ -575,7 +562,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                       fontWeight: FontWeight.w600,
                       color: isActive
                           ? Colors.white
-                          : const Color(0xFF475569),
+                          : context.appTextSecondary,
                     )),
                 // Strain count badge on the strains tab
                 if (isStrainTab && _strains.isNotEmpty) ...[
@@ -624,17 +611,17 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.science_outlined, size: 56, color: Colors.grey.shade300),
+            Icon(Icons.science_outlined, size: 56, color: context.appTextMuted),
             const SizedBox(height: 14),
             Text('No strains yet',
                 style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
-                    color: Colors.grey.shade500)),
+                    color: context.appTextSecondary)),
             const SizedBox(height: 4),
             Text('Tap the button below to add the first strain.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade400)),
+                style: TextStyle(fontSize: 13, color: context.appTextMuted)),
           ]),
         ),
       );
@@ -659,9 +646,9 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.appSurface,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _DS.cardBorder),
+              border: Border.all(color: context.appBorder),
               boxShadow: [
                 BoxShadow(color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 4, offset: const Offset(0, 1)),
@@ -681,16 +668,16 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(code,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
-                          color: _DS.titleColor)),
+                          color: context.appTextPrimary)),
                   if (taxon.isNotEmpty)
                     Text(taxon,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11,
                             fontStyle: FontStyle.italic,
-                            color: _DS.labelColor),
+                            color: context.appTextMuted),
                         overflow: TextOverflow.ellipsis),
                 ],
               )),
@@ -729,7 +716,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
     final id   = _data['sample_id']?.toString();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: context.appBg,
       appBar: _buildDesktopAppBar(code, id),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -820,10 +807,10 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         SizedBox(
           width: 240,
           child: Container(
-            color: Colors.white,
+            color: context.appSurface,
             child: Column(children: [
               _buildStatsBar(),
-              const Divider(height: 1),
+              Divider(height: 1, color: context.appBorder),
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -836,19 +823,19 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                       leading: Icon(_sectionIcon(group.icon), size: 18,
-                          color: isExp ? _DS.accent : const Color(0xFF94A3B8)),
+                          color: isExp ? _DS.accent : context.appTextSecondary),
                       title: Text(group.title,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: isExp ? FontWeight.w600 : FontWeight.normal,
-                            color: isExp ? _DS.accent : const Color(0xFF475569),
+                            color: isExp ? _DS.accent : context.appTextSecondary,
                           )),
                       trailing: Icon(
                           isExp
                               ? Icons.keyboard_arrow_down_rounded
                               : Icons.keyboard_arrow_right_rounded,
                           size: 16,
-                          color: isExp ? _DS.accent : const Color(0xFF94A3B8)),
+                          color: isExp ? _DS.accent : context.appTextSecondary),
                       selected: isExp,
                       selectedTileColor: _DS.accent.withValues(alpha: 0.06),
                       shape: RoundedRectangleBorder(
@@ -899,7 +886,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      color: const Color(0xFFEFF6FF),
+      color: _DS.accent.withValues(alpha: context.isDark ? 0.08 : 0.06),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           const Icon(Icons.colorize_outlined, size: 15, color: _DS.accent),
@@ -923,11 +910,11 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   Widget _statRow(IconData icon, String text, {Color? color}) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
     child: Row(children: [
-      Icon(icon, size: 13, color: color ?? _DS.labelColor),
+      Icon(icon, size: 13, color: color ?? context.appTextMuted),
       const SizedBox(width: 6),
       Expanded(
         child: Text(text,
-            style: TextStyle(fontSize: 12, color: color ?? const Color(0xFF334155)),
+            style: TextStyle(fontSize: 12, color: color ?? context.appTextSecondary),
             overflow: TextOverflow.ellipsis),
       ),
     ]),
@@ -939,9 +926,9 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.appSurface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _DS.cardBorder),
+          border: Border.all(color: context.appBorder),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 6, offset: const Offset(0, 2)),
@@ -951,10 +938,10 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
-              color: _DS.sectionBg,
+              color: context.appSurface2,
               borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(12), topRight: Radius.circular(12)),
-              border: const Border(bottom: BorderSide(color: _DS.cardBorder)),
+              border: Border(bottom: BorderSide(color: context.appBorder)),
             ),
             child: Row(children: [
               Container(
@@ -965,7 +952,9 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                 child: Icon(_sectionIcon(iconKey), size: 16, color: _DS.accent),
               ),
               const SizedBox(width: 10),
-              Text(title.toUpperCase(), style: _DS.sectionTitle),
+              Text(title.toUpperCase(), style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w700,
+                color: context.appTextMuted, letterSpacing: 0.8)),
               const Spacer(),
               GestureDetector(
                 onTap: () => setState(() {
@@ -975,8 +964,8 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                     _expanded.add(index);
                   }
                 }),
-                child: const Icon(Icons.keyboard_arrow_up_rounded,
-                    size: 20, color: Color(0xFF94A3B8)),
+                child: Icon(Icons.keyboard_arrow_up_rounded,
+                    size: 20, color: context.appTextSecondary),
               ),
             ]),
           ),
@@ -1008,17 +997,17 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       controller: ctrl,
       readOnly: f.readOnly,
       maxLines: f.lines,
-      style: const TextStyle(fontSize: 13, color: _DS.titleColor),
+      style: TextStyle(fontSize: 13, color: context.appTextPrimary),
       decoration: InputDecoration(
         labelText: f.label,
-        labelStyle: const TextStyle(fontSize: 12, color: _DS.labelColor),
+        labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
         isDense: true,
         filled: true,
-        fillColor: f.readOnly ? const Color(0xFFF1F5F9) : const Color(0xFFFAFAFC),
-        border:         OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _DS.cardBorder)),
-        enabledBorder:  OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _DS.cardBorder)),
+        fillColor: f.readOnly ? context.appSurface2 : context.appSurface3,
+        border:         OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
+        enabledBorder:  OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
         focusedBorder:  OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _DS.accent, width: 1.5)),
-        disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _DS.cardBorder)),
+        disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
         contentPadding: f.lines > 1
             ? const EdgeInsets.all(12)
             : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1030,9 +1019,9 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   Widget _buildStrainsSection() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.appSurface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _DS.cardBorder),
+        border: Border.all(color: context.appBorder),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 6, offset: const Offset(0, 2)),
@@ -1041,11 +1030,11 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          decoration: const BoxDecoration(
-            color: _DS.sectionBg,
-            borderRadius: BorderRadius.only(
+          decoration: BoxDecoration(
+            color: context.appSurface2,
+            borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12), topRight: Radius.circular(12)),
-            border: Border(bottom: BorderSide(color: _DS.cardBorder)),
+            border: Border(bottom: BorderSide(color: context.appBorder)),
           ),
           child: Row(children: [
             Container(
@@ -1056,7 +1045,9 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               child: const Icon(Icons.science_rounded, size: 16, color: _DS.accent),
             ),
             const SizedBox(width: 10),
-            Text('STRAINS FROM THIS SAMPLE'.toUpperCase(), style: _DS.sectionTitle),
+            Text('STRAINS FROM THIS SAMPLE'.toUpperCase(), style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w700,
+              color: context.appTextMuted, letterSpacing: 0.8)),
             if (_strains.isNotEmpty) ...[
               const SizedBox(width: 8),
               Container(
@@ -1103,14 +1094,14 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
     padding: const EdgeInsets.all(32),
     child: Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.science_outlined, size: 48, color: Colors.grey.shade300),
+        Icon(Icons.science_outlined, size: 48, color: context.appTextMuted),
         const SizedBox(height: 12),
         Text('No strains yet',
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15,
-                color: Colors.grey.shade500)),
+                color: context.appTextSecondary)),
         const SizedBox(height: 4),
         Text('Add the first strain isolated from this sample.',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade400)),
+            style: TextStyle(fontSize: 13, color: context.appTextMuted)),
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: _addStrain,
@@ -1127,7 +1118,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _strains.length,
-      separatorBuilder: (_, _) => const Divider(height: 1, color: _DS.cardBorder),
+      separatorBuilder: (_, _) => Divider(height: 1, color: context.appBorder),
       itemBuilder: (_, i) {
         final s       = _strains[i];
         final code    = s['strain_code']?.toString() ?? '—';
@@ -1148,12 +1139,12 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
             child: const Icon(Icons.science_outlined, size: 18, color: _DS.accent),
           ),
           title: Text(code,
-              style: const TextStyle(fontWeight: FontWeight.w600,
-                  fontSize: 13, color: _DS.titleColor)),
+              style: TextStyle(fontWeight: FontWeight.w600,
+                  fontSize: 13, color: context.appTextPrimary)),
           subtitle: taxon.isNotEmpty
               ? Text(taxon,
-                  style: const TextStyle(fontSize: 12,
-                      fontStyle: FontStyle.italic, color: _DS.labelColor))
+                  style: TextStyle(fontSize: 12,
+                      fontStyle: FontStyle.italic, color: context.appTextMuted))
               : null,
           trailing: status != null
               ? Container(

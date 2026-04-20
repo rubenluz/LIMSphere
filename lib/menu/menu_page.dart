@@ -10,7 +10,7 @@ import '../camera/camera_page.dart';
 import 'app_nav.dart';
 import 'package:limsphere/lab_chat/lab_chat_page.dart';
 import 'package:limsphere/labels/label_page.dart';
-import '../locations/locations_page.dart';
+import '../resources/locations/locations_page.dart';
 import '../resources/reagents/reagents_page.dart';
 import '../resources/machines/machines_page.dart';
 import '../resources/reservations/reservations_page.dart';
@@ -34,6 +34,7 @@ import '../users/user_detail_page.dart';
 import '../admin/app_settings.dart';
 import '../audit_log/audit_log.dart';
 import '../requests/requests_page.dart';
+import '../tools/tools_page.dart';
 
 const _roleOrder = ['viewer', 'technician', 'researcher', 'admin', 'superadmin'];
 
@@ -130,7 +131,7 @@ class _MenuPageState extends State<MenuPage> {
   List<Map<String, dynamic>> _pendingUsers = [];
   bool _loadingUser = true;
   bool _collapsed = false;
-  Set<String> _visibleGroups = {'dashboard', 'labels', 'chat', 'requests', 'culture_collection', 'fish_facility', 'resources', 'reservations'};
+  Set<String> _visibleGroups = {'dashboard', 'labels', 'chat', 'requests', 'tools', 'culture_collection', 'fish_facility', 'resources', 'reservations'};
 
   // Items within a group that have their own individual visibility toggle in settings.
   static const _perItemVisibilityKeys = {'reservations'};
@@ -188,6 +189,13 @@ class _MenuPageState extends State<MenuPage> {
       mobileOnly: true,
       builder: (_) => const CameraPage(),
     ),
+    _NavItem(
+      id: 'tools',
+      label: 'Tools',
+      icon: Icons.handyman_outlined,
+      accent: const Color(0xFFA855F7),
+      builder: (_) => const ToolsPage(),
+    ),
   ];
 
   late final List<_NavGroup> _groups = [
@@ -230,7 +238,7 @@ class _MenuPageState extends State<MenuPage> {
       label: 'Resources',
       icon: Icons.category_outlined,
       children: [
-        _NavItem(id: 'locations',    label: 'Locations',    icon: Icons.place_outlined,                   accent: const Color(0xFF6366F1), builder: (_) => const LocationsPage()),
+        _NavItem(id: 'locations',    label: 'Rooms & Locations', icon: Icons.place_outlined,              accent: const Color(0xFF6366F1), builder: (_) => const LocationsPage()),
         _NavItem(id: 'reagents',     label: 'Reagents',     icon: Icons.water_drop_outlined,              accent: const Color(0xFFF59E0B), builder: (_) => const ReagentsPage()),
         _NavItem(id: 'equipment',    label: 'Machines',     icon: Icons.precision_manufacturing_outlined, accent: const Color(0xFF14B8A6), builder: (_) => const MachinesPage()),
         _NavItem(id: 'reservations', label: 'Reservations', icon: Icons.event_outlined,                   accent: const Color(0xFFEC4899), builder: (_) => const ReservationsPage()),
@@ -538,9 +546,11 @@ class _MenuPageState extends State<MenuPage> {
     for (final item in _topItems) {
       final visible = item.id == 'backups'
           ? !(Platform.isAndroid || Platform.isIOS) && _getModulePerm('backups') != 'none'
-          : item.mobileOnly
-              ? (Platform.isAndroid || Platform.isIOS)
-              : _visibleGroups.contains(item.id);
+          : item.id == 'tools'
+              ? true
+              : item.mobileOnly
+                  ? (Platform.isAndroid || Platform.isIOS)
+                  : _visibleGroups.contains(item.id);
       if (!visible) continue;
       if (item.id == _selectedId && item.builder != null) {
         return _maybeWrapReadOnly(item.id, item.builder!(this));
@@ -648,6 +658,7 @@ class _MenuPageState extends State<MenuPage> {
                 children: [
                   ..._topItems
                     .where((item) {
+                      if (item.id == 'tools') return true;
                       if (item.mobileOnly) return isDrawer;
                       if (item.id == 'backups') {
                         if (Platform.isAndroid || Platform.isIOS) return false;

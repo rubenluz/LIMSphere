@@ -77,6 +77,7 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
           .neq('strain_status', 'DEAD');
 
       final Map<int, DateTime> byTimeDays = {};
+      final Map<int, int> countByTimeDays = {};
 
       for (final row in data) {
         final daysRaw = row['strain_periodicity'];
@@ -94,6 +95,8 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
 
         if (timeDays == null || timeDays <= 0) continue;
 
+        countByTimeDays[timeDays] = (countByTimeDays[timeDays] ?? 0) + 1;
+
         final date = _resolveNextTransfer(row);
         if (date == null) continue;
 
@@ -110,7 +113,11 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
 
       setState(() {
         _nextTransfers = sortedEntries
-            .map((e) => {'strain_periodicity': e.key, 'strain_next_transfer': e.value})
+            .map((e) => {
+                  'strain_periodicity': e.key,
+                  'strain_next_transfer': e.value,
+                  'strain_count': countByTimeDays[e.key] ?? 0,
+                })
             .toList();
         _loading = false;
       });
@@ -143,6 +150,7 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
         final item     = _nextTransfers[index];
         final timeDays = item['strain_periodicity'] as int;
         final nextDate = item['strain_next_transfer'] as DateTime;
+        final count    = item['strain_count'] as int;
         final now      = DateTime.now();
         final daysLeft = nextDate.difference(now).inDays;
 
@@ -168,7 +176,7 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '$timeDays days',
+                  '$timeDays days  ($count)',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,

@@ -1,5 +1,6 @@
-// reagent_model.dart - ReagentModel: maps to the reagents Supabase table;
-// expiry tracking, quantity, minimum-quantity threshold, fromMap serialisation.
+// reagent_model.dart - ReagentModel: maps to the reagents Supabase table.
+// Stock model: package_size × container_count (+ remaining amount in the
+// currently opened container). Low-stock threshold applies to container_count.
 
 class ReagentModel {
   final int id;
@@ -8,10 +9,13 @@ class ReagentModel {
   final String? brand;
   final String? reference;
   final String? casNumber;
-  final String type;
+  final String category;
+  final String? subcategory;
   final String? unit;
-  final double? quantity;
-  final double? quantityMin;
+  final double? packageSize;
+  final int? containerCount;
+  final int? containerMin;
+  final double? remainingAmount;
   final String? concentration;
   final String? storageTemp;
   final int? locationId;
@@ -27,21 +31,28 @@ class ReagentModel {
   final String? formula;
   final String? notes;
   final String? physicalState;
+  final String contamination;
+  final String? contaminationNotes;
+  final DateTime? contaminationDate;
+  final String? tags;
   final String? qrcode;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
   const ReagentModel({
     required this.id,
-    required this.type,
+    required this.category,
+    this.subcategory,
     this.name,
     this.code,
     this.brand,
     this.reference,
     this.casNumber,
     this.unit,
-    this.quantity,
-    this.quantityMin,
+    this.packageSize,
+    this.containerCount,
+    this.containerMin,
+    this.remainingAmount,
     this.concentration,
     this.storageTemp,
     this.locationId,
@@ -57,6 +68,10 @@ class ReagentModel {
     this.formula,
     this.notes,
     this.physicalState,
+    this.contamination = 'none',
+    this.contaminationNotes,
+    this.contaminationDate,
+    this.tags,
     this.qrcode,
     this.createdAt,
     this.updatedAt,
@@ -66,16 +81,23 @@ class ReagentModel {
         id: (m['reagent_id'] as num).toInt(),
         code: m['reagent_code'] as String?,
         name: m['reagent_name'] as String?,
-        type: (m['reagent_type'] as String?) ?? 'biological',
+        category: (m['reagent_category'] as String?) ?? 'chemical',
+        subcategory: m['reagent_subcategory'] as String?,
         brand: m['reagent_brand'] as String?,
         reference: m['reagent_reference'] as String?,
         casNumber: m['reagent_cas_number'] as String?,
         unit: m['reagent_unit'] as String?,
-        quantity: m['reagent_quantity'] != null
-            ? (m['reagent_quantity'] as num).toDouble()
+        packageSize: m['reagent_package_size'] != null
+            ? (m['reagent_package_size'] as num).toDouble()
             : null,
-        quantityMin: m['reagent_quantity_min'] != null
-            ? (m['reagent_quantity_min'] as num).toDouble()
+        containerCount: m['reagent_container_count'] != null
+            ? (m['reagent_container_count'] as num).toInt()
+            : null,
+        containerMin: m['reagent_container_min'] != null
+            ? (m['reagent_container_min'] as num).toInt()
+            : null,
+        remainingAmount: m['reagent_remaining_amount'] != null
+            ? (m['reagent_remaining_amount'] as num).toDouble()
             : null,
         concentration: m['reagent_concentration'] as String?,
         storageTemp: m['reagent_storage_temp'] as String?,
@@ -100,6 +122,12 @@ class ReagentModel {
         formula: m['reagent_formula'] as String?,
         notes: m['reagent_notes'] as String?,
         physicalState: m['reagent_physical_state'] as String?,
+        contamination: (m['reagent_contamination'] as String?) ?? 'none',
+        contaminationNotes: m['reagent_contamination_notes'] as String?,
+        contaminationDate: m['reagent_contamination_date'] != null
+            ? DateTime.tryParse(m['reagent_contamination_date'].toString())
+            : null,
+        tags: m['reagent_tags'] as String?,
         qrcode: m['reagent_qrcode'] as String?,
         createdAt: m['reagent_created_at'] != null
             ? DateTime.tryParse(m['reagent_created_at'].toString())
@@ -111,14 +139,17 @@ class ReagentModel {
 
   Map<String, dynamic> toInsertMap() => {
         if (name != null) 'reagent_name': name,
-        'reagent_type': type,
+        'reagent_category': category,
+        if (subcategory != null) 'reagent_subcategory': subcategory,
         if (code != null) 'reagent_code': code,
         if (brand != null) 'reagent_brand': brand,
         if (reference != null) 'reagent_reference': reference,
         if (casNumber != null) 'reagent_cas_number': casNumber,
         if (unit != null) 'reagent_unit': unit,
-        if (quantity != null) 'reagent_quantity': quantity,
-        if (quantityMin != null) 'reagent_quantity_min': quantityMin,
+        if (packageSize != null) 'reagent_package_size': packageSize,
+        if (containerCount != null) 'reagent_container_count': containerCount,
+        if (containerMin != null) 'reagent_container_min': containerMin,
+        if (remainingAmount != null) 'reagent_remaining_amount': remainingAmount,
         if (concentration != null) 'reagent_concentration': concentration,
         if (storageTemp != null) 'reagent_storage_temp': storageTemp,
         if (locationId != null) 'reagent_location_id': locationId,
@@ -138,6 +169,13 @@ class ReagentModel {
         if (formula != null) 'reagent_formula': formula,
         if (notes != null) 'reagent_notes': notes,
         if (physicalState != null) 'reagent_physical_state': physicalState,
+        'reagent_contamination': contamination,
+        if (contaminationNotes != null)
+          'reagent_contamination_notes': contaminationNotes,
+        if (contaminationDate != null)
+          'reagent_contamination_date':
+              contaminationDate!.toIso8601String().substring(0, 10),
+        if (tags != null) 'reagent_tags': tags,
       };
 
   bool get isExpired =>
@@ -147,26 +185,65 @@ class ReagentModel {
       !isExpired &&
       expiryDate!.difference(DateTime.now()).inDays <= 30;
   bool get isLowStock =>
-      quantity != null && quantityMin != null && quantity! <= quantityMin!;
+      containerCount != null &&
+      containerMin != null &&
+      containerCount! <= containerMin!;
+  bool get isContaminated => contamination != 'none';
 
-  String get displayQuantity {
-    if (quantity == null) return '—';
-    final q = quantity! % 1 == 0
-        ? quantity!.toInt().toString()
-        : quantity!.toStringAsFixed(2);
-    return unit != null ? '$q $unit' : q;
+  double? get totalStock {
+    if (packageSize == null || containerCount == null) return null;
+    if (containerCount! <= 0) return 0;
+    final base = (containerCount! - 1) * packageSize!;
+    return base + (remainingAmount ?? packageSize!);
   }
 
-  static const typeOptions = [
+  static String _fmt(double v) =>
+      v % 1 == 0 ? v.toInt().toString() : v.toStringAsFixed(2);
+
+  String get displayPackageSize {
+    if (packageSize == null) return '—';
+    return unit != null ? '${_fmt(packageSize!)} $unit' : _fmt(packageSize!);
+  }
+
+  String get displayRemaining {
+    if (remainingAmount == null) return '—';
+    return unit != null
+        ? '${_fmt(remainingAmount!)} $unit'
+        : _fmt(remainingAmount!);
+  }
+
+  String get displayTotalStock {
+    final t = totalStock;
+    if (t == null) return '—';
+    return unit != null ? '${_fmt(t)} $unit' : _fmt(t);
+  }
+
+  static const categoryOptions = [
+    'chemical',
     'biological',
-    'consumables',
-    'ppe',
-    'bioactivity_assays',
-    'analytical_chemistry',
-    'media_preparation',
-    'cleaning_maintenance',
-    'standards',
+    'consumable',
+    'kit',
+    'standard',
   ];
+
+  // Fixed, enumerated sub-categories per category. Sub-category values are
+  // persisted as-is; use [subcategoryLabel] for display.
+  static const subcategoryOptions = <String, List<String>>{
+    'chemical':   ['solvent', 'buffer', 'stain', 'extraction', 'cleaning', 'other'],
+    'biological': ['media', 'cell_culture', 'enzyme', 'nucleic_acid', 'other'],
+    'consumable': ['pipette_tip', 'tube', 'plate', 'flask', 'filter', 'ppe', 'glassware', 'other'],
+    'kit':        ['extraction_kit', 'assay_kit', 'other'],
+    'standard':   ['analytical', 'control', 'other'],
+  };
+
+  static const contaminationOptions = [
+    'none',
+    'bacteria',
+    'fungi',
+    'both',
+    'suspected',
+  ];
+
   static const tempOptions = ['RT', '4°C', '-20°C', '-80°C', 'liquid N2'];
   static const physicalStateOptions = ['liquid', 'solid', 'gas'];
 
@@ -177,22 +254,64 @@ class ReagentModel {
         _        => s,
       };
 
-  static String typeLabel(String t) => switch (t) {
-        'chemicals_general'    => 'Chemicals (General)',
-        'biological'           => 'Biological',
-        'consumables'          => 'Consumables',
-        'ppe'                  => 'PPE',
-        'bioactivity_assays'   => 'Assays',
-        'analytical_chemistry' => 'Analytical & Chemistry',
-        'media_preparation'    => 'Media Preparation',
-        'cleaning_maintenance' => 'Cleaning & Maintenance',
-        'standards'            => 'Standards',
-        // legacy fallbacks
-        'chemical'   => 'Chemicals (General)',
-        'kit'        => 'Assays',
-        'media'      => 'Media Preparation',
-        'gas'        => 'Chemicals (General)',
+  static String categoryLabel(String c) => switch (c) {
+        'chemical'   => 'Chemicals',
+        'biological' => 'Biological',
         'consumable' => 'Consumables',
-        _            => t,
+        'kit'        => 'Kits',
+        'standard'   => 'Standards',
+        _            => c,
+      };
+
+  static String subcategoryLabel(String s) => switch (s) {
+        'solvent'        => 'Solvents',
+        'buffer'         => 'Buffers & Solutions',
+        'stain'          => 'Stains & Dyes',
+        'extraction'     => 'Extraction Reagents',
+        'cleaning'       => 'Cleaning',
+        'media'          => 'Media',
+        'cell_culture'   => 'Cell Culture Supplements',
+        'enzyme'         => 'Enzymes',
+        'nucleic_acid'   => 'Nucleic Acids',
+        'pipette_tip'    => 'Pipette Tips',
+        'tube'           => 'Tubes',
+        'plate'          => 'Plates',
+        'flask'          => 'Flasks',
+        'filter'         => 'Filters',
+        'ppe'            => 'PPE',
+        'glassware'      => 'Glassware',
+        'extraction_kit' => 'Extraction Kits',
+        'assay_kit'      => 'Assay Kits',
+        'analytical'     => 'Analytical Standards',
+        'control'        => 'Controls',
+        'other'          => 'Others',
+        _                => s.replaceAll('_', ' ').replaceFirstMapped(
+            RegExp(r'^[a-z]'), (m) => m[0]!.toUpperCase()),
+      };
+
+  // Tags helpers — tags are persisted as a semicolon-separated string.
+  static List<String> parseTags(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return const [];
+    return raw
+        .split(';')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+  }
+
+  static String? joinTags(Iterable<String> tags) {
+    final cleaned = tags.map((t) => t.trim()).where((t) => t.isNotEmpty);
+    return cleaned.isEmpty ? null : cleaned.join('; ');
+  }
+
+  List<String> get tagList => parseTags(tags);
+
+  static String contaminationLabel(String c) => switch (c) {
+        'none'      => 'Clean',
+        'bacteria'  => 'Bacteria',
+        'fungi'     => 'Fungi',
+        'both'      => 'Bacteria + Fungi',
+        'suspected' => 'Suspected',
+        _           => c,
       };
 }
