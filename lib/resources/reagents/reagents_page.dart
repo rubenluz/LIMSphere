@@ -136,6 +136,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
         _applyFilters();
       });
     } catch (e) {
+      debugPrint('Reagents load error: $e');
       if (cached == null && mounted) {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context)
@@ -154,13 +155,48 @@ class _ReagentsPageState extends State<ReagentsPage> {
       if (_statusFilter == 'low' && !r.isLowStock) return false;
       if (_statusFilter == 'contaminated' && !r.isContaminated) return false;
       if (q.isEmpty) return true;
-      return (r.name?.toLowerCase().contains(q) ?? false) ||
-          (r.code?.toLowerCase().contains(q) ?? false) ||
-          (r.brand?.toLowerCase().contains(q) ?? false) ||
-          (r.reference?.toLowerCase().contains(q) ?? false) ||
-          (r.casNumber?.toLowerCase().contains(q) ?? false) ||
-          (r.subcategory?.toLowerCase().contains(q) ?? false) ||
-          (r.supplier?.toLowerCase().contains(q) ?? false);
+      final haystack = <String?>[
+        r.code,
+        r.name,
+        r.brand,
+        r.reference,
+        r.casNumber,
+        r.category,
+        ReagentModel.categoryLabel(r.category),
+        r.subcategory,
+        if (r.subcategory != null)
+          ReagentModel.subcategoryLabel(r.subcategory!),
+        r.unit,
+        r.packageSize?.toString(),
+        r.containerCount?.toString(),
+        r.containerMin?.toString(),
+        r.remainingAmount?.toString(),
+        r.concentration,
+        r.storageTemp,
+        r.locationName,
+        r.position,
+        r.lotNumber,
+        r.expiryDate?.toIso8601String().substring(0, 10),
+        r.receivedDate?.toIso8601String().substring(0, 10),
+        r.openedDate?.toIso8601String().substring(0, 10),
+        r.supplier,
+        r.hazard,
+        r.responsible,
+        r.formula,
+        r.notes,
+        r.physicalState,
+        if (r.physicalState != null)
+          ReagentModel.physicalStateLabel(r.physicalState!),
+        r.contamination,
+        ReagentModel.contaminationLabel(r.contamination),
+        r.contaminationNotes,
+        r.contaminationDate?.toIso8601String().substring(0, 10),
+        r.tags,
+      ];
+      for (final s in haystack) {
+        if (s != null && s.toLowerCase().contains(q)) return true;
+      }
+      return false;
     }).toList();
 
     // Natural sort for code: splits "BR0001" into prefix "BR" + number 1,
@@ -255,12 +291,79 @@ class _ReagentsPageState extends State<ReagentsPage> {
     try {
       final rows = await Supabase.instance.client
           .from('storage_locations')
-          .select('location_id, location_name')
+          .select('location_id, location_name, location_type, '
+              'location_parent_id, location_sort_order')
           .order('location_name');
-      return List<Map<String, dynamic>>.from(rows);
-    } catch (_) {
+      return _orderLocationsHierarchically(
+          List<Map<String, dynamic>>.from(rows));
+    } catch (e) {
+      debugPrint('Reagents _loadLocations error: $e');
       return [];
     }
+  }
+
+  // Sorts locations into the same R1 / L1.1 / L1.2 / R2 / L2.1 order used by
+  // the Locations page, and stamps each entry with a `_display` string
+  // ("R1 — Lab A", "L1.1 — Freezer").
+  List<Map<String, dynamic>> _orderLocationsHierarchically(
+      List<Map<String, dynamic>> rows) {
+    int cmp(Map a, Map b) {
+      final ao = a['location_sort_order'] as num?;
+      final bo = b['location_sort_order'] as num?;
+      if (ao != null && bo != null) return ao.compareTo(bo);
+      if (ao != null) return -1;
+      if (bo != null) return 1;
+      return (a['location_name'] as String)
+          .compareTo(b['location_name'] as String);
+    }
+
+    final rooms = rows
+        .where((r) => (r['location_type'] as String?) == 'room')
+        .toList()
+      ..sort(cmp);
+    final roomIds = {for (final r in rooms) (r['location_id'] as num).toInt()};
+    final childrenByRoom = <int, List<Map<String, dynamic>>>{};
+    final orphans = <Map<String, dynamic>>[];
+    for (final r in rows) {
+      if ((r['location_type'] as String?) == 'room') continue;
+      final pid = r['location_parent_id'] != null
+          ? (r['location_parent_id'] as num).toInt()
+          : null;
+      if (pid != null && roomIds.contains(pid)) {
+        childrenByRoom.putIfAbsent(pid, () => []).add(r);
+      } else {
+        orphans.add(r);
+      }
+    }
+    for (final list in childrenByRoom.values) {
+      list.sort(cmp);
+    }
+    orphans.sort(cmp);
+
+    final out = <Map<String, dynamic>>[];
+    for (var i = 0; i < rooms.length; i++) {
+      final room = rooms[i];
+      final roomCode = 'R${i + 1}';
+      out.add({
+        ...room,
+        '_display': '$roomCode — ${room['location_name']}',
+      });
+      final kids =
+          childrenByRoom[(room['location_id'] as num).toInt()] ?? const [];
+      for (var j = 0; j < kids.length; j++) {
+        out.add({
+          ...kids[j],
+          '_display': 'L${i + 1}.${j + 1} — ${kids[j]['location_name']}',
+        });
+      }
+    }
+    for (final o in orphans) {
+      out.add({
+        ...o,
+        '_display': o['location_name'] as String,
+      });
+    }
+    return out;
   }
 
   // ── Inline editing ──────────────────────────────────────────────────────────
@@ -316,6 +419,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
         contaminationNotes: dbPatch.containsKey('reagent_contamination_notes') ? dbPatch['reagent_contamination_notes'] as String? : old.contaminationNotes,
         contaminationDate:  dbPatch.containsKey('reagent_contamination_date')  ? DateTime.tryParse(dbPatch['reagent_contamination_date']?.toString() ?? '') : old.contaminationDate,
         notes:            old.notes,
+        tags:             dbPatch.containsKey('reagent_tags')              ? dbPatch['reagent_tags'] as String?              : old.tags,
         qrcode:           old.qrcode,
         createdAt:        old.createdAt,
         updatedAt:        old.updatedAt,
@@ -333,7 +437,17 @@ class _ReagentsPageState extends State<ReagentsPage> {
         .update({...netPatch, 'reagent_updated_at': DateTime.now().toUtc().toIso8601String()})
         .eq('reagent_id', id)
         .then((_) { unawaited(BackupService.instance.notifyCrudChange('reagents')); })
-        .catchError((_) { if (mounted) _load(); });
+        .catchError((e) {
+          debugPrint('Reagent save error (id=$id, patch=$netPatch): $e');
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Save failed: $e'),
+            backgroundColor: AppDS.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
+          _load();
+        });
   }
 
   void _commitCurrentEdit() {
@@ -795,7 +909,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                       selected: _categoryFilter == 'all',
                       onTap: () { _categoryFilter = 'all'; _applyFilters(); },
                     ),
-                    ...ReagentModel.categoryOptions.map((t) => _FilterChip(
+                    ...ReagentModel.categoryOptionsSorted.map((t) => _FilterChip(
                           label: ReagentModel.categoryLabel(t),
                           selected: _categoryFilter == t,
                           onTap: () { _categoryFilter = t; _applyFilters(); },

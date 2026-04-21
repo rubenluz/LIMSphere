@@ -44,7 +44,7 @@ const _widgetCategories = [
   'General',
 ];
 
-const _availableWidgets = [
+const List<Map<String, dynamic>> _availableWidgets = [
   // ── Fish Facility ────────────────────────────────────────────────────────
   {'id': 'fish_by_line',        'name': 'Active Fish Lines',        'icon': Icons.biotech_outlined,           'cat': 'Fish Facility'},
   {'id': 'tank_cleaning',       'name': 'Tank Cleaning',            'icon': Icons.cleaning_services_outlined, 'cat': 'Fish Facility'},

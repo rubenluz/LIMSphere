@@ -119,7 +119,8 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
             .limit(1),
         Supabase.instance.client
             .from('storage_locations')
-            .select('location_id, location_name')
+            .select('location_id, location_name, location_type, '
+                'location_parent_id, location_sort_order')
             .order('location_name'),
       ]);
 
@@ -172,7 +173,8 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
 
         setState(() {
           _reagent      = reagent;
-          _allLocations = List<Map<String, dynamic>>.from(locRows);
+          _allLocations = _orderLocationsHierarchically(
+              List<Map<String, dynamic>>.from(locRows));
           _loading      = false;
         });
       }
@@ -183,6 +185,65 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _snack('Failed to load: $e');
       }
     }
+  }
+
+  // Orders locations as R1, L1.1, L1.2, R2, L2.1, ... and stamps each entry
+  // with a `_display` string matching the Locations page hierarchy.
+  List<Map<String, dynamic>> _orderLocationsHierarchically(
+      List<Map<String, dynamic>> rows) {
+    int cmp(Map a, Map b) {
+      final ao = a['location_sort_order'] as num?;
+      final bo = b['location_sort_order'] as num?;
+      if (ao != null && bo != null) return ao.compareTo(bo);
+      if (ao != null) return -1;
+      if (bo != null) return 1;
+      return (a['location_name'] as String)
+          .compareTo(b['location_name'] as String);
+    }
+
+    final rooms = rows
+        .where((r) => (r['location_type'] as String?) == 'room')
+        .toList()
+      ..sort(cmp);
+    final roomIds = {for (final r in rooms) (r['location_id'] as num).toInt()};
+    final childrenByRoom = <int, List<Map<String, dynamic>>>{};
+    final orphans = <Map<String, dynamic>>[];
+    for (final r in rows) {
+      if ((r['location_type'] as String?) == 'room') continue;
+      final pid = r['location_parent_id'] != null
+          ? (r['location_parent_id'] as num).toInt()
+          : null;
+      if (pid != null && roomIds.contains(pid)) {
+        childrenByRoom.putIfAbsent(pid, () => []).add(r);
+      } else {
+        orphans.add(r);
+      }
+    }
+    for (final list in childrenByRoom.values) {
+      list.sort(cmp);
+    }
+    orphans.sort(cmp);
+
+    final out = <Map<String, dynamic>>[];
+    for (var i = 0; i < rooms.length; i++) {
+      final room = rooms[i];
+      out.add({
+        ...room,
+        '_display': 'R${i + 1} — ${room['location_name']}',
+      });
+      final kids =
+          childrenByRoom[(room['location_id'] as num).toInt()] ?? const [];
+      for (var j = 0; j < kids.length; j++) {
+        out.add({
+          ...kids[j],
+          '_display': 'L${i + 1}.${j + 1} — ${kids[j]['location_name']}',
+        });
+      }
+    }
+    for (final o in orphans) {
+      out.add({...o, '_display': o['location_name'] as String});
+    }
+    return out;
   }
 
   Future<void> _save() async {
@@ -291,7 +352,6 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     'biological': Color(0xFF22C55E),
     'consumable': Color(0xFFF59E0B),
     'kit':        Color(0xFF8B5CF6),
-    'standard':   Color(0xFF75B1E3),
   };
 
   static const _contamColor = <String, Color>{
@@ -530,8 +590,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   // ── Section bodies ─────────────────────────────────────────────────────────
 
   Widget _buildDetailsSection(BuildContext context) {
-    final subOptions =
-        ReagentModel.subcategoryOptions[_category] ?? const <String>[];
+    final subOptions = ReagentModel.subcategoryOptionsSorted(_category);
     if (_subcategory != null && !subOptions.contains(_subcategory)) {
       _subcategory = null;
     }
@@ -541,7 +600,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _InlineDropdown<String>(
           label: 'Category',
           value: _category,
-          items: ReagentModel.categoryOptions
+          items: ReagentModel.categoryOptionsSorted
               .map((t) => DropdownMenuItem(
                     value: t,
                     child: Text(ReagentModel.categoryLabel(t),
@@ -684,7 +743,9 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
             ),
             ..._allLocations.map((l) => DropdownMenuItem<int?>(
                   value: (l['location_id'] as num).toInt(),
-                  child: Text(l['location_name'] as String,
+                  child: Text(
+                      (l['_display'] as String?) ??
+                          (l['location_name'] as String),
                       style: GoogleFonts.spaceGrotesk(
                           color: context.appTextPrimary, fontSize: 13)),
                 )),

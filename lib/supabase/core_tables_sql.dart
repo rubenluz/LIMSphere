@@ -1003,10 +1003,13 @@ DO \$\$ BEGIN
     ALTER TABLE reagents ALTER COLUMN reagent_container_min TYPE INT USING CAST(reagent_container_min AS INT);
   END IF;
 END \$\$;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_category            TEXT;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_subcategory         TEXT;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_physical_state      TEXT;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_formula             TEXT;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_package_size        NUMERIC;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_container_count     INT DEFAULT 1;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_container_min       INT;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_remaining_amount    NUMERIC;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_contamination       TEXT DEFAULT 'none';
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_contamination_notes TEXT;

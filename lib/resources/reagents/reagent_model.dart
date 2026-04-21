@@ -223,17 +223,30 @@ class ReagentModel {
     'biological',
     'consumable',
     'kit',
-    'standard',
   ];
+
+  // Same options sorted by display label — for UI selectors.
+  static List<String> get categoryOptionsSorted {
+    final list = [...categoryOptions];
+    list.sort((a, b) => categoryLabel(a).toLowerCase()
+        .compareTo(categoryLabel(b).toLowerCase()));
+    return list;
+  }
+
+  static List<String> subcategoryOptionsSorted(String category) {
+    final list = [...?subcategoryOptions[category]];
+    list.sort((a, b) => subcategoryLabel(a).toLowerCase()
+        .compareTo(subcategoryLabel(b).toLowerCase()));
+    return list;
+  }
 
   // Fixed, enumerated sub-categories per category. Sub-category values are
   // persisted as-is; use [subcategoryLabel] for display.
   static const subcategoryOptions = <String, List<String>>{
-    'chemical':   ['solvent', 'buffer', 'stain', 'extraction', 'cleaning', 'other'],
+    'chemical':   ['reagents', 'solvent', 'buffer', 'stain', 'extraction', 'cleaning', 'media_preparation', 'standards_controls', 'assays', 'other'],
     'biological': ['media', 'cell_culture', 'enzyme', 'nucleic_acid', 'other'],
     'consumable': ['pipette_tip', 'tube', 'plate', 'flask', 'filter', 'ppe', 'glassware', 'other'],
     'kit':        ['extraction_kit', 'assay_kit', 'other'],
-    'standard':   ['analytical', 'control', 'other'],
   };
 
   static const contaminationOptions = [
@@ -259,16 +272,17 @@ class ReagentModel {
         'biological' => 'Biological',
         'consumable' => 'Consumables',
         'kit'        => 'Kits',
-        'standard'   => 'Standards',
         _            => c,
       };
 
   static String subcategoryLabel(String s) => switch (s) {
+        'reagents'       => 'Reagents',
         'solvent'        => 'Solvents',
         'buffer'         => 'Buffers & Solutions',
         'stain'          => 'Stains & Dyes',
         'extraction'     => 'Extraction Reagents',
-        'cleaning'       => 'Cleaning',
+        'cleaning'       => 'Cleaning & maintenance',
+        'media_preparation' => 'Media preparation',
         'media'          => 'Media',
         'cell_culture'   => 'Cell Culture Supplements',
         'enzyme'         => 'Enzymes',
@@ -284,6 +298,8 @@ class ReagentModel {
         'assay_kit'      => 'Assay Kits',
         'analytical'     => 'Analytical Standards',
         'control'        => 'Controls',
+        'standards_controls' => 'Standards and controls',
+        'assays'         => 'Assays',
         'other'          => 'Others',
         _                => s.replaceAll('_', ' ').replaceFirstMapped(
             RegExp(r'^[a-z]'), (m) => m[0]!.toUpperCase()),

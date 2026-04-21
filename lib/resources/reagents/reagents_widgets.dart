@@ -64,7 +64,6 @@ class _ReagentRow extends StatelessWidget {
     'biological': Color(0xFF22C55E),
     'consumable': Color(0xFFF59E0B),
     'kit':        Color(0xFF8B5CF6),
-    'standard':   Color(0xFF75B1E3),
   };
 
   static const _contamColor = {
@@ -74,6 +73,30 @@ class _ReagentRow extends StatelessWidget {
     'both':      Color(0xFFEC4899),
     'suspected': Color(0xFFEAB308),
   };
+
+  // Palette for auto-coloring tag chips. Each distinct tag string hashes to a
+  // stable color so identical tags across rows share a color.
+  static const _tagPalette = <Color>[
+    Color(0xFF38BDF8), // sky
+    Color(0xFF22C55E), // green
+    Color(0xFFEAB308), // yellow
+    Color(0xFFF97316), // orange
+    Color(0xFFEF4444), // red
+    Color(0xFFA855F7), // purple
+    Color(0xFFEC4899), // pink
+    Color(0xFF14B8A6), // teal
+    Color(0xFF8B5CF6), // violet
+  ];
+
+  static Color _tagColor(String tag) {
+    final key = tag.trim().toLowerCase();
+    if (key.isEmpty) return _tagPalette[0];
+    var h = 0;
+    for (final c in key.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return _tagPalette[h % _tagPalette.length];
+  }
 
   bool _isEditing(String key) =>
       editingCell != null &&
@@ -187,7 +210,7 @@ class _ReagentRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               child: _isEditing('category')
                   ? _ArrowDropdown<String>(
-                      values: ReagentModel.categoryOptions,
+                      values: ReagentModel.categoryOptionsSorted,
                       current: r.category,
                       labelOf: ReagentModel.categoryLabel,
                       onSelect: (v) => onCommitCategory(r.id, v),
@@ -208,8 +231,7 @@ class _ReagentRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               child: _isEditing('subcategory')
                   ? _ArrowDropdown<String>(
-                      values: ReagentModel.subcategoryOptions[r.category]
-                              ?? const <String>[],
+                      values: ReagentModel.subcategoryOptionsSorted(r.category),
                       current: r.subcategory ?? '',
                       labelOf: ReagentModel.subcategoryLabel,
                       onSelect: (v) => onCommitSubcategory(r.id, v),
@@ -241,21 +263,24 @@ class _ReagentRow extends StatelessWidget {
                     runSpacing: 2,
                     children: [
                       for (final t in r.tagList)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(3),
-                            border:
-                                Border.all(color: accent.withValues(alpha: 0.4)),
-                          ),
-                          child: Text(t,
-                              style: AppDS.ui(
-                                  size: 10,
-                                  color: accent,
-                                  weight: FontWeight.w600)),
-                        ),
+                        Builder(builder: (_) {
+                          final c = _tagColor(t);
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: c.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(3),
+                              border: Border.all(
+                                  color: c.withValues(alpha: 0.4)),
+                            ),
+                            child: Text(t,
+                                style: AppDS.ui(
+                                    size: 10,
+                                    color: c,
+                                    weight: FontWeight.w600)),
+                          );
+                        }),
                     ],
                   ),
             tsCell,
@@ -385,7 +410,9 @@ class _ReagentRow extends StatelessWidget {
                                 color: muted, fontSize: 12))),
                           ...locations.map((l) => DropdownMenuItem<int?>(
                             value: (l['location_id'] as num).toInt(),
-                            child: Text(l['location_name'] as String,
+                            child: Text(
+                                (l['_display'] as String?) ??
+                                    (l['location_name'] as String),
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.spaceGrotesk(
                                     color: primary, fontSize: 12)))),
@@ -913,8 +940,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final subOptions =
-        ReagentModel.subcategoryOptions[_category] ?? const <String>[];
+    final subOptions = ReagentModel.subcategoryOptionsSorted(_category);
     // If current subcategory isn't in the list for the selected category,
     // null it out so the dropdown doesn't assert.
     if (_subcategory != null && !subOptions.contains(_subcategory)) {
@@ -948,7 +974,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
                 Expanded(child: _dropdownField<String>(context,
                   label: 'Category',
                   value: _category,
-                  items: ReagentModel.categoryOptions.map((t) =>
+                  items: ReagentModel.categoryOptionsSorted.map((t) =>
                     DropdownMenuItem(value: t,
                       child: Text(ReagentModel.categoryLabel(t),
                         style: GoogleFonts.spaceGrotesk(
@@ -1052,7 +1078,9 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
                           color: context.appTextMuted, fontSize: 13))),
                     ...widget.locations.map((l) => DropdownMenuItem<int?>(
                       value: (l['location_id'] as num).toInt(),
-                      child: Text(l['location_name'] as String,
+                      child: Text(
+                          (l['_display'] as String?) ??
+                              (l['location_name'] as String),
                         style: GoogleFonts.spaceGrotesk(
                             color: context.appTextPrimary, fontSize: 13)))),
                   ],
