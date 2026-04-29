@@ -10,6 +10,7 @@ import '../camera/camera_page.dart';
 import 'app_nav.dart';
 import 'package:limsphere/lab_chat/lab_chat_page.dart';
 import 'package:limsphere/labels/label_page.dart';
+import '../resources/lab/lab_page.dart';
 import '../resources/locations/locations_page.dart';
 import '../resources/reagents/reagents_page.dart';
 import '../resources/machines/machines_page.dart';
@@ -61,6 +62,7 @@ const Map<String, String> _modulePermColumn = {
   'fish_lines':       'user_table_fish_facility',
   'fish_water_qc':    'user_table_fish_facility',
   'sops_fish':        'user_table_fish_facility',
+  'lab':              'user_table_resources',
   'locations':        'user_table_resources',
   'reagents':         'user_table_resources',
   'equipment':        'user_table_resources',
@@ -80,6 +82,7 @@ const Map<String, String?> _moduleRequiredRole = {
   'fish_lines':       'technician',
   'fish_water_qc':    'technician',
   'sops_fish':        'technician',
+  'lab':              'technician',
   'locations':        'technician',
   'reagents':         'technician',
   'equipment':        'technician',
@@ -238,6 +241,7 @@ class _MenuPageState extends State<MenuPage> {
       label: 'Resources',
       icon: Icons.category_outlined,
       children: [
+        _NavItem(id: 'lab',          label: 'Lab Map',           icon: Icons.map_outlined,                 accent: const Color(0xFF38BDF8), builder: (_) => const LabPage()),
         _NavItem(id: 'locations',    label: 'Rooms & Locations', icon: Icons.place_outlined,              accent: const Color(0xFF6366F1), builder: (_) => const LocationsPage()),
         _NavItem(id: 'reagents',     label: 'Reagents',     icon: Icons.water_drop_outlined,              accent: const Color(0xFFF59E0B), builder: (_) => const ReagentsPage()),
         _NavItem(id: 'equipment',    label: 'Machines',     icon: Icons.precision_manufacturing_outlined, accent: const Color(0xFF14B8A6), builder: (_) => const MachinesPage()),

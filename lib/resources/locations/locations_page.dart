@@ -3,6 +3,13 @@
 // Widget and dialog classes in locations_widgets.dart (part).
 
 
+
+// TODO: Assign room types:
+// - Wet lab
+// - Imaging room
+// - Fish facility
+
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,6 +20,7 @@ import '/core/data_cache.dart';
 import '/supabase/supabase_manager.dart';
 import '/theme/theme.dart';
 import '/camera/qr_scanner/qr_code_rules.dart';
+import 'detail_widgets.dart';
 import 'location_model.dart';
 import 'location_detail_page.dart';
 import 'room_detail_page.dart';
@@ -35,6 +43,7 @@ class _LocationsPageState extends State<LocationsPage> {
   List<LocationModel> _rooms = [];
   Map<int, List<LocationModel>> _childMap = {};
   List<LocationModel> _orphans = [];
+  List<Map<String, dynamic>> _users = [];
   bool _loading = true;
   String _search = '';
   final _searchCtrl = TextEditingController();
@@ -125,6 +134,18 @@ class _LocationsPageState extends State<LocationsPage> {
             .showSnackBar(SnackBar(content: Text('Failed to load: $e')));
       }
     }
+    try {
+      final userRows = await Supabase.instance.client
+          .from('users')
+          .select('user_id, user_email, user_name, user_phone, '
+              'user_institution, user_group, user_role')
+          .order('user_name');
+      if (!mounted) return;
+      setState(() =>
+          _users = List<Map<String, dynamic>>.from(userRows));
+    } catch (e) {
+      debugPrint('locations: users lookup failed: $e');
+    }
   }
 
   // One-time migration: parse legacy "R1 - Description" / "L1.1 - Description"
@@ -172,54 +193,136 @@ class _LocationsPageState extends State<LocationsPage> {
     }
   }
 
+  // Re-fetches storage_locations from the DB and writes the result to cache,
+  // but does NOT call setState. Used after a reorder to keep the cache fresh
+  // without rebuilding the in-flight ReorderableListView (which would crash
+  // with a duplicate-GlobalKey assertion mid-animation).
+  Future<void> _refreshCache() async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('storage_locations')
+          .select('*, parent:location_parent_id(location_name)')
+          .order('location_name');
+      await DataCache.write('storage_locations', rows as List<dynamic>);
+    } catch (e) {
+      debugPrint('locations: _refreshCache failed: $e');
+    }
+  }
+
   Future<void> _persistOrder(List<LocationModel> items) async {
     final client = Supabase.instance.client;
+    // Always rewrite every row's sort_order. The list passed in was already
+    // re-stamped with sequential sortOrders by the caller, so a per-row
+    // comparison against the local model would skip every update — the bug
+    // that made reorder appear to work then snap back after _load().
+    int ok = 0;
+    final failures = <String>[];
     for (var i = 0; i < items.length; i++) {
       final loc = items[i];
       final newSort = i + 1;
-      if (loc.sortOrder == newSort) continue;
       try {
         await client
             .from('storage_locations')
             .update({'location_sort_order': newSort})
             .eq('location_id', loc.id);
-      } catch (e) {
-        debugPrint('locations: persist order failed for ${loc.id}: $e');
+        ok++;
+      } catch (e, st) {
+        debugPrint(
+            'locations: persist order failed for id=${loc.id} '
+            '("${loc.name}") → $newSort: $e\n$st');
+        failures.add('${loc.name} (id=${loc.id}): $e');
       }
+    }
+    debugPrint('locations: _persistOrder updated $ok/${items.length} rows');
+    if (failures.isNotEmpty && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          'Reorder save failed for ${failures.length} item(s):\n'
+          '${failures.take(3).join('\n')}',
+          style: GoogleFonts.spaceGrotesk(color: Colors.white),
+        ),
+        backgroundColor: AppDS.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: const Duration(seconds: 5),
+      ));
     }
   }
 
   void _reorderRooms(int oldIndex, int newIndex) {
-    setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
-      final moved = _rooms.removeAt(oldIndex);
-      _rooms.insert(newIndex, moved);
-      _rooms = [
-        for (var i = 0; i < _rooms.length; i++)
-          _rooms[i].copyWith(sortOrder: i + 1),
-      ];
-    });
+    debugPrint(
+        'locations: _reorderRooms oldIndex=$oldIndex newIndex=$newIndex '
+        'len=${_rooms.length}');
+    try {
+      setState(() {
+        if (newIndex > oldIndex) newIndex -= 1;
+        final moved = _rooms.removeAt(oldIndex);
+        _rooms.insert(newIndex, moved);
+        _rooms = [
+          for (var i = 0; i < _rooms.length; i++)
+            _rooms[i].copyWith(sortOrder: i + 1),
+        ];
+      });
+    } catch (e, st) {
+      debugPrint('locations: _reorderRooms reorder threw: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Reorder failed: $e',
+              style: GoogleFonts.spaceGrotesk(color: Colors.white)),
+          backgroundColor: AppDS.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ));
+      }
+      return;
+    }
+    // Don't call _load() here — the local _rooms list is already correct, and
+    // re-fetching would rebuild the ReorderableListView while it's still
+    // running its drop animation, which triggers a duplicate-GlobalKey
+    // assertion. Refresh the cache asynchronously instead.
     _persistOrder(_rooms).then((_) {
-      if (mounted) _load();
+      if (mounted) _refreshCache();
+    }).catchError((e, st) {
+      debugPrint('locations: _persistOrder unhandled error: $e\n$st');
     });
   }
 
   void _reorderChildren(int roomId, int oldIndex, int newIndex) {
-    setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
-      final list = _childMap[roomId];
-      if (list == null) return;
-      final moved = list.removeAt(oldIndex);
-      list.insert(newIndex, moved);
-      _childMap[roomId] = [
-        for (var i = 0; i < list.length; i++)
-          list[i].copyWith(sortOrder: i + 1),
-      ];
-    });
+    debugPrint('locations: _reorderChildren roomId=$roomId '
+        'oldIndex=$oldIndex newIndex=$newIndex '
+        'len=${_childMap[roomId]?.length}');
+    try {
+      setState(() {
+        if (newIndex > oldIndex) newIndex -= 1;
+        final list = _childMap[roomId];
+        if (list == null) return;
+        final moved = list.removeAt(oldIndex);
+        list.insert(newIndex, moved);
+        _childMap[roomId] = [
+          for (var i = 0; i < list.length; i++)
+            list[i].copyWith(sortOrder: i + 1),
+        ];
+      });
+    } catch (e, st) {
+      debugPrint('locations: _reorderChildren reorder threw: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Reorder failed: $e',
+              style: GoogleFonts.spaceGrotesk(color: Colors.white)),
+          backgroundColor: AppDS.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ));
+      }
+      return;
+    }
     final updated = _childMap[roomId];
     if (updated != null) {
+      // See _reorderRooms for why we skip _load() here.
       _persistOrder(updated).then((_) {
-        if (mounted) _load();
+        if (mounted) _refreshCache();
+      }).catchError((e, st) {
+        debugPrint('locations: _persistOrder (children) unhandled error: $e\n$st');
       });
     }
   }
@@ -233,6 +336,20 @@ class _LocationsPageState extends State<LocationsPage> {
               ? RoomDetailPage(locationId: loc.id)
               : LocationDetailPage(locationId: loc.id)))
       .then((_) => _load());
+
+  Future<void> _showEditAllDialog(LocationModel room, String code,
+      int roomIndex, List<LocationModel> children) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => _EditChildrenDialog(
+        room: room,
+        roomCode: code,
+        roomIndex: roomIndex,
+        children: children,
+      ),
+    );
+    if (ok == true) _load();
+  }
 
   Future<void> _showDialog({
     int? defaultParentId,
@@ -296,48 +413,11 @@ class _LocationsPageState extends State<LocationsPage> {
   Widget build(BuildContext context) {
     return Column(children: [
       _buildToolbar(context),
-      if (!_loading) _buildStatsBar(context),
       Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _buildBody(context)),
     ]);
-  }
-
-  Widget _buildStatsBar(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appSurface,
-        border: Border(bottom: BorderSide(color: context.appBorder)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          _buildSummaryChip(
-            context,
-            icon: Icons.meeting_room_outlined,
-            label: '${_rooms.length} room${_rooms.length == 1 ? '' : 's'}',
-            color: const Color(0xFF6366F1),
-          ),
-          _buildSummaryChip(
-            context,
-            icon: Icons.place_outlined,
-            label:
-                '$_locationCount location${_locationCount == 1 ? '' : 's'}',
-            color: const Color(0xFF3B82F6),
-          ),
-          if (_orphans.isNotEmpty)
-            _buildSummaryChip(
-              context,
-              icon: Icons.link_off_outlined,
-              label: '${_orphans.length} without room',
-              color: AppDS.orange,
-            ),
-        ],
-      ),
-    );
   }
 
   Widget _buildToolbar(BuildContext context) {
@@ -405,6 +485,32 @@ class _LocationsPageState extends State<LocationsPage> {
           ),
         ),
         const SizedBox(width: 8),
+        if (!_loading) ...[
+          _buildSummaryChip(
+            context,
+            icon: Icons.meeting_room_outlined,
+            label: '${_rooms.length} room${_rooms.length == 1 ? '' : 's'}',
+            color: const Color(0xFF6366F1),
+          ),
+          const SizedBox(width: 6),
+          _buildSummaryChip(
+            context,
+            icon: Icons.place_outlined,
+            label:
+                '$_locationCount location${_locationCount == 1 ? '' : 's'}',
+            color: const Color(0xFF3B82F6),
+          ),
+          if (_orphans.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            _buildSummaryChip(
+              context,
+              icon: Icons.link_off_outlined,
+              label: '${_orphans.length} without room',
+              color: AppDS.orange,
+            ),
+          ],
+          const SizedBox(width: 8),
+        ],
         Tooltip(
           message: 'Export CSV',
           child: IconButton(
@@ -497,18 +603,46 @@ class _LocationsPageState extends State<LocationsPage> {
                 child: child,
               ),
               onReorder: (oldIndex, newIndex) {
-                if (q.isNotEmpty) return;
-                final movedId = visibleRooms[oldIndex].id;
-                final anchorId = newIndex >= visibleRooms.length
-                    ? null
-                    : visibleRooms[newIndex].id;
-                final srcIdx = _rooms.indexWhere((r) => r.id == movedId);
-                int dstIdx = anchorId == null
-                    ? _rooms.length
-                    : _rooms.indexWhere((r) => r.id == anchorId);
-                if (srcIdx < 0 || dstIdx < 0) return;
-                _reorderRooms(
-                    srcIdx, dstIdx > srcIdx ? dstIdx + 1 : dstIdx);
+                debugPrint('locations: rooms onReorder old=$oldIndex '
+                    'new=$newIndex visible=${visibleRooms.length} '
+                    'all=${_rooms.length}');
+                if (q.isNotEmpty) {
+                  debugPrint('locations: skip reorder — search active');
+                  return;
+                }
+                try {
+                  final movedId = visibleRooms[oldIndex].id;
+                  final anchorId = newIndex >= visibleRooms.length
+                      ? null
+                      : visibleRooms[newIndex].id;
+                  final srcIdx =
+                      _rooms.indexWhere((r) => r.id == movedId);
+                  int dstIdx = anchorId == null
+                      ? _rooms.length
+                      : _rooms.indexWhere((r) => r.id == anchorId);
+                  debugPrint('locations: movedId=$movedId anchorId=$anchorId '
+                      'srcIdx=$srcIdx dstIdx=$dstIdx');
+                  if (srcIdx < 0 || dstIdx < 0) {
+                    debugPrint('locations: aborting — invalid index map');
+                    return;
+                  }
+                  _reorderRooms(
+                      srcIdx, dstIdx > srcIdx ? dstIdx + 1 : dstIdx);
+                } catch (e, st) {
+                  debugPrint(
+                      'locations: rooms onReorder threw: $e\n$st');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Reorder failed: $e',
+                          style: GoogleFonts.spaceGrotesk(
+                              color: Colors.white)),
+                      backgroundColor: AppDS.red,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ));
+                  }
+                }
               },
               children: [
                 for (final room in visibleRooms)
@@ -529,30 +663,31 @@ class _LocationsPageState extends State<LocationsPage> {
                       };
                       final roomIndex = _rooms.indexOf(room);
                       final visibleIndex = visibleRooms.indexOf(room);
-                      return ReorderableDelayedDragStartListener(
-                        index: visibleIndex,
-                        child: _RoomCard(
-                          key: ValueKey(room.id),
-                          room: room,
-                          roomCode: roomCode(roomIndex),
-                          children: kids,
-                          childCodes: {
-                            for (final c in kids)
-                              c.id: childCode(
-                                  roomIndex, childIndexById[c.id] ?? 0),
-                          },
-                          onTap: () => _navigate(room),
-                          onTapChild: _navigate,
-                          onAddChild: () => _showDialog(
-                            defaultParentId: room.id,
-                            defaultType:
-                                LocationModel.defaultLocationType,
-                          ),
-                          onReorderChildren: q.isEmpty
-                              ? (oldIdx, newIdx) =>
-                                  _reorderChildren(room.id, oldIdx, newIdx)
-                              : null,
+                      return _RoomCard(
+                        key: ValueKey(room.id),
+                        room: room,
+                        roomCode: roomCode(roomIndex),
+                        users: _users,
+                        dragIndex: q.isEmpty ? visibleIndex : null,
+                        children: kids,
+                        childCodes: {
+                          for (final c in kids)
+                            c.id: childCode(
+                                roomIndex, childIndexById[c.id] ?? 0),
+                        },
+                        onTap: () => _navigate(room),
+                        onTapChild: _navigate,
+                        onAddChild: () => _showDialog(
+                          defaultParentId: room.id,
+                          defaultType:
+                              LocationModel.defaultLocationType,
                         ),
+                        onEditAll: () => _showEditAllDialog(
+                            room, roomCode(roomIndex), roomIndex, allKids),
+                        onReorderChildren: q.isEmpty
+                            ? (oldIdx, newIdx) =>
+                                _reorderChildren(room.id, oldIdx, newIdx)
+                            : null,
                       );
                     }),
                   ),

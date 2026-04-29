@@ -1,13 +1,12 @@
 // room_detail_page.dart - Room detail editor.
 // Fields: name, responsible, notes. Sub-locations sorted numerically by L#.# suffix.
 // Pushed via Navigator with its own Scaffold + AppBar.
-//TODO: in the rooms the responsible when writing @ should appear the names of the user, if a name is selecte enter slecte tha names, more than one resposible is possible. onyl names in the users is possible to add as responsible.
-//TODO: when clicking on the name this shoudl open a user dialog preview.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '/theme/theme.dart';
+import '/theme/module_permission.dart';
 import 'detail_widgets.dart';
 import 'location_detail_page.dart';
 import 'location_model.dart';
@@ -23,10 +22,11 @@ class RoomDetailPage extends StatefulWidget {
 class _RoomDetailPageState extends State<RoomDetailPage> {
   LocationModel? _room;
   List<LocationModel> _children = [];
-  String? _roomCode;
+  List<Map<String, dynamic>> _users = [];
   final Map<int, String> _childCodes = {};
   bool _loading = true;
   bool _saving = false;
+  bool _editMode = false;
   final Set<int> _expanded = {0, 1, 2};
 
   late final TextEditingController _nameCtrl;
@@ -85,6 +85,18 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           .toList()
         ..sort(_bySortThenName);
 
+      List<Map<String, dynamic>> users = [];
+      try {
+        final userRows = await Supabase.instance.client
+            .from('users')
+            .select('user_id, user_email, user_name, user_phone, '
+                'user_institution, user_group, user_role')
+            .order('user_name');
+        users = List<Map<String, dynamic>>.from(userRows);
+      } catch (e) {
+        debugPrint('room_detail: users lookup failed: $e');
+      }
+
       final codes = <int, String>{
         for (var i = 0; i < children.length; i++)
           children[i].id:
@@ -99,7 +111,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         setState(() {
           _room      = room;
           _children  = children;
-          _roomCode  = roomIdx >= 0 ? 'R${roomIdx + 1}' : null;
+          _users     = users;
           _childCodes
             ..clear()
             ..addAll(codes);
@@ -148,7 +160,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           .update(data)
           .eq('location_id', widget.locationId);
       await _load();
-      if (mounted) detailSnack(context, 'Saved');
+      if (mounted) {
+        setState(() => _editMode = false);
+        detailSnack(context, 'Saved');
+      }
     } catch (e) {
       debugPrint('room_detail: save failed: $e');
       if (mounted) detailSnack(context, 'Save failed: $e');
@@ -232,21 +247,29 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         foregroundColor: context.appTextPrimary,
         elevation: 0,
         title: Text(
-          room == null
-              ? 'Room'
-              : (_roomCode == null
-                  ? stripLocationCodePrefix(room.name)
-                  : '${_roomCode!} · ${stripLocationCodePrefix(room.name)}'),
+          'Room',
           style: GoogleFonts.spaceGrotesk(
               color: context.appTextPrimary, fontWeight: FontWeight.w600),
         ),
         actions: [
           if (room != null) ...[
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20, color: AppDS.red),
-              tooltip: 'Delete',
-              onPressed: _delete,
-            ),
+            if (_editMode)
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    size: 20, color: AppDS.red),
+                tooltip: 'Delete',
+                onPressed: _delete,
+              ),
+            if (_editMode && !_saving)
+              IconButton(
+                icon: Icon(Icons.close,
+                    size: 20, color: context.appTextSecondary),
+                tooltip: 'Cancel',
+                onPressed: () {
+                  setState(() => _editMode = false);
+                  _load();
+                },
+              ),
             _saving
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
@@ -255,14 +278,29 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         height: 18,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white)))
-                : TextButton.icon(
-                    onPressed: _save,
-                    icon: const Icon(Icons.save_outlined,
-                        size: 16, color: AppDS.accent),
-                    label: Text('Save',
-                        style:
-                            GoogleFonts.spaceGrotesk(color: AppDS.accent)),
-                  ),
+                : _editMode
+                    ? TextButton.icon(
+                        onPressed: _save,
+                        icon: const Icon(Icons.save_outlined,
+                            size: 16, color: AppDS.accent),
+                        label: Text('Save',
+                            style: GoogleFonts.spaceGrotesk(
+                                color: AppDS.accent)),
+                      )
+                    : TextButton.icon(
+                        onPressed: () {
+                          if (!context.canEditModule) {
+                            context.warnReadOnly();
+                            return;
+                          }
+                          setState(() => _editMode = true);
+                        },
+                        icon: const Icon(Icons.edit_outlined,
+                            size: 16, color: AppDS.accent),
+                        label: Text('Edit',
+                            style: GoogleFonts.spaceGrotesk(
+                                color: AppDS.accent)),
+                      ),
           ],
         ],
       ),
@@ -304,7 +342,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     : _expanded.add(1);
               }),
               child: DetailInlineField(
-                  label: 'Notes', controller: _notesCtrl, maxLines: 4),
+                  label: 'Notes',
+                  controller: _notesCtrl,
+                  maxLines: 4,
+                  readOnly: !_editMode),
             ),
             DetailSection(
               title: 'SUB-LOCATIONS (${_children.length})',
@@ -327,23 +368,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     return Container(
       color: context.appSurface2,
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (_roomCode != null)
-          Text(_roomCode!,
-              style: GoogleFonts.jetBrainsMono(
-                  color: context.appTextMuted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700)),
-        Text(stripLocationCodePrefix(room.name),
-            style: GoogleFonts.spaceGrotesk(
-                color: context.appTextPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        Row(children: [
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(6),
@@ -359,36 +388,30 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       fontWeight: FontWeight.w600)),
             ]),
           ),
-          if (room.responsible != null) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: context.appSurface3,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: context.appBorder),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.person_outline,
-                    color: context.appTextMuted, size: 13),
-                const SizedBox(width: 5),
-                Text(room.responsible!,
-                    style: GoogleFonts.spaceGrotesk(
-                        color: context.appTextSecondary, fontSize: 12)),
-              ]),
+          if (room.responsible != null &&
+              room.responsible!.trim().isNotEmpty) ...[
+            const SizedBox(width: 10),
+            Flexible(
+              child: DetailResponsibleChips(
+                  raw: room.responsible, users: _users),
             ),
           ],
-        ]),
-      ]),
+        ],
+      ),
     );
   }
 
   Widget _buildDetailsSection(BuildContext context, LocationModel room) {
+    final ro = !_editMode;
     return Column(children: [
       DetailFieldRow(children: [
-        DetailInlineField(label: 'Name', controller: _nameCtrl),
-        DetailInlineField(label: 'Responsible', controller: _responsibleCtrl),
+        DetailInlineField(label: 'Name', controller: _nameCtrl, readOnly: ro),
+        DetailResponsibleField(
+          label: 'Responsible',
+          controller: _responsibleCtrl,
+          users: _users,
+          readOnly: ro,
+        ),
       ]),
       if (room.createdAt != null) ...[
         const SizedBox(height: 10),

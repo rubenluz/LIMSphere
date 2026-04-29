@@ -6,21 +6,27 @@ import 'package:flutter/material.dart';
 class LocationModel {
   static const roomType = 'room';
   static const genericLocationType = 'location';
+  // Storage subcategories grouped by physical kind. The order here also drives
+  // the order shown in the Add Location dropdown (after group headers).
+  // 'oven', 'incubator', 'water_bath' were intentionally removed — those are
+  // tracked as machines, not storage locations. Existing rows with those types
+  // still render via typeLabel / typeIcon switches below for backward compat.
+  static const _furniture = ['bench', 'cabinet', 'drawer', 'rack', 'shelf'];
+  static const _coldStorage = ['cold_room', 'cryotank', 'freezer', 'fridge'];
+  static const _containers = ['box'];
+
   static const locationTypeOptions = [
     genericLocationType,
-    'bench',
-    'box',
-    'cabinet',
-    'cold_room',
-    'cryotank',
-    'drawer',
-    'freezer',
-    'fridge',
-    'incubator',
-    'oven',
-    'rack',
-    'shelf',
-    'water_bath',
+    ..._furniture,
+    ..._coldStorage,
+    ..._containers,
+  ];
+  // Subcategories grouped for picker UIs. Each entry is a (group label,
+  // type values) pair; use typeLabel() to display each value.
+  static const locationSubtypeGroups = <(String, List<String>)>[
+    ('Furniture',    _furniture),
+    ('Cold storage', _coldStorage),
+    ('Containers',   _containers),
   ];
   static const typeOptions = [roomType, ...locationTypeOptions];
   static const defaultLocationType = genericLocationType;

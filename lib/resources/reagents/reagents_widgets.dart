@@ -8,6 +8,7 @@ part of 'reagents_page.dart';
 class _ReagentRow extends StatelessWidget {
   final ReagentModel reagent;
   final int rowIndex;
+  final String? roomName;
   final VoidCallback onViewMore;
   final VoidCallback onRequest;
   final Map<String, dynamic>? editingCell;
@@ -23,12 +24,12 @@ class _ReagentRow extends StatelessWidget {
   final void Function(int id, String? value) onCommitPhysicalState;
   final void Function(int id, String value) onCommitContamination;
   final void Function(int id, int? value) onCommitLocation;
-  final Future<void> Function(int id, DateTime? current) onPickOpenedDate;
   final List<Map<String, dynamic>> locations;
 
   const _ReagentRow({
     required this.reagent,
     required this.rowIndex,
+    required this.roomName,
     required this.onViewMore,
     required this.onRequest,
     required this.editingCell,
@@ -44,7 +45,6 @@ class _ReagentRow extends StatelessWidget {
     required this.onCommitPhysicalState,
     required this.onCommitContamination,
     required this.onCommitLocation,
-    required this.onPickOpenedDate,
     required this.locations,
   });
 
@@ -98,10 +98,40 @@ class _ReagentRow extends StatelessWidget {
     return _tagPalette[h % _tagPalette.length];
   }
 
+  // Wrap a cell's display widget so hovering with the mouse reveals the full
+  // string when it was truncated with ellipsis. Skips the tooltip for empty
+  // values to avoid an empty hover bubble.
+  static Widget _tip(String? msg, Widget child) {
+    if (msg == null || msg.trim().isEmpty) return child;
+    return Tooltip(
+      message: msg,
+      waitDuration: const Duration(milliseconds: 400),
+      textStyle: GoogleFonts.spaceGrotesk(color: AppDS.textPrimary, fontSize: 12),
+      decoration: BoxDecoration(
+        color: AppDS.surface3,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppDS.border),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      child: child,
+    );
+  }
+
   bool _isEditing(String key) =>
       editingCell != null &&
       editingCell!['id'] == reagent.id &&
       editingCell!['key'] == key;
+
+  String? _locationDisplay(int? id) {
+    if (id == null) return null;
+    for (final loc in locations) {
+      if ((loc['location_id'] as num).toInt() == id) {
+        return (loc['_display'] as String?) ??
+            (loc['location_name'] as String?);
+      }
+    }
+    return reagent.locationName;
+  }
 
   Widget _editField(BuildContext ctx, String key, TextStyle ts,
       {TextInputType? keyboardType}) {
@@ -190,12 +220,12 @@ class _ReagentRow extends StatelessWidget {
           width: _colCode,
           child: _editCell(context, 'code', r.code ?? '',
             r.code != null && r.code!.isNotEmpty
-                ? Text(r.code!,
+                ? _tip(r.code, Text(r.code!,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.jetBrainsMono(
                         color: context.appTextPrimary,
                         fontSize: 11,
-                        fontWeight: FontWeight.w700))
+                        fontWeight: FontWeight.w700)))
                 : const SizedBox.shrink(),
             GoogleFonts.jetBrainsMono(fontSize: 12, color: primary),
           ),
@@ -215,6 +245,8 @@ class _ReagentRow extends StatelessWidget {
                       labelOf: ReagentModel.categoryLabel,
                       onSelect: (v) => onCommitCategory(r.id, v),
                       onCancel: onCancel,
+                      onAddNewRow: onAddNewRow,
+                      autoOpen: true,
                     )
                   : _Badge(label: ReagentModel.categoryLabel(r.category), color: accent),
             ),
@@ -236,13 +268,20 @@ class _ReagentRow extends StatelessWidget {
                       labelOf: ReagentModel.subcategoryLabel,
                       onSelect: (v) => onCommitSubcategory(r.id, v),
                       onCancel: onCancel,
+                      onAddNewRow: onAddNewRow,
+                      autoOpen: true,
                     )
-                  : Text(
+                  : _tip(
                       r.subcategory != null
                           ? ReagentModel.subcategoryLabel(r.subcategory!)
-                          : '—',
-                      overflow: TextOverflow.ellipsis,
-                      style: r.subcategory != null ? tsCell : tsMuted,
+                          : null,
+                      Text(
+                        r.subcategory != null
+                            ? ReagentModel.subcategoryLabel(r.subcategory!)
+                            : '—',
+                        overflow: TextOverflow.ellipsis,
+                        style: r.subcategory != null ? tsCell : tsMuted,
+                      ),
                     ),
             ),
           ),
@@ -301,10 +340,13 @@ class _ReagentRow extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     child: Row(children: [
                       Flexible(
-                        child: Text(
-                            (r.name == null || r.name!.isEmpty) ? '—' : r.name!,
-                            overflow: TextOverflow.ellipsis,
-                            style: (r.name == null || r.name!.isEmpty) ? tsMuted : tsName),
+                        child: _tip(
+                          r.name,
+                          Text(
+                              (r.name == null || r.name!.isEmpty) ? '—' : r.name!,
+                              overflow: TextOverflow.ellipsis,
+                              style: (r.name == null || r.name!.isEmpty) ? tsMuted : tsName),
+                        ),
                       ),
                       if (r.isExpired) ...[
                         const SizedBox(width: 4),
@@ -344,6 +386,8 @@ class _ReagentRow extends StatelessWidget {
                       labelOf: (v) => v == null ? '—' : ReagentModel.physicalStateLabel(v),
                       onSelect: (v) => onCommitPhysicalState(r.id, v),
                       onCancel: onCancel,
+                      onAddNewRow: onAddNewRow,
+                      autoOpen: true,
                     )
                   : r.physicalState != null
                       ? _Badge(
@@ -364,31 +408,47 @@ class _ReagentRow extends StatelessWidget {
         SizedBox(
           width: _colFormula,
           child: _editCell(context, 'formula', r.formula ?? '',
-              Text(r.formula ?? '—',
+              _tip(r.formula, Text(r.formula ?? '—',
                   overflow: TextOverflow.ellipsis,
-                  style: r.formula != null ? tsMono : tsMonoMut),
+                  style: r.formula != null ? tsMono : tsMonoMut)),
               tsMono),
         ),
 
         // ── Opened Date ───────────────────────────────────────────────────
         SizedBox(
           width: _colOpened,
-          child: GestureDetector(
-            onDoubleTap: () => onPickOpenedDate(r.id, r.openedDate),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              child: Text(
-                r.openedDate != null
-                    ? '${r.openedDate!.year}-${r.openedDate!.month.toString().padLeft(2, '0')}-${r.openedDate!.day.toString().padLeft(2, '0')}'
-                    : '—',
-                overflow: TextOverflow.ellipsis,
-                style: r.openedDate != null ? tsMono : tsMonoMut,
-              ),
+          child: _editCell(
+            context,
+            'openedDate',
+            r.openedDate != null
+                ? '${r.openedDate!.year}-${r.openedDate!.month.toString().padLeft(2, '0')}-${r.openedDate!.day.toString().padLeft(2, '0')}'
+                : '',
+            Text(
+              r.openedDate != null
+                  ? '${r.openedDate!.year}-${r.openedDate!.month.toString().padLeft(2, '0')}-${r.openedDate!.day.toString().padLeft(2, '0')}'
+                  : '—',
+              overflow: TextOverflow.ellipsis,
+              style: r.openedDate != null ? tsMono : tsMonoMut,
             ),
+            tsMono,
           ),
         ),
 
         // ── Location ─────────────────────────────────────────────────────
+        SizedBox(
+          width: _colRoom,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: _tip(
+              roomName,
+              Text(
+                roomName ?? '—',
+                overflow: TextOverflow.ellipsis,
+                style: roomName != null ? tsCell : tsMuted,
+              ),
+            ),
+          ),
+        ),
         SizedBox(
           width: _colLoc,
           child: GestureDetector(
@@ -396,33 +456,31 @@ class _ReagentRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               child: _isEditing('location')
-                  ? DropdownButtonHideUnderline(
-                      child: DropdownButton<int?>(
-                        value: r.locationId,
-                        isDense: true,
-                        isExpanded: true,
-                        autofocus: true,
-                        dropdownColor: context.appSurface,
-                        style: GoogleFonts.spaceGrotesk(color: primary, fontSize: 12),
-                        items: [
-                          DropdownMenuItem<int?>(value: null,
-                            child: Text('None', style: GoogleFonts.spaceGrotesk(
-                                color: muted, fontSize: 12))),
-                          ...locations.map((l) => DropdownMenuItem<int?>(
-                            value: (l['location_id'] as num).toInt(),
-                            child: Text(
-                                (l['_display'] as String?) ??
-                                    (l['location_name'] as String),
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.spaceGrotesk(
-                                    color: primary, fontSize: 12)))),
-                        ],
-                        onChanged: (v) => onCommitLocation(r.id, v),
-                      ),
+                  ? _ArrowDropdown<int?>(
+                      values: [
+                        null,
+                        ...locations
+                            .map((l) => (l['location_id'] as num).toInt()),
+                      ],
+                      current: r.locationId,
+                      labelOf: (id) {
+                        if (id == null) return 'None';
+                        final loc = locations.firstWhere(
+                          (l) => (l['location_id'] as num).toInt() == id,
+                          orElse: () => <String, dynamic>{},
+                        );
+                        return (loc['_display'] as String?) ??
+                            (loc['location_name'] as String?) ??
+                            '—';
+                      },
+                      onSelect: (v) => onCommitLocation(r.id, v),
+                      onCancel: onCancel,
+                      onAddNewRow: onAddNewRow,
+                      autoOpen: true,
                     )
-                  : Text(r.locationName ?? '—',
+                  : _tip(_locationDisplay(r.locationId), Text(_locationDisplay(r.locationId) ?? '—',
                       overflow: TextOverflow.ellipsis,
-                      style: r.locationName != null ? tsCell : tsMuted),
+                      style: _locationDisplay(r.locationId) != null ? tsCell : tsMuted)),
             ),
           ),
         ),
@@ -490,8 +548,9 @@ class _ReagentRow extends StatelessWidget {
         SizedBox(
           width: _colConc,
           child: _editCell(context, 'concentration', r.concentration ?? '',
-              Text(r.concentration ?? '—', overflow: TextOverflow.ellipsis,
-                  style: r.concentration != null ? tsMono : tsMonoMut),
+              _tip(r.concentration, Text(r.concentration ?? '—',
+                  overflow: TextOverflow.ellipsis,
+                  style: r.concentration != null ? tsMono : tsMonoMut)),
               tsMono),
         ),
 
@@ -510,6 +569,8 @@ class _ReagentRow extends StatelessWidget {
                       labelOf: ReagentModel.contaminationLabel,
                       onSelect: (v) => onCommitContamination(r.id, v),
                       onCancel: onCancel,
+                      onAddNewRow: onAddNewRow,
+                      autoOpen: true,
                     )
                   : _Badge(
                       label: ReagentModel.contaminationLabel(r.contamination),
@@ -523,8 +584,9 @@ class _ReagentRow extends StatelessWidget {
         SizedBox(
           width: _colBrand,
           child: _editCell(context, 'brand', r.brand ?? '',
-              Text(r.brand ?? '—', overflow: TextOverflow.ellipsis,
-                  style: r.brand != null ? tsCell : tsMuted),
+              _tip(r.brand, Text(r.brand ?? '—',
+                  overflow: TextOverflow.ellipsis,
+                  style: r.brand != null ? tsCell : tsMuted)),
               tsCell),
         ),
 
@@ -532,8 +594,9 @@ class _ReagentRow extends StatelessWidget {
         SizedBox(
           width: _colSupp,
           child: _editCell(context, 'supplier', r.supplier ?? '',
-              Text(r.supplier ?? '—', overflow: TextOverflow.ellipsis,
-                  style: r.supplier != null ? tsCell : tsMuted),
+              _tip(r.supplier, Text(r.supplier ?? '—',
+                  overflow: TextOverflow.ellipsis,
+                  style: r.supplier != null ? tsCell : tsMuted)),
               tsCell),
         ),
       ]),
@@ -569,12 +632,16 @@ class _ArrowDropdown<T> extends StatefulWidget {
   final String Function(T) labelOf;
   final void Function(T) onSelect;
   final VoidCallback onCancel;
+  final VoidCallback? onAddNewRow;
+  final bool autoOpen;
   const _ArrowDropdown({
     required this.values,
     required this.current,
     required this.labelOf,
     required this.onSelect,
     required this.onCancel,
+    this.onAddNewRow,
+    this.autoOpen = false,
   });
 
   @override
@@ -591,7 +658,12 @@ class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
     _index = widget.values.indexOf(widget.current);
     if (_index < 0) _index = 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focus.requestFocus();
+      if (!mounted) return;
+      if (widget.autoOpen) {
+        _showMenu();
+      } else {
+        _focus.requestFocus();
+      }
     });
   }
 
@@ -640,7 +712,12 @@ class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
         const SingleActivator(LogicalKeyboardKey.arrowUp): () {
           setState(() => _index = (_index - 1 + widget.values.length) % widget.values.length);
         },
-        const SingleActivator(LogicalKeyboardKey.enter): _showMenu,
+        const SingleActivator(LogicalKeyboardKey.enter): () =>
+            widget.onSelect(widget.values[_index]),
+        const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
+          widget.onSelect(widget.values[_index]);
+          widget.onAddNewRow?.call();
+        },
         const SingleActivator(LogicalKeyboardKey.tab): () =>
             widget.onSelect(widget.values[_index]),
         const SingleActivator(LogicalKeyboardKey.escape): widget.onCancel,

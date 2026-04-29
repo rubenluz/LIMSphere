@@ -9,6 +9,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '../../supabase/supabase_manager.dart';
 import '/theme/theme.dart';
+import '/theme/module_permission.dart';
+import '../locations/detail_widgets.dart';
 import 'machine_model.dart';
 import '../reservations/reservation_model.dart';
 import '../reservations/reservations_page.dart';
@@ -25,8 +27,10 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
   MachineModel?           _machine;
   List<ReservationModel>  _reservations  = [];
   List<Map<String, dynamic>> _allLocations = [];
+  List<Map<String, dynamic>> _allUsers = [];
   bool _loading = true;
   bool _saving  = false;
+  bool _editMode = false;
   final Set<int> _expanded = {0, 1, 2, 3, 4, 5, 6};
 
   // Controllers
@@ -113,11 +117,17 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
             .from('storage_locations')
             .select('location_id, location_name')
             .order('location_name'),
+        Supabase.instance.client
+            .from('users')
+            .select('user_id, user_email, user_name, user_phone, '
+                'user_institution, user_group, user_role')
+            .order('user_name'),
       ]);
 
-      final rows    = results[0] as List<dynamic>;
-      final resRows = results[1] as List<dynamic>;
-      final locRows = results[2] as List<dynamic>;
+      final rows     = results[0] as List<dynamic>;
+      final resRows  = results[1] as List<dynamic>;
+      final locRows  = results[2] as List<dynamic>;
+      final userRows = results[3] as List<dynamic>;
 
       if (rows.isEmpty) {
         if (mounted) setState(() => _loading = false);
@@ -158,6 +168,7 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
           _machine      = machine;
           _reservations = resRows.map<ReservationModel>((r) => ReservationModel.fromMap(r as Map<String, dynamic>)).toList();
           _allLocations = List<Map<String, dynamic>>.from(locRows);
+          _allUsers     = List<Map<String, dynamic>>.from(userRows);
           _loading      = false;
         });
       }
@@ -201,6 +212,7 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
           .update(data)
           .eq('equipment_id', widget.machineId);
       await _load();
+      if (mounted) setState(() => _editMode = false);
       _snack('Saved');
     } catch (e) {
       _snack('Save failed: $e');
@@ -306,11 +318,23 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
                 machineName: m.name,
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20, color: AppDS.red),
-              tooltip: 'Delete',
-              onPressed: _delete,
-            ),
+            if (_editMode)
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    size: 20, color: AppDS.red),
+                tooltip: 'Delete',
+                onPressed: _delete,
+              ),
+            if (_editMode && !_saving)
+              IconButton(
+                icon: Icon(Icons.close,
+                    size: 20, color: context.appTextSecondary),
+                tooltip: 'Cancel',
+                onPressed: () {
+                  setState(() => _editMode = false);
+                  _load();
+                },
+              ),
             _saving
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
@@ -318,12 +342,29 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
                         width: 18, height: 18,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: AppDS.accent)))
-                : TextButton.icon(
-                    onPressed: _save,
-                    icon: const Icon(Icons.save_outlined, size: 16, color: AppDS.accent),
-                    label: Text('Save',
-                        style: GoogleFonts.spaceGrotesk(color: AppDS.accent)),
-                  ),
+                : _editMode
+                    ? TextButton.icon(
+                        onPressed: _save,
+                        icon: const Icon(Icons.save_outlined,
+                            size: 16, color: AppDS.accent),
+                        label: Text('Save',
+                            style: GoogleFonts.spaceGrotesk(
+                                color: AppDS.accent)),
+                      )
+                    : TextButton.icon(
+                        onPressed: () {
+                          if (!context.canEditModule) {
+                            context.warnReadOnly();
+                            return;
+                          }
+                          setState(() => _editMode = true);
+                        },
+                        icon: const Icon(Icons.edit_outlined,
+                            size: 16, color: AppDS.accent),
+                        label: Text('Edit',
+                            style: GoogleFonts.spaceGrotesk(
+                                color: AppDS.accent)),
+                      ),
           ],
         ],
       ),
@@ -410,7 +451,10 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
               onToggle: () => setState(() =>
                   _expanded.contains(5) ? _expanded.remove(5) : _expanded.add(5)),
               child: _InlineField(
-                  label: 'Notes', controller: _notesCtrl, maxLines: 4),
+                  label: 'Notes',
+                  controller: _notesCtrl,
+                  maxLines: 4,
+                  readOnly: !_editMode),
             ),
             _Section(
               index: 6,
@@ -484,12 +528,14 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
   // ── Section bodies ─────────────────────────────────────────────────────────
 
   Widget _buildDetailsSection(BuildContext context) {
+    final ro = !_editMode;
     return Column(children: [
       _FieldRow(children: [
-        _InlineField(label: 'Name *', controller: _nameCtrl),
+        _InlineField(label: 'Name *', controller: _nameCtrl, readOnly: ro),
         _InlineDropdown<String>(
           label: 'Status',
           value: _status,
+          readOnly: ro,
           items: MachineModel.statusOptions
               .map((s) => DropdownMenuItem(
                     value: s,
@@ -503,35 +549,43 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
-        _InlineField(label: 'Type', controller: _typeCtrl),
-        _InlineField(label: 'Brand', controller: _brandCtrl),
+        _InlineField(label: 'Type', controller: _typeCtrl, readOnly: ro),
+        _InlineField(label: 'Brand', controller: _brandCtrl, readOnly: ro),
       ]),
       const SizedBox(height: 10),
-      _InlineField(label: 'Model', controller: _modelCtrl),
+      _InlineField(label: 'Model', controller: _modelCtrl, readOnly: ro),
     ]);
   }
 
   Widget _buildIdentificationSection(BuildContext context) {
+    final ro = !_editMode;
     return Column(children: [
       _FieldRow(children: [
-        _InlineField(label: 'Serial Number', controller: _serialCtrl),
-        _InlineField(label: 'Patrimony Number', controller: _patrimonyCtrl),
+        _InlineField(label: 'Serial Number', controller: _serialCtrl, readOnly: ro),
+        _InlineField(label: 'Patrimony Number', controller: _patrimonyCtrl, readOnly: ro),
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
-        _InlineField(label: 'Supplier', controller: _supplierCtrl),
-        _InlineField(label: 'Responsible', controller: _responsibleCtrl),
+        _InlineField(label: 'Supplier', controller: _supplierCtrl, readOnly: ro),
+        DetailResponsibleField(
+          label: 'Responsible',
+          controller: _responsibleCtrl,
+          users: _allUsers,
+          readOnly: ro,
+        ),
       ]),
       const SizedBox(height: 10),
-      _InlineField(label: 'Manual Link', controller: _manualCtrl),
+      _InlineField(label: 'Manual Link', controller: _manualCtrl, readOnly: ro),
     ]);
   }
 
   Widget _buildLocationSection(BuildContext context) {
+    final ro = !_editMode;
     return _FieldRow(children: [
       _InlineDropdown<int?>(
         label: 'Location',
         value: _locationId,
+        readOnly: ro,
         items: [
           DropdownMenuItem<int?>(
             value: null,
@@ -547,22 +601,25 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
         ],
         onChanged: (v) => setState(() => _locationId = v),
       ),
-      _InlineField(label: 'Room', controller: _roomCtrl),
+      _InlineField(label: 'Room', controller: _roomCtrl, readOnly: ro),
     ]);
   }
 
   Widget _buildMaintenanceSection(BuildContext context, MachineModel m) {
+    final ro = !_editMode;
     return Column(children: [
       _FieldRow(children: [
         _DateField(
           label: 'Last Maintenance',
           date: _lastMaintenance,
+          readOnly: ro,
           onTap: () => _pickDate(_lastMaintenance, (d) => setState(() => _lastMaintenance = d)),
           onClear: () => setState(() => _lastMaintenance = null),
         ),
         _DateField(
           label: 'Next Maintenance',
           date: _nextMaintenance,
+          readOnly: ro,
           onTap: () => _pickDate(_nextMaintenance, (d) => setState(() => _nextMaintenance = d)),
           onClear: () => setState(() => _nextMaintenance = null),
           danger: m.maintenanceOverdue,
@@ -574,6 +631,7 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
         Expanded(child: _InlineField(
           label: 'Maintenance interval (days)',
           controller: _maintIntervalCtrl,
+          readOnly: ro,
           keyboardType: TextInputType.number,
         )),
         const Expanded(child: SizedBox()),
@@ -583,12 +641,14 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
         _DateField(
           label: 'Last Calibration',
           date: _lastCalibration,
+          readOnly: ro,
           onTap: () => _pickDate(_lastCalibration, (d) => setState(() => _lastCalibration = d)),
           onClear: () => setState(() => _lastCalibration = null),
         ),
         _DateField(
           label: 'Next Calibration',
           date: _nextCalibration,
+          readOnly: ro,
           onTap: () => _pickDate(_nextCalibration, (d) => setState(() => _nextCalibration = d)),
           onClear: () => setState(() => _nextCalibration = null),
         ),
@@ -598,6 +658,7 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
         Expanded(child: _InlineField(
           label: 'Calibration interval (days)',
           controller: _calibIntervalCtrl,
+          readOnly: ro,
           keyboardType: TextInputType.number,
         )),
         const Expanded(child: SizedBox()),
@@ -606,16 +667,19 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
   }
 
   Widget _buildPurchaseSection(BuildContext context) {
+    final ro = !_editMode;
     return _FieldRow(children: [
       _DateField(
         label: 'Purchase Date',
         date: _purchaseDate,
+        readOnly: ro,
         onTap: () => _pickDate(_purchaseDate, (d) => setState(() => _purchaseDate = d)),
         onClear: () => setState(() => _purchaseDate = null),
       ),
       _DateField(
         label: 'Warranty Until',
         date: _warrantyDate,
+        readOnly: ro,
         onTap: () => _pickDate(_warrantyDate, (d) => setState(() => _warrantyDate = d)),
         onClear: () => setState(() => _warrantyDate = null),
         warning: _warrantyDate != null &&
@@ -850,12 +914,14 @@ class _InlineField extends StatelessWidget {
   final TextEditingController controller;
   final int maxLines;
   final TextInputType? keyboardType;
+  final bool readOnly;
 
   const _InlineField({
     required this.label,
     required this.controller,
     this.maxLines = 1,
     this.keyboardType,
+    this.readOnly = false,
   });
 
   @override
@@ -864,13 +930,16 @@ class _InlineField extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
-      style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13),
+      readOnly: readOnly,
+      style: GoogleFonts.spaceGrotesk(
+          color: readOnly ? context.appTextSecondary : context.appTextPrimary,
+          fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.spaceGrotesk(
             color: context.appTextSecondary, fontSize: 11),
         filled: true,
-        fillColor: context.appSurface3,
+        fillColor: readOnly ? context.appSurface2 : context.appSurface3,
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: context.appBorder)),
@@ -879,7 +948,8 @@ class _InlineField extends StatelessWidget {
             borderSide: BorderSide(color: context.appBorder)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppDS.accent)),
+            borderSide: BorderSide(
+                color: readOnly ? context.appBorder : AppDS.accent)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
     );
@@ -891,12 +961,14 @@ class _InlineDropdown<T> extends StatelessWidget {
   final T value;
   final List<DropdownMenuItem<T>> items;
   final void Function(T?) onChanged;
+  final bool readOnly;
 
   const _InlineDropdown({
     required this.label,
     required this.value,
     required this.items,
     required this.onChanged,
+    this.readOnly = false,
   });
 
   @override
@@ -907,7 +979,7 @@ class _InlineDropdown<T> extends StatelessWidget {
         labelStyle: GoogleFonts.spaceGrotesk(
             color: context.appTextSecondary, fontSize: 11),
         filled: true,
-        fillColor: context.appSurface3,
+        fillColor: readOnly ? context.appSurface2 : context.appSurface3,
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: context.appBorder)),
@@ -922,11 +994,26 @@ class _InlineDropdown<T> extends StatelessWidget {
           isExpanded: true,
           dropdownColor: context.appSurface,
           style: GoogleFonts.spaceGrotesk(
-              color: context.appTextPrimary, fontSize: 13),
+              color: readOnly ? context.appTextSecondary : context.appTextPrimary,
+              fontSize: 13),
           items: items,
-          onChanged: onChanged,
+          onChanged: readOnly ? null : onChanged,
+          disabledHint: _disabledHint(context),
+          icon: readOnly
+              ? const SizedBox.shrink()
+              : const Icon(Icons.arrow_drop_down),
         ),
       ),
+    );
+  }
+
+  Widget? _disabledHint(BuildContext context) {
+    final match = items.where((i) => i.value == value).toList();
+    if (match.isEmpty) return null;
+    return DefaultTextStyle.merge(
+      style: GoogleFonts.spaceGrotesk(
+          color: context.appTextSecondary, fontSize: 13),
+      child: match.first.child,
     );
   }
 }
@@ -938,6 +1025,7 @@ class _DateField extends StatelessWidget {
   final VoidCallback onClear;
   final bool danger;
   final bool warning;
+  final bool readOnly;
 
   const _DateField({
     required this.label,
@@ -946,20 +1034,21 @@ class _DateField extends StatelessWidget {
     required this.onClear,
     this.danger  = false,
     this.warning = false,
+    this.readOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final color = danger ? AppDS.red : warning ? AppDS.yellow : AppDS.accent;
     return GestureDetector(
-      onTap: onTap,
+      onTap: readOnly ? null : onTap,
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
           labelStyle: GoogleFonts.spaceGrotesk(
               color: context.appTextSecondary, fontSize: 11),
           filled: true,
-          fillColor: context.appSurface3,
+          fillColor: readOnly ? context.appSurface2 : context.appSurface3,
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
@@ -974,11 +1063,14 @@ class _DateField extends StatelessWidget {
                       : context.appBorder)),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          suffixIcon: date != null
-              ? GestureDetector(
-                  onTap: onClear,
-                  child: Icon(Icons.clear, size: 16, color: context.appTextMuted))
-              : const Icon(Icons.calendar_today_outlined, size: 14),
+          suffixIcon: readOnly
+              ? null
+              : date != null
+                  ? GestureDetector(
+                      onTap: onClear,
+                      child: Icon(Icons.clear,
+                          size: 16, color: context.appTextMuted))
+                  : const Icon(Icons.calendar_today_outlined, size: 14),
         ),
         child: Text(
           date != null

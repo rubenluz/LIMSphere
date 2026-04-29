@@ -975,6 +975,7 @@ WITH CHECK (bucket_id = 'facility-sops');
 -- ═══════════════════════════════════════════════════════════════════════════════
 ALTER TABLE storage_locations ADD COLUMN IF NOT EXISTS location_parent_id  BIGINT REFERENCES storage_locations(location_id);
 ALTER TABLE storage_locations ADD COLUMN IF NOT EXISTS location_sort_order  INT;
+ALTER TABLE storage_locations ADD COLUMN IF NOT EXISTS location_layout      JSONB;
 ALTER TABLE reagents          ADD COLUMN IF NOT EXISTS reagent_qrcode       TEXT;
 ALTER TABLE reagents          ADD COLUMN IF NOT EXISTS reagent_code         TEXT UNIQUE;
 ALTER TABLE equipment         ADD COLUMN IF NOT EXISTS equipment_qrcode     TEXT;

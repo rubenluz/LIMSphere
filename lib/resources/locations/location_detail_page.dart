@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '/theme/theme.dart';
+import '/theme/module_permission.dart';
 import 'detail_widgets.dart';
 import 'location_model.dart';
 
@@ -21,15 +22,18 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
   LocationModel? _loc;
   List<LocationModel> _rooms = [];
   List<Map<String, dynamic>> _reagents = [];
+  List<Map<String, dynamic>> _users = [];
   String? _displayCode;
   bool _loading = true;
   bool _saving = false;
+  bool _editMode = false;
   final Set<int> _expanded = {0, 1, 2};
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _tempCtrl;
   late final TextEditingController _capCtrl;
   late final TextEditingController _notesCtrl;
+  late final TextEditingController _responsibleCtrl;
   String _type = LocationModel.defaultLocationType;
   int? _parentId;
 
@@ -40,6 +44,7 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
     _tempCtrl = TextEditingController();
     _capCtrl  = TextEditingController();
     _notesCtrl = TextEditingController();
+    _responsibleCtrl = TextEditingController();
     _load();
   }
 
@@ -49,6 +54,7 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
     _tempCtrl.dispose();
     _capCtrl.dispose();
     _notesCtrl.dispose();
+    _responsibleCtrl.dispose();
     super.dispose();
   }
 
@@ -115,11 +121,24 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
         debugPrint('location_detail: reagents lookup failed: $e');
       }
 
+      List<Map<String, dynamic>> users = [];
+      try {
+        final userRows = await Supabase.instance.client
+            .from('users')
+            .select('user_id, user_email, user_name, user_phone, '
+                'user_institution, user_group, user_role')
+            .order('user_name');
+        users = List<Map<String, dynamic>>.from(userRows);
+      } catch (e) {
+        debugPrint('location_detail: users lookup failed: $e');
+      }
+
       if (mounted) {
-        _nameCtrl.text  = stripLocationCodePrefix(loc.name);
-        _tempCtrl.text  = loc.temperature ?? '';
-        _capCtrl.text   = loc.capacity?.toString() ?? '';
-        _notesCtrl.text = loc.notes ?? '';
+        _nameCtrl.text         = stripLocationCodePrefix(loc.name);
+        _tempCtrl.text         = loc.temperature ?? '';
+        _capCtrl.text          = loc.capacity?.toString() ?? '';
+        _notesCtrl.text        = loc.notes ?? '';
+        _responsibleCtrl.text  = loc.responsible ?? '';
         _type = loc.isRoom ? LocationModel.defaultLocationType : loc.type;
         final roomIds = {for (final r in rooms) r.id};
         _parentId = roomIds.contains(loc.parentId) ? loc.parentId : null;
@@ -128,6 +147,7 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
           _loc         = loc;
           _rooms       = rooms;
           _reagents    = List<Map<String, dynamic>>.from(reagentRows);
+          _users       = users;
           _displayCode = code;
           _loading     = false;
         });
@@ -156,7 +176,9 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
         'location_capacity': _capCtrl.text.trim().isEmpty
             ? null
             : int.tryParse(_capCtrl.text.trim()),
-        'location_responsible': null,
+        'location_responsible': _responsibleCtrl.text.trim().isEmpty
+            ? null
+            : _responsibleCtrl.text.trim(),
         'location_notes':
             _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
         'location_parent_id': _parentId,
@@ -166,7 +188,10 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
           .update(data)
           .eq('location_id', widget.locationId);
       await _load();
-      if (mounted) detailSnack(context, 'Saved');
+      if (mounted) {
+        setState(() => _editMode = false);
+        detailSnack(context, 'Saved');
+      }
     } catch (e) {
       debugPrint('location_detail: save failed: $e');
       if (mounted) detailSnack(context, 'Save failed: $e');
@@ -269,11 +294,23 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
         ),
         actions: [
           if (loc != null) ...[
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20, color: AppDS.red),
-              tooltip: 'Delete',
-              onPressed: _delete,
-            ),
+            if (_editMode)
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    size: 20, color: AppDS.red),
+                tooltip: 'Delete',
+                onPressed: _delete,
+              ),
+            if (_editMode && !_saving)
+              IconButton(
+                icon: Icon(Icons.close,
+                    size: 20, color: context.appTextSecondary),
+                tooltip: 'Cancel',
+                onPressed: () {
+                  setState(() => _editMode = false);
+                  _load();
+                },
+              ),
             _saving
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
@@ -282,14 +319,29 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
                         height: 18,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white)))
-                : TextButton.icon(
-                    onPressed: _save,
-                    icon: const Icon(Icons.save_outlined,
-                        size: 16, color: AppDS.accent),
-                    label: Text('Save',
-                        style:
-                            GoogleFonts.spaceGrotesk(color: AppDS.accent)),
-                  ),
+                : _editMode
+                    ? TextButton.icon(
+                        onPressed: _save,
+                        icon: const Icon(Icons.save_outlined,
+                            size: 16, color: AppDS.accent),
+                        label: Text('Save',
+                            style: GoogleFonts.spaceGrotesk(
+                                color: AppDS.accent)),
+                      )
+                    : TextButton.icon(
+                        onPressed: () {
+                          if (!context.canEditModule) {
+                            context.warnReadOnly();
+                            return;
+                          }
+                          setState(() => _editMode = true);
+                        },
+                        icon: const Icon(Icons.edit_outlined,
+                            size: 16, color: AppDS.accent),
+                        label: Text('Edit',
+                            style: GoogleFonts.spaceGrotesk(
+                                color: AppDS.accent)),
+                      ),
           ],
         ],
       ),
@@ -331,7 +383,10 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
                     : _expanded.add(1);
               }),
               child: DetailInlineField(
-                  label: 'Notes', controller: _notesCtrl, maxLines: 4),
+                  label: 'Notes',
+                  controller: _notesCtrl,
+                  maxLines: 4,
+                  readOnly: !_editMode),
             ),
             DetailSection(
               title: 'REAGENTS STORED HERE (${_reagents.length})',
@@ -365,11 +420,27 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
                   color: context.appTextMuted,
                   fontSize: 12,
                   fontWeight: FontWeight.w700)),
-        Text(stripLocationCodePrefix(loc.name),
-            style: GoogleFonts.spaceGrotesk(
-                color: context.appTextPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.w700)),
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            Text(stripLocationCodePrefix(loc.name),
+                style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextPrimary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700)),
+            if (_responsibleCtrl.text.trim().isNotEmpty) ...[
+              Text('·',
+                  style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextMuted,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700)),
+              DetailResponsibleChips(
+                  raw: _responsibleCtrl.text, users: _users),
+            ],
+          ],
+        ),
         const SizedBox(height: 8),
         Row(children: [
           Container(
@@ -403,12 +474,14 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
         ? _type
         : LocationModel.defaultLocationType;
 
+    final ro = !_editMode;
     return Column(children: [
       DetailFieldRow(children: [
-        DetailInlineField(label: 'Name', controller: _nameCtrl),
+        DetailInlineField(label: 'Name', controller: _nameCtrl, readOnly: ro),
         DetailInlineDropdown<String>(
           label: 'Type',
           value: typeValue,
+          readOnly: ro,
           items: typeOptions
               .map((t) => DropdownMenuItem(
                     value: t,
@@ -423,10 +496,11 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
       ]),
       const SizedBox(height: 10),
       DetailFieldRow(children: [
-        DetailInlineField(label: 'Temperature', controller: _tempCtrl),
+        DetailInlineField(label: 'Temperature', controller: _tempCtrl, readOnly: ro),
         DetailInlineField(
             label: 'Capacity',
             controller: _capCtrl,
+            readOnly: ro,
             keyboardType: TextInputType.number),
       ]),
       const SizedBox(height: 10),
@@ -434,6 +508,7 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
         DetailInlineDropdown<int?>(
           label: 'Parent Room',
           value: selectedParentId,
+          readOnly: ro,
           items: [
             DropdownMenuItem<int?>(
               value: null,
@@ -449,6 +524,12 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
                 )),
           ],
           onChanged: (v) => setState(() => _parentId = v),
+        ),
+        DetailResponsibleField(
+          label: 'Responsible',
+          controller: _responsibleCtrl,
+          users: _users,
+          readOnly: ro,
         ),
       ]),
       if (loc.createdAt != null) ...[

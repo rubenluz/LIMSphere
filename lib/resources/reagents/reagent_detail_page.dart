@@ -13,6 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 import '../../backups/backup_service.dart';
 import '../../supabase/supabase_manager.dart';
 import '/theme/theme.dart';
+import '/theme/module_permission.dart';
 import 'reagent_model.dart';
 import '../../requests/requests_page.dart';
 import '../../camera/qr_scanner/qr_code_rules.dart';
@@ -30,6 +31,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   List<Map<String, dynamic>> _allLocations = [];
   bool _loading = true;
   bool _saving  = false;
+  bool _editMode = false;
   final Set<int> _expanded = {0, 1, 2, 3, 4, 5};
 
   // Controllers
@@ -37,7 +39,6 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _brandCtrl;
   late final TextEditingController _supplierCtrl;
-  late final TextEditingController _responsibleCtrl;
   late final TextEditingController _referenceCtrl;
   late final TextEditingController _casCtrl;
   late final TextEditingController _lotCtrl;
@@ -73,7 +74,6 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     _nameCtrl           = TextEditingController();
     _brandCtrl          = TextEditingController();
     _supplierCtrl       = TextEditingController();
-    _responsibleCtrl    = TextEditingController();
     _referenceCtrl      = TextEditingController();
     _casCtrl            = TextEditingController();
     _lotCtrl            = TextEditingController();
@@ -95,7 +95,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   @override
   void dispose() {
     for (final c in [
-      _codeCtrl, _nameCtrl, _brandCtrl, _supplierCtrl, _responsibleCtrl,
+      _codeCtrl, _nameCtrl, _brandCtrl, _supplierCtrl,
       _referenceCtrl, _casCtrl, _lotCtrl, _concentrationCtrl, _formulaCtrl,
       _hazardCtrl, _packSizeCtrl, _containerCountCtrl, _containerMinCtrl,
       _remainingCtrl, _unitCtrl, _positionCtrl, _notesCtrl,
@@ -144,7 +144,6 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _nameCtrl.text           = reagent.name ?? '';
         _brandCtrl.text          = reagent.brand ?? '';
         _supplierCtrl.text       = reagent.supplier ?? '';
-        _responsibleCtrl.text    = reagent.responsible ?? '';
         _referenceCtrl.text      = reagent.reference ?? '';
         _casCtrl.text            = reagent.casNumber ?? '';
         _lotCtrl.text            = reagent.lotNumber ?? '';
@@ -258,7 +257,6 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         'reagent_physical_state':  _physicalState,
         'reagent_brand':           _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
         'reagent_supplier':        _supplierCtrl.text.trim().isEmpty ? null : _supplierCtrl.text.trim(),
-        'reagent_responsible':     _responsibleCtrl.text.trim().isEmpty ? null : _responsibleCtrl.text.trim(),
         'reagent_reference':       _referenceCtrl.text.trim().isEmpty ? null : _referenceCtrl.text.trim(),
         'reagent_cas_number':      _casCtrl.text.trim().isEmpty ? null : _casCtrl.text.trim(),
         'reagent_lot_number':      _lotCtrl.text.trim().isEmpty ? null : _lotCtrl.text.trim(),
@@ -289,6 +287,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
           .eq('reagent_id', widget.reagentId);
       unawaited(BackupService.instance.notifyCrudChange('reagents'));
       await _load();
+      if (mounted) setState(() => _editMode = false);
       _snack('Saved');
     } catch (e) {
       debugPrint('ReagentDetailPage save error: $e');
@@ -406,11 +405,21 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
                 prefillTitle: r.name ?? '',
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20, color: AppDS.red),
-              tooltip: 'Delete',
-              onPressed: _delete,
-            ),
+            if (_editMode)
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20, color: AppDS.red),
+                tooltip: 'Delete',
+                onPressed: _delete,
+              ),
+            if (_editMode && !_saving)
+              IconButton(
+                icon: Icon(Icons.close, size: 20, color: context.appTextSecondary),
+                tooltip: 'Cancel',
+                onPressed: () {
+                  setState(() => _editMode = false);
+                  _load();
+                },
+              ),
             _saving
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
@@ -418,12 +427,27 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
                         width: 18, height: 18,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: AppDS.accent)))
-                : TextButton.icon(
-                    onPressed: _save,
-                    icon: const Icon(Icons.save_outlined, size: 16, color: AppDS.accent),
-                    label: Text('Save',
-                        style: GoogleFonts.spaceGrotesk(color: AppDS.accent)),
-                  ),
+                : _editMode
+                    ? TextButton.icon(
+                        onPressed: _save,
+                        icon: const Icon(Icons.save_outlined,
+                            size: 16, color: AppDS.accent),
+                        label: Text('Save',
+                            style: GoogleFonts.spaceGrotesk(color: AppDS.accent)),
+                      )
+                    : TextButton.icon(
+                        onPressed: () {
+                          if (!context.canEditModule) {
+                            context.warnReadOnly();
+                            return;
+                          }
+                          setState(() => _editMode = true);
+                        },
+                        icon: const Icon(Icons.edit_outlined,
+                            size: 16, color: AppDS.accent),
+                        label: Text('Edit',
+                            style: GoogleFonts.spaceGrotesk(color: AppDS.accent)),
+                      ),
           ],
         ],
       ),
@@ -500,7 +524,10 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
               onToggle: () => setState(() =>
                   _expanded.contains(5) ? _expanded.remove(5) : _expanded.add(5)),
               child: _InlineField(
-                  label: 'Notes', controller: _notesCtrl, maxLines: 4),
+                  label: 'Notes',
+                  controller: _notesCtrl,
+                  maxLines: 4,
+                  readOnly: !_editMode),
             ),
           ]),
         ),
@@ -594,12 +621,14 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     if (_subcategory != null && !subOptions.contains(_subcategory)) {
       _subcategory = null;
     }
+    final ro = !_editMode;
     return Column(children: [
       _FieldRow(children: [
-        _InlineField(label: 'Name', controller: _nameCtrl),
+        _InlineField(label: 'Name', controller: _nameCtrl, readOnly: ro),
         _InlineDropdown<String>(
           label: 'Category',
           value: _category,
+          readOnly: ro,
           items: ReagentModel.categoryOptionsSorted
               .map((t) => DropdownMenuItem(
                     value: t,
@@ -619,6 +648,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _InlineDropdown<String?>(
           label: 'Subcategory',
           value: _subcategory,
+          readOnly: ro,
           items: [
             DropdownMenuItem<String?>(
               value: null,
@@ -638,6 +668,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _InlineDropdown<String?>(
           label: 'Physical State',
           value: _physicalState,
+          readOnly: ro,
           items: [
             DropdownMenuItem<String?>(
               value: null,
@@ -657,60 +688,66 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
-        _InlineField(label: 'Brand', controller: _brandCtrl),
-        _InlineField(label: 'Supplier', controller: _supplierCtrl),
-        _InlineField(label: 'Responsible', controller: _responsibleCtrl),
+        _InlineField(label: 'Brand', controller: _brandCtrl, readOnly: ro),
+        _InlineField(label: 'Supplier', controller: _supplierCtrl, readOnly: ro),
       ]),
       const SizedBox(height: 10),
       _InlineField(
         label: 'Tags (separated by ";")',
         controller: _tagsCtrl,
+        readOnly: ro,
       ),
     ]);
   }
 
   Widget _buildIdentificationSection(BuildContext context) {
+    final ro = !_editMode;
     return Column(children: [
       _FieldRow(children: [
-        _InlineField(label: 'Code * (e.g. BR001)', controller: _codeCtrl),
-        _InlineField(label: 'Reference', controller: _referenceCtrl),
-        _InlineField(label: 'CAS Number', controller: _casCtrl),
+        _InlineField(label: 'Code * (e.g. BR001)', controller: _codeCtrl, readOnly: ro),
+        _InlineField(label: 'Reference', controller: _referenceCtrl, readOnly: ro),
+        _InlineField(label: 'CAS Number', controller: _casCtrl, readOnly: ro),
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
-        _InlineField(label: 'Lot Number', controller: _lotCtrl),
-        _InlineField(label: 'Concentration', controller: _concentrationCtrl),
+        _InlineField(label: 'Lot Number', controller: _lotCtrl, readOnly: ro),
+        _InlineField(label: 'Concentration', controller: _concentrationCtrl, readOnly: ro),
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
-        _InlineField(label: 'Formula', controller: _formulaCtrl),
-        _InlineField(label: 'Hazard', controller: _hazardCtrl),
+        _InlineField(label: 'Formula', controller: _formulaCtrl, readOnly: ro),
+        _InlineField(label: 'Hazard', controller: _hazardCtrl, readOnly: ro),
       ]),
     ]);
   }
 
   Widget _buildStockSection(BuildContext context, ReagentModel r) {
+    final ro = !_editMode;
     return Column(children: [
       _FieldRow(children: [
         _InlineField(
             label: 'Package / flask size',
             controller: _packSizeCtrl,
+            readOnly: ro,
             keyboardType: const TextInputType.numberWithOptions(decimal: true)),
-        _InlineField(label: 'Unit (mL / g / …)', controller: _unitCtrl),
+        _InlineField(label: 'Unit (mL / g / …)', controller: _unitCtrl, readOnly: ro),
       ]),
       const SizedBox(height: 10),
       _FieldRow(children: [
         _InlineField(
             label: '# Containers on hand',
             controller: _containerCountCtrl,
+            readOnly: ro,
             keyboardType: TextInputType.number),
         _InlineField(
             label: 'Min containers (reorder)',
             controller: _containerMinCtrl,
+            readOnly: ro,
             keyboardType: TextInputType.number),
         _InlineField(
             label: 'Remaining in opened',
             controller: _remainingCtrl,
+            readOnly: ro,
             keyboardType: const TextInputType.numberWithOptions(decimal: true)),
       ]),
       const SizedBox(height: 10),
@@ -718,6 +755,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _InlineDropdown<String?>(
           label: 'Storage Temp',
           value: _storageTemp,
+          readOnly: ro,
           items: [
             DropdownMenuItem<String?>(
               value: null,
@@ -735,6 +773,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _InlineDropdown<int?>(
           label: 'Location',
           value: _locationId,
+          readOnly: ro,
           items: [
             DropdownMenuItem<int?>(
               value: null,
@@ -752,7 +791,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
           ],
           onChanged: (v) => setState(() => _locationId = v),
         ),
-        _InlineField(label: 'Position', controller: _positionCtrl),
+        _InlineField(label: 'Position', controller: _positionCtrl, readOnly: ro),
       ]),
       if (r.totalStock != null) ...[
         const SizedBox(height: 12),
@@ -781,11 +820,13 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   }
 
   Widget _buildContaminationSection(BuildContext context) {
+    final ro = !_editMode;
     return Column(children: [
       _FieldRow(children: [
         _InlineDropdown<String>(
           label: 'Status',
           value: _contamination,
+          readOnly: ro,
           items: ReagentModel.contaminationOptions
               .map((c) => DropdownMenuItem(
                     value: c,
@@ -804,6 +845,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _DateField(
           label: 'Detected on',
           date: _contaminationDate,
+          readOnly: ro,
           onTap: () => _pickDate(_contaminationDate,
               (d) => setState(() => _contaminationDate = d)),
           onClear: () => setState(() => _contaminationDate = null),
@@ -814,6 +856,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _InlineField(
           label: 'Contamination notes',
           controller: _contamNotesCtrl,
+          readOnly: ro,
           maxLines: 2,
         ),
       ],
@@ -821,11 +864,13 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   }
 
   Widget _buildDatesSection(BuildContext context) {
+    final ro = !_editMode;
     return Column(children: [
       _FieldRow(children: [
         _DateField(
           label: 'Expiry Date',
           date: _expiryDate,
+          readOnly: ro,
           onTap: () => _pickDate(_expiryDate, (d) => setState(() => _expiryDate = d)),
           onClear: () => setState(() => _expiryDate = null),
           danger: _reagent?.isExpired == true,
@@ -834,6 +879,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _DateField(
           label: 'Received',
           date: _receivedDate,
+          readOnly: ro,
           onTap: () => _pickDate(_receivedDate, (d) => setState(() => _receivedDate = d)),
           onClear: () => setState(() => _receivedDate = null),
         ),
@@ -844,6 +890,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
           child: _DateField(
             label: 'Opened',
             date: _openedDate,
+            readOnly: ro,
             onTap: () => _pickDate(_openedDate, (d) => setState(() => _openedDate = d)),
             onClear: () => setState(() => _openedDate = null),
           ),
@@ -988,12 +1035,14 @@ class _InlineField extends StatelessWidget {
   final TextEditingController controller;
   final int maxLines;
   final TextInputType? keyboardType;
+  final bool readOnly;
 
   const _InlineField({
     required this.label,
     required this.controller,
     this.maxLines = 1,
     this.keyboardType,
+    this.readOnly = false,
   });
 
   @override
@@ -1002,13 +1051,16 @@ class _InlineField extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
-      style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13),
+      readOnly: readOnly,
+      style: GoogleFonts.spaceGrotesk(
+          color: readOnly ? context.appTextSecondary : context.appTextPrimary,
+          fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.spaceGrotesk(
             color: context.appTextSecondary, fontSize: 11),
         filled: true,
-        fillColor: context.appSurface3,
+        fillColor: readOnly ? context.appSurface2 : context.appSurface3,
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: context.appBorder)),
@@ -1017,7 +1069,8 @@ class _InlineField extends StatelessWidget {
             borderSide: BorderSide(color: context.appBorder)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppDS.accent)),
+            borderSide: BorderSide(
+                color: readOnly ? context.appBorder : AppDS.accent)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
     );
@@ -1029,12 +1082,14 @@ class _InlineDropdown<T> extends StatelessWidget {
   final T value;
   final List<DropdownMenuItem<T>> items;
   final void Function(T?) onChanged;
+  final bool readOnly;
 
   const _InlineDropdown({
     required this.label,
     required this.value,
     required this.items,
     required this.onChanged,
+    this.readOnly = false,
   });
 
   @override
@@ -1045,7 +1100,7 @@ class _InlineDropdown<T> extends StatelessWidget {
         labelStyle: GoogleFonts.spaceGrotesk(
             color: context.appTextSecondary, fontSize: 11),
         filled: true,
-        fillColor: context.appSurface3,
+        fillColor: readOnly ? context.appSurface2 : context.appSurface3,
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: context.appBorder)),
@@ -1060,11 +1115,26 @@ class _InlineDropdown<T> extends StatelessWidget {
           isExpanded: true,
           dropdownColor: context.appSurface,
           style: GoogleFonts.spaceGrotesk(
-              color: context.appTextPrimary, fontSize: 13),
+              color: readOnly ? context.appTextSecondary : context.appTextPrimary,
+              fontSize: 13),
           items: items,
-          onChanged: onChanged,
+          onChanged: readOnly ? null : onChanged,
+          disabledHint: _disabledHint(context),
+          icon: readOnly
+              ? const SizedBox.shrink()
+              : const Icon(Icons.arrow_drop_down),
         ),
       ),
+    );
+  }
+
+  Widget? _disabledHint(BuildContext context) {
+    final match = items.where((i) => i.value == value).toList();
+    if (match.isEmpty) return null;
+    return DefaultTextStyle.merge(
+      style: GoogleFonts.spaceGrotesk(
+          color: context.appTextSecondary, fontSize: 13),
+      child: match.first.child,
     );
   }
 }
@@ -1076,6 +1146,7 @@ class _DateField extends StatelessWidget {
   final VoidCallback onClear;
   final bool danger;
   final bool warning;
+  final bool readOnly;
 
   const _DateField({
     required this.label,
@@ -1084,20 +1155,21 @@ class _DateField extends StatelessWidget {
     required this.onClear,
     this.danger  = false,
     this.warning = false,
+    this.readOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final color = danger ? AppDS.red : warning ? AppDS.yellow : AppDS.accent;
     return GestureDetector(
-      onTap: onTap,
+      onTap: readOnly ? null : onTap,
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
           labelStyle: GoogleFonts.spaceGrotesk(
               color: context.appTextSecondary, fontSize: 11),
           filled: true,
-          fillColor: context.appSurface3,
+          fillColor: readOnly ? context.appSurface2 : context.appSurface3,
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
@@ -1107,11 +1179,13 @@ class _DateField extends StatelessWidget {
               borderSide: BorderSide(
                   color: (danger || warning) ? color.withValues(alpha: 0.5) : context.appBorder)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          suffixIcon: date != null
-              ? GestureDetector(
-                  onTap: onClear,
-                  child: Icon(Icons.clear, size: 16, color: context.appTextMuted))
-              : const Icon(Icons.calendar_today_outlined, size: 14),
+          suffixIcon: readOnly
+              ? null
+              : date != null
+                  ? GestureDetector(
+                      onTap: onClear,
+                      child: Icon(Icons.clear, size: 16, color: context.appTextMuted))
+                  : const Icon(Icons.calendar_today_outlined, size: 14),
         ),
         child: Text(
           date != null

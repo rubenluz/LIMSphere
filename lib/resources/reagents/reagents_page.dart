@@ -33,7 +33,8 @@ const _colName      = 190.0;
 const _colState     = 80.0;
 const _colFormula   = 130.0;
 const _colOpened    = 100.0;
-const _colLoc       = 130.0;
+const _colRoom      = 210.0;
+const _colLoc       = 190.0;
 const _colPackSize  = 90.0;
 const _colCount     = 70.0;
 const _colMin       = 60.0;
@@ -45,7 +46,7 @@ const _colBrand     = 110.0;
 const _colSupp      = 120.0;
 const _colTags      = 160.0;
 const _tableW = _colBtn + _colCode + _colCategory + _colSubcat + _colName +
-    _colState + _colFormula + _colOpened + _colLoc + _colPackSize +
+    _colState + _colFormula + _colOpened + _colRoom + _colLoc + _colPackSize +
     _colCount + _colMin + _colRemaining + _colUnit + _colConc +
     _colContam + _colBrand + _colSupp + _colTags;
 
@@ -54,6 +55,7 @@ const _tableW = _colBtn + _colCode + _colCategory + _colSubcat + _colName +
 // the rest are text fields.
 const _tabCols = [
   'category', 'subcategory', 'tags', 'name', 'physicalState', 'formula',
+  'openedDate', 'location',
   'packageSize', 'remainingAmount', 'unit', 'containerCount', 'containerMin',
   'concentration', 'contamination', 'brand', 'supplier',
 ];
@@ -143,7 +145,35 @@ class _ReagentsPageState extends State<ReagentsPage> {
             .showSnackBar(SnackBar(content: Text('Failed to load: $e')));
       }
     }
-    _locations = await _loadLocations();
+    final locations = await _loadLocations();
+    if (!mounted) return;
+    setState(() => _locations = locations);
+    _applyFilters();
+  }
+
+  Map<String, dynamic>? _locationMetaById(int? id) {
+    if (id == null) return null;
+    for (final loc in _locations) {
+      if ((loc['location_id'] as num).toInt() == id) return loc;
+    }
+    return null;
+  }
+
+  String? _roomDisplayForLocationId(int? locationId) {
+    final loc = _locationMetaById(locationId);
+    if (loc == null) return null;
+    if ((loc['location_type'] as String?) == 'room') {
+      return (loc['_display'] as String?) ?? (loc['location_name'] as String?);
+    }
+    final parentId = (loc['location_parent_id'] as num?)?.toInt();
+    final parent = _locationMetaById(parentId);
+    return (parent?['_display'] as String?) ?? (parent?['location_name'] as String?);
+  }
+
+  String? _locationDisplayForLocationId(int? locationId) {
+    final loc = _locationMetaById(locationId);
+    if (loc == null) return null;
+    return (loc['_display'] as String?) ?? (loc['location_name'] as String?);
   }
 
   void _applyFilters() {
@@ -173,6 +203,8 @@ class _ReagentsPageState extends State<ReagentsPage> {
         r.remainingAmount?.toString(),
         r.concentration,
         r.storageTemp,
+        _roomDisplayForLocationId(r.locationId),
+        _locationDisplayForLocationId(r.locationId),
         r.locationName,
         r.position,
         r.lotNumber,
@@ -227,7 +259,8 @@ class _ReagentsPageState extends State<ReagentsPage> {
         case 'brand':           c = (a.brand ?? '').compareTo(b.brand ?? '');
         case 'category':        c = a.category.compareTo(b.category);
         case 'subcategory':     c = (a.subcategory ?? '').compareTo(b.subcategory ?? '');
-        case 'location':        c = (a.locationName ?? '').compareTo(b.locationName ?? '');
+        case 'room':            c = (_roomDisplayForLocationId(a.locationId) ?? '').compareTo(_roomDisplayForLocationId(b.locationId) ?? '');
+        case 'location':        c = (_locationDisplayForLocationId(a.locationId) ?? '').compareTo(_locationDisplayForLocationId(b.locationId) ?? '');
         case 'concentration':   c = (a.concentration ?? '').compareTo(b.concentration ?? '');
         case 'unit':            c = (a.unit ?? '').compareTo(b.unit ?? '');
         case 'packageSize':     c = (a.packageSize ?? -1.0).compareTo(b.packageSize ?? -1.0);
@@ -477,13 +510,22 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                 : ReagentModel.joinTags(raw.split(';'));
       case 'subcategory':     dbCol = 'reagent_subcategory';      dbVal = raw.isEmpty ? null : raw;
       case 'category':        dbCol = 'reagent_category';         dbVal = raw;
+      case 'openedDate':
+        dbCol = 'reagent_opened_date';
+        if (raw.isEmpty) {
+          dbVal = null;
+        } else {
+          final d = DateTime.tryParse(raw);
+          // Invalid input → null (erases the field).
+          dbVal = d?.toIso8601String().substring(0, 10);
+        }
       default: return;
     }
 
     _saveAndPatch(id, {dbCol: dbVal});
   }
 
-  static const _dropdownCols = {'category', 'subcategory', 'physicalState', 'contamination'};
+  static const _dropdownCols = {'category', 'subcategory', 'physicalState', 'contamination', 'location'};
 
   void _commitCategoryEdit(int id, String value) {
     _saveAndPatch(id, {'reagent_category': value, 'reagent_subcategory': null});
@@ -513,8 +555,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
           )['location_name'] as String?)
         : null;
     _saveAndPatch(id, {'reagent_location_id': locationId, '_location_name': locName});
-    // Remove the internal-only key before sending to DB
-    setState(() => _editingCell = null);
+    _advanceFromDropdown(id);
   }
 
   void _advanceFromDropdown(int id) {
@@ -529,19 +570,6 @@ class _ReagentsPageState extends State<ReagentsPage> {
     } else {
       setState(() => _editingCell = null);
     }
-  }
-
-  Future<void> _pickOpenedDate(int id, DateTime? current) async {
-    if (!context.canEditModule) { context.warnReadOnly(); return; }
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: current ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked == null || !mounted) return;
-    final ds = picked.toIso8601String().substring(0, 10);
-    _saveAndPatch(id, {'reagent_opened_date': ds});
   }
 
   void _cancelEdit() {
@@ -607,6 +635,11 @@ class _ReagentsPageState extends State<ReagentsPage> {
     'subcategory'      => r.subcategory ?? '',
     'category'         => r.category,
     'contamination'    => r.contamination,
+    'physicalState'    => r.physicalState ?? '',
+    'openedDate'       => r.openedDate != null
+        ? r.openedDate!.toIso8601String().substring(0, 10)
+        : '',
+    'location'         => r.locationId?.toString() ?? '',
     _                  => '',
   };
 
@@ -635,12 +668,23 @@ class _ReagentsPageState extends State<ReagentsPage> {
       if (!mounted) return;
       await _load();
       if (!mounted) return;
-      // Scroll to the new row and start editing
-      final ri = _filtered.indexWhere((r) => r.id == newId);
-      if (ri >= 0 && _vertCtrl.hasClients) {
-        final target = (ri + 1) * AppDS.tableRowH; // +1 for the add-row at index 0
-        _vertCtrl.jumpTo(target.clamp(0.0, _vertCtrl.position.maxScrollExtent));
-      }
+      // Defer the scroll until the ListView has rebuilt with the new row —
+      // otherwise maxScrollExtent is still computed for the old item count.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_vertCtrl.hasClients) return;
+        final ri = _filtered.indexWhere((r) => r.id == newId);
+        if (ri < 0) return;
+        final rowOffset = (ri + 1) * AppDS.tableRowH; // +1 for the add-row
+        final viewport = _vertCtrl.position.viewportDimension;
+        final max = _vertCtrl.position.maxScrollExtent;
+        final target = (rowOffset - viewport / 2 + AppDS.tableRowH / 2)
+            .clamp(0.0, max);
+        _vertCtrl.animateTo(
+          target,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+        );
+      });
       _startEdit(newId, 'category', 'chemical');
     } catch (e) {
       if (!mounted) return;
@@ -1055,6 +1099,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                       SizedBox(width: _colState,     child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'STATE',     'physicalState'))),
                                       SizedBox(width: _colFormula,   child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'FORMULA',   'formula'))),
                                       SizedBox(width: _colOpened,    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'OPENED',    'openedDate'))),
+                                      SizedBox(width: _colRoom,      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'ROOM',      'room'))),
                                       SizedBox(width: _colLoc,       child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'LOCATION',  'location'))),
                                       SizedBox(width: _colPackSize,  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'SIZE',      'packageSize'))),
                                       SizedBox(width: _colRemaining, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: _sortHdr(context, 'REMAINING', 'remainingAmount'))),
@@ -1081,6 +1126,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                         return _ReagentRow(
                                           reagent: r,
                                           rowIndex: i - 1,
+                                          roomName: _roomDisplayForLocationId(r.locationId),
                                           onViewMore: () => Navigator.push(
                                             context,
                                             MaterialPageRoute(
@@ -1110,7 +1156,6 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                           onCommitPhysicalState: _commitPhysicalStateEdit,
                                           onCommitContamination: _commitContaminationEdit,
                                           onCommitLocation: _commitLocationEdit,
-                                          onPickOpenedDate: _pickOpenedDate,
                                           locations: _locations,
                                         );
                                       },
