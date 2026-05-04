@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 import '/core/fish_db_schema.dart';
 import '/core/sop_db_schema.dart';
@@ -193,19 +194,34 @@ class _CornerPainter extends CustomPainter {
 Future<Widget> resolveQrRoute(QrPayload payload) async {
   switch (payload.type) {
     case 'machines':
-      return MachineDetailPage(machineId: payload.id);
+      return ResolvedModulePermission(
+        moduleId: 'equipment',
+        child: MachineDetailPage(machineId: payload.id),
+      );
 
     case 'reagents':
-      return ReagentDetailPage(reagentId: payload.id);
+      return ResolvedModulePermission(
+        moduleId: 'reagents',
+        child: ReagentDetailPage(reagentId: payload.id),
+      );
 
     case 'locations':
-      return LocationDetailPage(locationId: payload.id);
+      return ResolvedModulePermission(
+        moduleId: 'locations',
+        child: LocationDetailPage(locationId: payload.id),
+      );
 
     case 'strains':
-      return StrainDetailPage(strainId: payload.id);
+      return ResolvedModulePermission(
+        moduleId: 'strains',
+        child: StrainDetailPage(strainId: payload.id),
+      );
 
     case 'samples':
-      return SampleDetailPage(sampleId: payload.id);
+      return ResolvedModulePermission(
+        moduleId: 'samples',
+        child: SampleDetailPage(sampleId: payload.id),
+      );
 
     case 'fish_lines':
       final row = await Supabase.instance.client
@@ -213,7 +229,10 @@ Future<Widget> resolveQrRoute(QrPayload payload) async {
           .select()
           .eq(FishSch.lineId, payload.id)
           .single();
-      return FishLineDetailPage(fishLine: FishLine.fromMap(Map<String, dynamic>.from(row)));
+      return ResolvedModulePermission(
+        moduleId: 'fish_lines',
+        child: FishLineDetailPage(fishLine: FishLine.fromMap(Map<String, dynamic>.from(row))),
+      );
 
     case 'fish_stocks':
       final row = await Supabase.instance.client
@@ -221,9 +240,31 @@ Future<Widget> resolveQrRoute(QrPayload payload) async {
           .select()
           .eq(FishSch.stockId, payload.id)
           .single();
-      return TankDetailPage(tank: ZebrafishTank.fromMap(Map<String, dynamic>.from(row)));
+      return ResolvedModulePermission(
+        moduleId: 'fish_stock',
+        child: TankDetailPage(tank: ZebrafishTank.fromMap(Map<String, dynamic>.from(row))),
+      );
 
     case 'users':
+      final viewerEmail = Supabase.instance.client.auth.currentSession?.user.email ??
+          Supabase.instance.client.auth.currentUser?.email ??
+          '';
+      if (viewerEmail.isEmpty) {
+        throw Exception('Access denied.');
+      }
+      final viewer = await Supabase.instance.client
+          .from('users')
+          .select('user_id, user_role')
+          .eq('user_email', viewerEmail)
+          .maybeSingle();
+      final viewerRole = viewer?['user_role'] as String? ?? '';
+      final viewerId = viewer?['user_id'] as int?;
+      final canOpenUser = viewerId == payload.id ||
+          viewerRole == 'admin' ||
+          viewerRole == 'superadmin';
+      if (!canOpenUser) {
+        throw Exception('Access denied.');
+      }
       final row = await Supabase.instance.client
           .from('users')
           .select()

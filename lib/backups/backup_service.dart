@@ -65,11 +65,11 @@ const _backupScheduledTables = <String>[
 
 extension BackupFrequencyX on BackupFrequency {
   String get label => switch (this) {
-        BackupFrequency.daily => 'Daily',
-        BackupFrequency.weekly => 'Weekly',
-        BackupFrequency.monthly => 'Monthly',
-        BackupFrequency.yearly => 'Yearly',
-      };
+    BackupFrequency.daily => 'Daily',
+    BackupFrequency.weekly => 'Weekly',
+    BackupFrequency.monthly => 'Monthly',
+    BackupFrequency.yearly => 'Yearly',
+  };
 
   String get folderName => label;
 
@@ -77,12 +77,14 @@ extension BackupFrequencyX on BackupFrequency {
 }
 
 Map<String, Set<String>> _defaultTablesByTarget() => {
-      for (final frequency in BackupFrequency.values)
-        frequency.name: Set<String>.from(_backupScheduledTables),
-      _localMirrorTargetKey: Set<String>.from(_backupAllTables),
-    };
+  for (final frequency in BackupFrequency.values)
+    frequency.name: Set<String>.from(_backupScheduledTables),
+  _localMirrorTargetKey: Set<String>.from(_backupAllTables),
+};
 
-Map<String, Set<String>> _normalizeTablesByTarget(Map<String, Set<String>> raw) {
+Map<String, Set<String>> _normalizeTablesByTarget(
+  Map<String, Set<String>> raw,
+) {
   final normalized = _defaultTablesByTarget();
 
   for (final frequency in BackupFrequency.values) {
@@ -134,7 +136,9 @@ class BackupSettings {
     final frequencies = <BackupFrequency>{};
     if (rawFrequencies is List) {
       for (final raw in rawFrequencies) {
-        final match = BackupFrequency.values.where((f) => f.name == raw).toList();
+        final match = BackupFrequency.values
+            .where((f) => f.name == raw)
+            .toList();
         if (match.isNotEmpty) frequencies.add(match.first);
       }
     }
@@ -143,7 +147,10 @@ class BackupSettings {
     final mode = BackupLocationMode.values
         .where((m) => m.name == rawMode)
         .cast<BackupLocationMode?>()
-        .firstWhere((m) => m != null, orElse: () => BackupLocationMode.documents)!;
+        .firstWhere(
+          (m) => m != null,
+          orElse: () => BackupLocationMode.documents,
+        )!;
 
     DateTime? parseDate(String key) {
       final value = json[key];
@@ -157,15 +164,19 @@ class BackupSettings {
       for (final entry in tablesJson.entries) {
         final value = entry.value;
         if (value is List) {
-          rawTablesByTarget[entry.key.toString()] =
-              value.whereType<String>().toSet();
+          rawTablesByTarget[entry.key.toString()] = value
+              .whereType<String>()
+              .toSet();
         }
       }
     }
 
     return BackupSettings(
       scheduledEnabled: json['scheduledEnabled'] as bool? ?? false,
-      localMirrorEnabled: (json['localMirrorEnabled'] ?? json['offlineMirrorEnabled']) as bool? ?? false,
+      localMirrorEnabled:
+          (json['localMirrorEnabled'] ?? json['offlineMirrorEnabled'])
+              as bool? ??
+          false,
       frequencies: frequencies,
       tablesByTarget: _normalizeTablesByTarget(rawTablesByTarget),
       locationMode: mode,
@@ -179,21 +190,21 @@ class BackupSettings {
   }
 
   Map<String, dynamic> toJson() => {
-        'scheduledEnabled': scheduledEnabled,
-        'localMirrorEnabled': localMirrorEnabled,
-        'frequencies': frequencies.map((f) => f.name).toList()..sort(),
-        'tablesByTarget': {
-          for (final entry in _normalizeTablesByTarget(tablesByTarget).entries)
-            entry.key: entry.value.toList()..sort(),
-        },
-        'locationMode': locationMode.name,
-        'customPath': customPath,
-        'lastDailyBackupAt': lastDailyBackupAt?.toIso8601String(),
-        'lastWeeklyBackupAt': lastWeeklyBackupAt?.toIso8601String(),
-        'lastMonthlyBackupAt': lastMonthlyBackupAt?.toIso8601String(),
-        'lastYearlyBackupAt': lastYearlyBackupAt?.toIso8601String(),
-        'lastOfflineSyncAt': lastOfflineSyncAt?.toIso8601String(),
-      };
+    'scheduledEnabled': scheduledEnabled,
+    'localMirrorEnabled': localMirrorEnabled,
+    'frequencies': frequencies.map((f) => f.name).toList()..sort(),
+    'tablesByTarget': {
+      for (final entry in _normalizeTablesByTarget(tablesByTarget).entries)
+        entry.key: entry.value.toList()..sort(),
+    },
+    'locationMode': locationMode.name,
+    'customPath': customPath,
+    'lastDailyBackupAt': lastDailyBackupAt?.toIso8601String(),
+    'lastWeeklyBackupAt': lastWeeklyBackupAt?.toIso8601String(),
+    'lastMonthlyBackupAt': lastMonthlyBackupAt?.toIso8601String(),
+    'lastYearlyBackupAt': lastYearlyBackupAt?.toIso8601String(),
+    'lastOfflineSyncAt': lastOfflineSyncAt?.toIso8601String(),
+  };
 
   BackupSettings copyWith({
     bool? scheduledEnabled,
@@ -215,10 +226,14 @@ class BackupSettings {
       tablesByTarget: identical(tablesByTarget, _backupUnset)
           ? this.tablesByTarget
           : _normalizeTablesByTarget(
-              Map<String, Set<String>>.from(tablesByTarget as Map<String, Set<String>>),
+              Map<String, Set<String>>.from(
+                tablesByTarget as Map<String, Set<String>>,
+              ),
             ),
       locationMode: locationMode ?? this.locationMode,
-      customPath: identical(customPath, _backupUnset) ? this.customPath : customPath as String?,
+      customPath: identical(customPath, _backupUnset)
+          ? this.customPath
+          : customPath as String?,
       lastDailyBackupAt: identical(lastDailyBackupAt, _backupUnset)
           ? this.lastDailyBackupAt
           : lastDailyBackupAt as DateTime?,
@@ -237,15 +252,15 @@ class BackupSettings {
     );
   }
 
-  Set<String> tablesForFrequency(BackupFrequency frequency) =>
-      Set<String>.from(
-        _normalizeTablesByTarget(tablesByTarget)[frequency.name] ?? const <String>{},
-      );
+  Set<String> tablesForFrequency(BackupFrequency frequency) => Set<String>.from(
+    _normalizeTablesByTarget(tablesByTarget)[frequency.name] ??
+        const <String>{},
+  );
 
   Set<String> get offlineTables => Set<String>.from(
-        _normalizeTablesByTarget(tablesByTarget)[_localMirrorTargetKey] ??
-            const <String>{},
-      );
+    _normalizeTablesByTarget(tablesByTarget)[_localMirrorTargetKey] ??
+        const <String>{},
+  );
 }
 
 class BackupErrorEntry {
@@ -266,17 +281,18 @@ class BackupErrorEntry {
       message: json['message']?.toString() ?? 'Unknown backup error',
       detail: json['detail']?.toString() ?? '',
       scope: json['scope']?.toString() ?? 'backup',
-      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+      createdAt:
+          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
           DateTime.now(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'message': message,
-        'detail': detail,
-        'scope': scope,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'message': message,
+    'detail': detail,
+    'scope': scope,
+    'createdAt': createdAt.toIso8601String(),
+  };
 }
 
 class BackupService extends ChangeNotifier {
@@ -334,7 +350,8 @@ class BackupService extends ChangeNotifier {
   static const _standardDebounce = Duration(seconds: 6);
 
   BackupSettings get settings => _settings;
-  List<BackupErrorEntry> get errors => List<BackupErrorEntry>.unmodifiable(_errors);
+  List<BackupErrorEntry> get errors =>
+      List<BackupErrorEntry>.unmodifiable(_errors);
   int get errorCount => _errors.length;
   bool get isLoaded => _loaded;
   bool get isBusy => _busy;
@@ -363,11 +380,15 @@ class BackupService extends ChangeNotifier {
     if (rawErrors != null && rawErrors.isNotEmpty) {
       try {
         final decoded = jsonDecode(rawErrors) as List<dynamic>;
-        _errors = decoded
-            .whereType<Map>()
-            .map((e) => BackupErrorEntry.fromJson(Map<String, dynamic>.from(e)))
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _errors =
+            decoded
+                .whereType<Map>()
+                .map(
+                  (e) =>
+                      BackupErrorEntry.fromJson(Map<String, dynamic>.from(e)),
+                )
+                .toList()
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       } catch (_) {
         _errors = const [];
       }
@@ -422,7 +443,8 @@ class BackupService extends ChangeNotifier {
   }
 
   Future<String> recommendedRootPath() async {
-    final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
+    final home =
+        Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
     if (home != null && home.isNotEmpty) {
       return _joinPath(home, 'Documents', 'LIMSphere');
     }
@@ -460,7 +482,8 @@ class BackupService extends ChangeNotifier {
   Future<String> runSelectedBackupsNow() async {
     await loadSettings();
     if (!_settings.scheduledEnabled || _settings.frequencies.isEmpty) {
-      const message = 'Scheduled backups are disabled or no cadence is selected.';
+      const message =
+          'Scheduled backups are disabled or no cadence is selected.';
       _statusMessage = message;
       notifyListeners();
       return message;
@@ -503,11 +526,12 @@ class BackupService extends ChangeNotifier {
     }
     final result = await _runBusy<String>('Refreshing local mirror...', () async {
       final allSelected = _settings.offlineTables;
-      final selectedTables = (onlyTables != null
-              ? allSelected.intersection(onlyTables)
-              : allSelected)
-          .toList()
-        ..sort();
+      final selectedTables =
+          (onlyTables != null
+                  ? allSelected.intersection(onlyTables)
+                  : allSelected)
+              .toList()
+            ..sort();
       if (selectedTables.isEmpty) {
         const message = 'Local mirror has no tables selected.';
         _statusMessage = message;
@@ -520,6 +544,7 @@ class BackupService extends ChangeNotifier {
         type: 'local_mirror',
         reason: reason,
         tables: selectedTables,
+        writeJson: true,
       );
       await _addExportErrors(
         summary.errors,
@@ -530,8 +555,8 @@ class BackupService extends ChangeNotifier {
       _settings = _settings.copyWith(lastOfflineSyncAt: now);
       await _persistSettings();
       final message = summary.errors.isEmpty
-          ? 'Local mirror updated in ${dir.path}.'
-          : 'Local mirror updated with ${summary.errors.length} table warning(s).';
+          ? 'Local mirror JSON/CSV updated in ${dir.path}.'
+          : 'Local mirror JSON/CSV updated with ${summary.errors.length} table warning(s).';
       _statusMessage = message;
       return message;
     });
@@ -547,7 +572,9 @@ class BackupService extends ChangeNotifier {
     final now = DateTime.now();
     final due = <BackupFrequency>[
       for (final frequency in BackupFrequency.values)
-        if (_settings.frequencies.contains(frequency) && (force || _isDue(frequency, now))) frequency,
+        if (_settings.frequencies.contains(frequency) &&
+            (force || _isDue(frequency, now)))
+          frequency,
     ];
     if (due.isEmpty) {
       const message = 'No scheduled backups were due.';
@@ -556,43 +583,50 @@ class BackupService extends ChangeNotifier {
       return message;
     }
 
-    final result = await _runBusy<String>('Creating scheduled backups...', () async {
-      final backupsRoot = await resolveBackupsRootPath();
-      final allErrors = <String>[];
-      for (final frequency in due) {
-        final selectedTables = _settings.tablesForFrequency(frequency).toList()
-          ..sort();
-        if (selectedTables.isEmpty) {
-          allErrors.add('${frequency.label}: no tables selected');
-          continue;
+    final result = await _runBusy<String>(
+      'Creating scheduled backups...',
+      () async {
+        final backupsRoot = await resolveBackupsRootPath();
+        final allErrors = <String>[];
+        for (final frequency in due) {
+          final selectedTables =
+              _settings.tablesForFrequency(frequency).toList()..sort();
+          if (selectedTables.isEmpty) {
+            allErrors.add('${frequency.label}: no tables selected');
+            continue;
+          }
+          final folder = Directory(
+            _joinPath(
+              backupsRoot,
+              frequency.folderName,
+              _timestampFolderName(now),
+            ),
+          );
+          final summary = await _exportIntoDirectory(
+            folder,
+            type: frequency.key,
+            reason: reason,
+            tables: selectedTables,
+          );
+          allErrors.addAll(summary.errors);
+          if (summary.tablesWritten > 0) {
+            _settings = _markFrequencyAsCompleted(_settings, frequency, now);
+          }
         }
-        final folder = Directory(
-          _joinPath(backupsRoot, frequency.folderName, _timestampFolderName(now)),
+        await _addExportErrors(
+          allErrors,
+          scope: 'scheduled',
+          message: 'Scheduled backup completed with errors.',
         );
-        final summary = await _exportIntoDirectory(
-          folder,
-          type: frequency.key,
-          reason: reason,
-          tables: selectedTables,
-        );
-        allErrors.addAll(summary.errors);
-        if (summary.tablesWritten > 0) {
-          _settings = _markFrequencyAsCompleted(_settings, frequency, now);
-        }
-      }
-      await _addExportErrors(
-        allErrors,
-        scope: 'scheduled',
-        message: 'Scheduled backup completed with errors.',
-      );
-      await _persistSettings();
-      final label = due.map((f) => f.label).join(', ');
-      final message = allErrors.isEmpty
-          ? 'Created ${due.length} backup snapshot(s): $label.'
-          : 'Created ${due.length} snapshot(s) with ${allErrors.length} table warning(s).';
-      _statusMessage = message;
-      return message;
-    });
+        await _persistSettings();
+        final label = due.map((f) => f.label).join(', ');
+        final message = allErrors.isEmpty
+            ? 'Created ${due.length} backup snapshot(s): $label.'
+            : 'Created ${due.length} snapshot(s) with ${allErrors.length} table warning(s).';
+        _statusMessage = message;
+        return message;
+      },
+    );
 
     notifyListeners();
     return result;
@@ -643,11 +677,7 @@ class BackupService extends ChangeNotifier {
     required String message,
   }) async {
     if (errors.isEmpty) return;
-    await addError(
-      message: message,
-      detail: errors.join('\n'),
-      scope: scope,
-    );
+    await addError(message: message, detail: errors.join('\n'), scope: scope);
   }
 
   Future<void> _configureOfflineMirrorSubscription() async {
@@ -665,7 +695,8 @@ class BackupService extends ChangeNotifier {
     }
     if (current != null) return;
 
-    final channelName = 'backup_offline_${SupabaseManager.projectRef ?? 'default'}';
+    final channelName =
+        'backup_offline_${SupabaseManager.projectRef ?? 'default'}';
     var channel = Supabase.instance.client.channel(channelName);
     for (final table in _tables) {
       channel = channel
@@ -696,7 +727,9 @@ class BackupService extends ChangeNotifier {
   void _scheduleTableRefresh(String table) {
     if (!_settings.localMirrorEnabled) return;
     _offlineChangedTables.add(table);
-    final hasPriorityPending = _offlineChangedTables.any(_priorityTables.contains);
+    final hasPriorityPending = _offlineChangedTables.any(
+      _priorityTables.contains,
+    );
     final delay = hasPriorityPending ? _priorityDebounce : _standardDebounce;
     _offlineRefreshDebounce?.cancel();
     _offlineRefreshDebounce = Timer(delay, () {
@@ -776,6 +809,7 @@ class BackupService extends ChangeNotifier {
     required String type,
     required String reason,
     required List<String> tables,
+    bool writeJson = false,
   }) async {
     await dir.create(recursive: true);
     final counts = <String, int>{};
@@ -791,6 +825,9 @@ class BackupService extends ChangeNotifier {
           _joinPath(dir.path, '$table.csv'),
           _rowsToCsv(rows),
         );
+        if (writeJson) {
+          await _writeJsonFile(_joinPath(dir.path, '$table.json'), rows);
+        }
       } on PostgrestException catch (e) {
         errors.add('$table: ${e.message}');
       } catch (e) {
@@ -804,16 +841,8 @@ class BackupService extends ChangeNotifier {
         'key': 'generated_at',
         'value': DateTime.now().toIso8601String(),
       },
-      {
-        'section': 'meta',
-        'key': 'type',
-        'value': type,
-      },
-      {
-        'section': 'meta',
-        'key': 'reason',
-        'value': reason,
-      },
+      {'section': 'meta', 'key': 'type', 'value': type},
+      {'section': 'meta', 'key': 'reason', 'value': reason},
       {
         'section': 'meta',
         'key': 'connection_name',
@@ -825,33 +854,37 @@ class BackupService extends ChangeNotifier {
         'value': SupabaseManager.projectRef ?? '',
       },
       for (final table in tables)
-        {
-          'section': 'table_selected',
-          'key': table,
-          'value': tableLabel(table),
-        },
-      {
-        'section': 'meta',
-        'key': 'total_rows',
-        'value': totalRows,
-      },
+        {'section': 'table_selected', 'key': table, 'value': tableLabel(table)},
+      {'section': 'meta', 'key': 'total_rows', 'value': totalRows},
       for (final entry in counts.entries)
-        {
-          'section': 'table_count',
-          'key': entry.key,
-          'value': entry.value,
-        },
+        {'section': 'table_count', 'key': entry.key, 'value': entry.value},
       for (final error in errors)
-        {
-          'section': 'error',
-          'key': 'message',
-          'value': error,
-        },
+        {'section': 'error', 'key': 'message', 'value': error},
     ];
     await _writeCsvFile(
       _joinPath(dir.path, '_manifest.csv'),
       _rowsToCsv(manifestRows),
     );
+    if (writeJson) {
+      await _writeJsonFile(_joinPath(dir.path, '_manifest.json'), {
+        'generatedAt': DateTime.now().toIso8601String(),
+        'type': type,
+        'reason': reason,
+        'connectionName': SupabaseManager.currentName ?? '',
+        'projectRef': SupabaseManager.projectRef ?? '',
+        'formats': const ['csv', 'json'],
+        'totalRows': totalRows,
+        'tables': [
+          for (final table in tables)
+            {
+              'table': table,
+              'label': tableLabel(table),
+              'rowCount': counts[table] ?? 0,
+            },
+        ],
+        'errors': errors,
+      });
+    }
 
     return _BackupExportSummary(
       tablesWritten: counts.length,
@@ -869,7 +902,9 @@ class BackupService extends ChangeNotifier {
           .select()
           .range(offset, offset + _pageSize - 1);
       final page = List<Map<String, dynamic>>.from(
-        (response as List<dynamic>).map((e) => Map<String, dynamic>.from(e as Map)),
+        (response as List<dynamic>).map(
+          (e) => Map<String, dynamic>.from(e as Map),
+        ),
       );
       rows.addAll(page);
       if (page.length < _pageSize) break;
@@ -891,7 +926,12 @@ class BackupService extends ChangeNotifier {
     return '${dt.year}-${two(dt.month)}-${two(dt.day)}_${two(dt.hour)}-${two(dt.minute)}-${two(dt.second)}';
   }
 
-  static String _joinPath(String first, [String? second, String? third, String? fourth]) {
+  static String _joinPath(
+    String first, [
+    String? second,
+    String? third,
+    String? fourth,
+  ]) {
     final parts = <String>[
       first,
       if (second != null && second.isNotEmpty) second,
@@ -909,6 +949,11 @@ class BackupService extends ChangeNotifier {
     await File(path).writeAsBytes(bytes, flush: true);
   }
 
+  Future<void> _writeJsonFile(String path, Object data) async {
+    const encoder = JsonEncoder.withIndent('  ');
+    await File(path).writeAsString(encoder.convert(data), flush: true);
+  }
+
   String _rowsToCsv(List<Map<String, dynamic>> rows) {
     final headers = <String>[];
     final seen = <String>{};
@@ -922,8 +967,7 @@ class BackupService extends ChangeNotifier {
       return '';
     }
 
-    final buffer = StringBuffer()
-      ..writeln(headers.map(_csvCell).join(','));
+    final buffer = StringBuffer()..writeln(headers.map(_csvCell).join(','));
     for (final row in rows) {
       buffer.writeln(
         headers.map((header) => _csvCell(_csvValue(row[header]))).join(','),
@@ -940,7 +984,8 @@ class BackupService extends ChangeNotifier {
 
   String _csvCell(String value) {
     final escaped = value.replaceAll('"', '""');
-    final needsQuotes = escaped.contains(',') ||
+    final needsQuotes =
+        escaped.contains(',') ||
         escaped.contains('"') ||
         escaped.contains('\n') ||
         escaped.contains('\r');

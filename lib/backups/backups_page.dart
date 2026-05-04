@@ -103,7 +103,10 @@ class _BackupsPageState extends State<BackupsPage> {
     });
   }
 
-  Future<void> _applySettings(BackupSettings next, {String? successMessage}) async {
+  Future<void> _applySettings(
+    BackupSettings next, {
+    String? successMessage,
+  }) async {
     setState(() {
       _saving = true;
       _settings = next;
@@ -138,7 +141,8 @@ class _BackupsPageState extends State<BackupsPage> {
 
   Future<void> _selectLocationMode(BackupLocationMode mode) async {
     if (mode == BackupLocationMode.custom &&
-        (_settings.customPath == null || _settings.customPath!.trim().isEmpty)) {
+        (_settings.customPath == null ||
+            _settings.customPath!.trim().isEmpty)) {
       await _chooseCustomFolder();
       return;
     }
@@ -179,12 +183,9 @@ class _BackupsPageState extends State<BackupsPage> {
   }
 
   void _snack(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
   String _dt(DateTime? value) {
@@ -204,7 +205,11 @@ class _BackupsPageState extends State<BackupsPage> {
           ),
           title: Row(
             children: [
-              const Icon(Icons.error_outline_rounded, color: AppDS.red, size: 20),
+              const Icon(
+                Icons.error_outline_rounded,
+                color: AppDS.red,
+                size: 20,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -294,9 +299,9 @@ class _BackupsPageState extends State<BackupsPage> {
   }
 
   Map<String, Set<String>> _cloneTablesByTarget() => {
-        for (final entry in _settings.tablesByTarget.entries)
-          entry.key: Set<String>.from(entry.value),
-      };
+    for (final entry in _settings.tablesByTarget.entries)
+      entry.key: Set<String>.from(entry.value),
+  };
 
   Future<void> _toggleFrequency(BackupFrequency frequency, bool enabled) async {
     final next = Set<BackupFrequency>.from(_settings.frequencies);
@@ -371,7 +376,11 @@ class _BackupsPageState extends State<BackupsPage> {
                     onPressed: () => Scaffold.of(context).openDrawer(),
                   ),
                 ],
-                const Icon(Icons.backup_outlined, color: BackupsPage.accent, size: 20),
+                const Icon(
+                  Icons.backup_outlined,
+                  color: BackupsPage.accent,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Text(
                   'Backups',
@@ -385,7 +394,9 @@ class _BackupsPageState extends State<BackupsPage> {
                 if (_settings.localMirrorEnabled) ...[
                   IconButton(
                     tooltip: 'Refresh local mirror',
-                    onPressed: (_isMobile || _saving || _service.isBusy) ? null : _runOfflineNow,
+                    onPressed: (_isMobile || _saving || _service.isBusy)
+                        ? null
+                        : _runOfflineNow,
                     icon: Icon(
                       Icons.sync_rounded,
                       color: (_saving || _service.isBusy)
@@ -458,7 +469,11 @@ class _BackupsPageState extends State<BackupsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.black87, size: 18),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.black87,
+                    size: 18,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -482,27 +497,27 @@ class _BackupsPageState extends State<BackupsPage> {
                     child: Opacity(
                       opacity: _isMobile ? 0.45 : 1.0,
                       child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1040),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _activationCard(context),
-                            const SizedBox(height: 16),
-                            _locationCard(context),
-                            const SizedBox(height: 16),
-                            _scheduleCard(context),
-                            const SizedBox(height: 16),
-                            _statusCard(context),
-                            const SizedBox(height: 16),
-                            _actionsCard(context),
-                          ],
+                        padding: const EdgeInsets.all(24),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1040),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _activationCard(context),
+                                const SizedBox(height: 16),
+                                _locationCard(context),
+                                const SizedBox(height: 16),
+                                _scheduleCard(context),
+                                const SizedBox(height: 16),
+                                _statusCard(context),
+                                const SizedBox(height: 16),
+                                _actionsCard(context),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
                     ),
                   ),
           ),
@@ -514,14 +529,16 @@ class _BackupsPageState extends State<BackupsPage> {
   Widget _activationCard(BuildContext context) {
     return _SectionCard(
       title: '1. Activate Backups',
-      subtitle: 'Choose which backup systems this machine should run. Both switches start disabled by default. Audit Log is reserved for the local mirror only.',
+      subtitle:
+          'Choose which backup systems this machine should run. Both switches start disabled by default. Audit Log is reserved for the local mirror only.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _ToggleRow(
             icon: Icons.event_repeat_outlined,
             title: 'Scheduled backups on login',
-            subtitle: 'Checks the current day, week, month, and year after login and writes any missing snapshots.',
+            subtitle:
+                'Checks the current day, week, month, and year after login and writes any missing snapshots.',
             value: _settings.scheduledEnabled,
             accent: BackupsPage.accent,
             onChanged: (value) => _applySettings(
@@ -535,7 +552,8 @@ class _BackupsPageState extends State<BackupsPage> {
           _ToggleRow(
             icon: Icons.cloud_sync_outlined,
             title: 'Local database mirror',
-            subtitle: 'Keeps a fresh full export in Backups/local_mirror at login and after database changes.',
+            subtitle:
+                'Keeps a fresh full export in Backups/local_mirror at login and after database changes. Each selected table is saved as CSV and JSON.',
             value: _settings.localMirrorEnabled,
             accent: const Color(0xFF0EA5E9),
             onChanged: (value) => _applySettings(
@@ -549,7 +567,8 @@ class _BackupsPageState extends State<BackupsPage> {
           const SizedBox(height: 12),
           _TableSelectorPanel(
             title: 'Local mirror tables',
-            subtitle: 'These tables are exported into Backups/local_mirror. Audit Log can be selected only here.',
+            subtitle:
+                'These tables are exported into Backups/local_mirror as CSV and JSON files. Audit Log can be selected only here.',
             tables: _service.offlineSelectableTables,
             selected: _settings.offlineTables,
             enabled: _settings.localMirrorEnabled,
@@ -564,7 +583,8 @@ class _BackupsPageState extends State<BackupsPage> {
   Widget _locationCard(BuildContext context) {
     return _SectionCard(
       title: '2. Backup Location',
-      subtitle: 'Pick where the root backup folder lives. The app creates Backups/Daily, Weekly, Monthly, Yearly, and local_mirror inside that root.',
+      subtitle:
+          'Pick where the root backup folder lives. The app creates Backups/Daily, Weekly, Monthly, Yearly, and local_mirror inside that root.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -575,13 +595,15 @@ class _BackupsPageState extends State<BackupsPage> {
               _LocationChoice(
                 label: 'Documents',
                 description: 'Recommended',
-                selected: _settings.locationMode == BackupLocationMode.documents,
+                selected:
+                    _settings.locationMode == BackupLocationMode.documents,
                 onTap: () => _selectLocationMode(BackupLocationMode.documents),
               ),
               _LocationChoice(
                 label: 'App Folder',
                 description: 'Installed app path',
-                selected: _settings.locationMode == BackupLocationMode.appFolder,
+                selected:
+                    _settings.locationMode == BackupLocationMode.appFolder,
                 onTap: () => _selectLocationMode(BackupLocationMode.appFolder),
               ),
               _LocationChoice(
@@ -646,23 +668,27 @@ class _BackupsPageState extends State<BackupsPage> {
     final enabled = _settings.scheduledEnabled;
     return _SectionCard(
       title: '3. Scheduled Cadence',
-      subtitle: 'Select which folders should be checked and created at login, then choose which tables each cadence should export.',
+      subtitle:
+          'Select which folders should be checked and created at login, then choose which tables each cadence should export.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _FrequencyRow(
             frequency: BackupFrequency.daily,
-            description: 'Stored in Backups/Daily when today has no snapshot yet.',
+            description:
+                'Stored in Backups/Daily when today has no snapshot yet.',
             enabled: enabled,
             selected: _settings.frequencies.contains(BackupFrequency.daily),
-            onChanged: (value) => _toggleFrequency(BackupFrequency.daily, value),
+            onChanged: (value) =>
+                _toggleFrequency(BackupFrequency.daily, value),
             lastBackup: _dt(_settings.lastDailyBackupAt),
           ),
           if (_settings.frequencies.contains(BackupFrequency.daily)) ...[
             const SizedBox(height: 10),
             _TableSelectorPanel(
               title: 'Daily tables',
-              subtitle: 'Choose which tables should be exported into Backups/Daily.',
+              subtitle:
+                  'Choose which tables should be exported into Backups/Daily.',
               tables: _service.scheduledSelectableTables,
               selected: _settings.tablesForFrequency(BackupFrequency.daily),
               enabled: enabled,
@@ -674,67 +700,85 @@ class _BackupsPageState extends State<BackupsPage> {
           Divider(color: context.appBorder, height: 1),
           _FrequencyRow(
             frequency: BackupFrequency.weekly,
-            description: 'Stored in Backups/Weekly when the current week has no snapshot yet.',
+            description:
+                'Stored in Backups/Weekly when the current week has no snapshot yet.',
             enabled: enabled,
             selected: _settings.frequencies.contains(BackupFrequency.weekly),
-            onChanged: (value) => _toggleFrequency(BackupFrequency.weekly, value),
+            onChanged: (value) =>
+                _toggleFrequency(BackupFrequency.weekly, value),
             lastBackup: _dt(_settings.lastWeeklyBackupAt),
           ),
           if (_settings.frequencies.contains(BackupFrequency.weekly)) ...[
             const SizedBox(height: 10),
             _TableSelectorPanel(
               title: 'Weekly tables',
-              subtitle: 'Choose which tables should be exported into Backups/Weekly.',
+              subtitle:
+                  'Choose which tables should be exported into Backups/Weekly.',
               tables: _service.scheduledSelectableTables,
               selected: _settings.tablesForFrequency(BackupFrequency.weekly),
               enabled: enabled,
               labelForTable: _service.tableLabel,
-              onToggle: (table, value) =>
-                  _toggleTableForFrequency(BackupFrequency.weekly, table, value),
+              onToggle: (table, value) => _toggleTableForFrequency(
+                BackupFrequency.weekly,
+                table,
+                value,
+              ),
             ),
           ],
           Divider(color: context.appBorder, height: 1),
           _FrequencyRow(
             frequency: BackupFrequency.monthly,
-            description: 'Stored in Backups/Monthly when the current month has no snapshot yet.',
+            description:
+                'Stored in Backups/Monthly when the current month has no snapshot yet.',
             enabled: enabled,
             selected: _settings.frequencies.contains(BackupFrequency.monthly),
-            onChanged: (value) => _toggleFrequency(BackupFrequency.monthly, value),
+            onChanged: (value) =>
+                _toggleFrequency(BackupFrequency.monthly, value),
             lastBackup: _dt(_settings.lastMonthlyBackupAt),
           ),
           if (_settings.frequencies.contains(BackupFrequency.monthly)) ...[
             const SizedBox(height: 10),
             _TableSelectorPanel(
               title: 'Monthly tables',
-              subtitle: 'Choose which tables should be exported into Backups/Monthly.',
+              subtitle:
+                  'Choose which tables should be exported into Backups/Monthly.',
               tables: _service.scheduledSelectableTables,
               selected: _settings.tablesForFrequency(BackupFrequency.monthly),
               enabled: enabled,
               labelForTable: _service.tableLabel,
-              onToggle: (table, value) =>
-                  _toggleTableForFrequency(BackupFrequency.monthly, table, value),
+              onToggle: (table, value) => _toggleTableForFrequency(
+                BackupFrequency.monthly,
+                table,
+                value,
+              ),
             ),
           ],
           Divider(color: context.appBorder, height: 1),
           _FrequencyRow(
             frequency: BackupFrequency.yearly,
-            description: 'Stored in Backups/Yearly when the current year has no snapshot yet.',
+            description:
+                'Stored in Backups/Yearly when the current year has no snapshot yet.',
             enabled: enabled,
             selected: _settings.frequencies.contains(BackupFrequency.yearly),
-            onChanged: (value) => _toggleFrequency(BackupFrequency.yearly, value),
+            onChanged: (value) =>
+                _toggleFrequency(BackupFrequency.yearly, value),
             lastBackup: _dt(_settings.lastYearlyBackupAt),
           ),
           if (_settings.frequencies.contains(BackupFrequency.yearly)) ...[
             const SizedBox(height: 10),
             _TableSelectorPanel(
               title: 'Yearly tables',
-              subtitle: 'Choose which tables should be exported into Backups/Yearly.',
+              subtitle:
+                  'Choose which tables should be exported into Backups/Yearly.',
               tables: _service.scheduledSelectableTables,
               selected: _settings.tablesForFrequency(BackupFrequency.yearly),
               enabled: enabled,
               labelForTable: _service.tableLabel,
-              onToggle: (table, value) =>
-                  _toggleTableForFrequency(BackupFrequency.yearly, table, value),
+              onToggle: (table, value) => _toggleTableForFrequency(
+                BackupFrequency.yearly,
+                table,
+                value,
+              ),
             ),
           ],
         ],
@@ -745,7 +789,8 @@ class _BackupsPageState extends State<BackupsPage> {
   Widget _statusCard(BuildContext context) {
     return _SectionCard(
       title: '4. Backup Status',
-      subtitle: 'See the last known automatic exports for each cadence and the local mirror.',
+      subtitle:
+          'See the last known automatic exports for each cadence and the local mirror.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -753,11 +798,26 @@ class _BackupsPageState extends State<BackupsPage> {
             spacing: 12,
             runSpacing: 12,
             children: [
-              _StatusTile(title: 'Daily', value: _dt(_settings.lastDailyBackupAt)),
-              _StatusTile(title: 'Weekly', value: _dt(_settings.lastWeeklyBackupAt)),
-              _StatusTile(title: 'Monthly', value: _dt(_settings.lastMonthlyBackupAt)),
-              _StatusTile(title: 'Yearly', value: _dt(_settings.lastYearlyBackupAt)),
-              _StatusTile(title: 'Local mirror', value: _dt(_settings.lastOfflineSyncAt)),
+              _StatusTile(
+                title: 'Daily',
+                value: _dt(_settings.lastDailyBackupAt),
+              ),
+              _StatusTile(
+                title: 'Weekly',
+                value: _dt(_settings.lastWeeklyBackupAt),
+              ),
+              _StatusTile(
+                title: 'Monthly',
+                value: _dt(_settings.lastMonthlyBackupAt),
+              ),
+              _StatusTile(
+                title: 'Yearly',
+                value: _dt(_settings.lastYearlyBackupAt),
+              ),
+              _StatusTile(
+                title: 'Local mirror',
+                value: _dt(_settings.lastOfflineSyncAt),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -773,14 +833,17 @@ class _BackupsPageState extends State<BackupsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  _service.isBusy ? Icons.sync_rounded : Icons.info_outline_rounded,
+                  _service.isBusy
+                      ? Icons.sync_rounded
+                      : Icons.info_outline_rounded,
                   color: BackupsPage.accent,
                   size: 18,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _service.statusMessage ?? 'No backup action has been triggered in this session yet.',
+                    _service.statusMessage ??
+                        'No backup action has been triggered in this session yet.',
                     style: _uiStyle(
                       color: context.appTextSecondary,
                       fontSize: 12,
@@ -799,7 +862,8 @@ class _BackupsPageState extends State<BackupsPage> {
   Widget _actionsCard(BuildContext context) {
     return _SectionCard(
       title: '5. Run Now',
-      subtitle: 'Manual controls for immediate export without waiting for the next login.',
+      subtitle:
+          'Manual controls for immediate export without waiting for the next login.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -808,7 +872,8 @@ class _BackupsPageState extends State<BackupsPage> {
             runSpacing: 10,
             children: [
               FilledButton.icon(
-                onPressed: _service.isBusy ||
+                onPressed:
+                    _service.isBusy ||
                         !_settings.scheduledEnabled ||
                         _settings.frequencies.isEmpty
                     ? null
@@ -828,18 +893,12 @@ class _BackupsPageState extends State<BackupsPage> {
           const SizedBox(height: 14),
           Text(
             'Folder layout: $_resolvedRootPath',
-            style: _monoStyle(
-              color: context.appTextPrimary,
-              fontSize: 11,
-            ),
+            style: _monoStyle(color: context.appTextPrimary, fontSize: 11),
           ),
           const SizedBox(height: 6),
           Text(
             'Backups/Daily  |  Backups/Weekly  |  Backups/Monthly  |  Backups/Yearly  |  Backups/local_mirror',
-            style: _monoStyle(
-              color: context.appTextSecondary,
-              fontSize: 11,
-            ),
+            style: _monoStyle(color: context.appTextSecondary, fontSize: 11),
           ),
         ],
       ),
@@ -1081,10 +1140,7 @@ class _PathBlock extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             hint,
-            style: _uiStyle(
-              color: context.appTextSecondary,
-              fontSize: 11,
-            ),
+            style: _uiStyle(color: context.appTextSecondary, fontSize: 11),
           ),
         ],
       ),
@@ -1261,10 +1317,7 @@ class _StatusTile extends StatelessWidget {
   final String title;
   final String value;
 
-  const _StatusTile({
-    required this.title,
-    required this.value,
-  });
+  const _StatusTile({required this.title, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -1290,10 +1343,7 @@ class _StatusTile extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: _monoStyle(
-              color: context.appTextPrimary,
-              fontSize: 11,
-            ),
+            style: _monoStyle(color: context.appTextPrimary, fontSize: 11),
           ),
         ],
       ),

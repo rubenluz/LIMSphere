@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 import '/menu/app_nav.dart';
 
@@ -136,6 +137,7 @@ class RequestsPage extends StatefulWidget {
   static final pendingNotifier = ValueNotifier<int>(0);
 
   static RealtimeChannel? _bgSub;
+  // ignore: unused_field
   static Timer? _bgTimer;
 
   /// Start the always-on background listener. Call once from MenuPage.initState.
@@ -197,7 +199,8 @@ class _RequestsPageState extends State<RequestsPage> {
 
   int?   _currentUserId;
   String _userRole = '';
-  bool   _hasWritePerm = false;
+  ModuleAccess _requestsAccess = const ModuleAccess.none(moduleId: 'requests');
+  ModuleAccess _cultureAccess = const ModuleAccess.none(moduleId: 'strains');
 
   @override
   void initState() {
@@ -211,17 +214,23 @@ class _RequestsPageState extends State<RequestsPage> {
       final email = Supabase.instance.client.auth.currentSession?.user.email ?? '';
       final rows  = await Supabase.instance.client
           .from('users')
-          .select('user_id, user_role, user_table_culture_collection')
+          .select()
           .eq('user_email', email)
           .limit(1);
       if (!mounted) return;
       if (rows.isNotEmpty) {
-        final r = rows[0];
+        final r = Map<String, dynamic>.from(rows[0]);
         setState(() {
           _currentUserId = r['user_id'] as int?;
           _userRole      = r['user_role'] as String? ?? '';
-          _hasWritePerm  = _isAdmin ||
-              (r['user_table_culture_collection'] as String? ?? 'none') == 'write';
+          _requestsAccess = resolveModuleAccess(
+            moduleId: 'requests',
+            userRow: r,
+          );
+          _cultureAccess = resolveModuleAccess(
+            moduleId: 'strains',
+            userRow: r,
+          );
         });
       }
     } catch (_) {}
@@ -254,8 +263,18 @@ class _RequestsPageState extends State<RequestsPage> {
 
   bool get _isAdmin    => ['admin', 'superadmin'].contains(_userRole);
   bool _isCreator(_Req r) => r.createdBy != null && r.createdBy == _currentUserId;
-  bool _canEdit(_Req r)   => _isAdmin || _hasWritePerm || _isCreator(r);
-  bool get _canClose      => _isAdmin || _hasWritePerm;
+  bool get _hasGranularRequestRules => _requestsAccess.hasGranularRules;
+  bool get _canEditAnyRequest =>
+      _isAdmin ||
+      (_hasGranularRequestRules ? _requestsAccess.canEdit : _cultureAccess.canEdit);
+  bool get _canDeleteAnyRequest =>
+      _isAdmin ||
+      (_hasGranularRequestRules ? _requestsAccess.canDelete : _cultureAccess.canEdit);
+  bool _canEdit(_Req r)   => _canEditAnyRequest || _isCreator(r);
+  bool _canDelete(_Req r) => _canDeleteAnyRequest || _isCreator(r);
+  bool get _canClose      =>
+      _isAdmin ||
+      (_hasGranularRequestRules ? _requestsAccess.canApprove : _cultureAccess.canEdit);
 
   void _showTypeFilterMenu() {
     final renderBox = context.findRenderObject() as RenderBox;
@@ -974,7 +993,7 @@ class _RequestsPageState extends State<RequestsPage> {
                       color: AppDS.yellow,
                       onPressed: () => _reopen(r),
                     ),
-                  if (canEdit)
+                  if (_canDelete(r))
                     _actionBtn(
                       label: 'Delete',
                       icon: Icons.delete_outline,

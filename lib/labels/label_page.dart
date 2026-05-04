@@ -21,6 +21,7 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 import '/menu/app_nav.dart';
 import '../camera/qr_scanner/qr_code_rules.dart';
@@ -688,12 +689,20 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   }
 
   Future<void> _saveTemplate(LabelTemplate tpl) async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     try {
       await Supabase.instance.client.from('label_templates').upsert(tpl.toDb());
     } catch (_) {}
   }
 
   void _duplicateTemplate(LabelTemplate tpl) {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     // Generate a unique name: "Name_duplicate1", "Name_duplicate2", …
     final existingNames = _templates.map((t) => t.name).toSet();
     String newName;
@@ -708,6 +717,10 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   }
 
   Future<void> _deleteTemplate(LabelTemplate tpl) async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     try {
       await Supabase.instance.client
           .from('label_templates')
@@ -717,6 +730,10 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   }
 
   void _openStarters() {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     showDialog(
       context: context,
       builder: (_) => _StartersDialog(
@@ -787,6 +804,10 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   }
 
   Future<void> _showNewTemplateDialog() async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     final nameCtrl = TextEditingController(text: 'New Template');
     String selectedCategory = widget.entityType;
     String selectedPaperSize = '62x29';
@@ -933,6 +954,10 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   }
 
   void _openBuilder([LabelTemplate? template]) {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     final tpl = template ?? LabelTemplate(
       id: 'tpl_${DateTime.now().millisecondsSinceEpoch}',
       name: 'New Template',
@@ -941,47 +966,63 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
       labelH: 30,
     );
     if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _BuilderPage(
-        template: tpl,
-        profiles: _profiles,
-        activeProfile: _activeProfile,
-        onProfileChanged: (p) {
-          setState(() => _activeProfile = p);
-          _saveProfiles();
-          _checkConnection();
-        },
-        onSave: (saved) async {
-          await Supabase.instance.client.from('label_templates').upsert(saved.toDb());
-          if (!mounted) return;
-          setState(() {
-            final i = _templates.indexWhere((x) => x.id == saved.id);
-            if (i >= 0) { _templates[i] = saved; } else { _templates.add(saved); }
-            _activeTemplate = saved;
-          });
-        },
+    Navigator.push(
+      context,
+      modulePageRoute(
+        context: context,
+        child: _BuilderPage(
+          template: tpl,
+          profiles: _profiles,
+          activeProfile: _activeProfile,
+          onProfileChanged: (p) {
+            setState(() => _activeProfile = p);
+            _saveProfiles();
+            _checkConnection();
+          },
+          onSave: (saved) async {
+            if (!context.canEditModule) {
+              context.warnReadOnly();
+              return;
+            }
+            await Supabase.instance.client.from('label_templates').upsert(saved.toDb());
+            if (!mounted) return;
+            setState(() {
+              final i = _templates.indexWhere((x) => x.id == saved.id);
+              if (i >= 0) { _templates[i] = saved; } else { _templates.add(saved); }
+              _activeTemplate = saved;
+            });
+          },
+        ),
       ),
-    ));
+    );
   }
 
   void _openSettings() {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _PrinterSettingsPage(
-        profiles: _profiles,
-        activeProfileId: _activeProfile?.id,
-        onChanged: (profiles, activeId) {
-          setState(() {
-            _profiles
-              ..clear()
-              ..addAll(profiles);
-            _activeProfile = _profiles.firstWhereOrNull((p) => p.id == activeId)
-                ?? _profiles.firstOrNull;
-          });
-          _saveProfiles();
-          _checkConnection();
-        },
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
+    Navigator.push(
+      context,
+      modulePageRoute(
+        context: context,
+        child: _PrinterSettingsPage(
+          profiles: _profiles,
+          activeProfileId: _activeProfile?.id,
+          onChanged: (profiles, activeId) {
+            setState(() {
+              _profiles
+                ..clear()
+                ..addAll(profiles);
+              _activeProfile = _profiles.firstWhereOrNull((p) => p.id == activeId)
+                  ?? _profiles.firstOrNull;
+            });
+            _saveProfiles();
+            _checkConnection();
+          },
+        ),
       ),
-    ));
+    );
   }
 
   @override
@@ -1048,12 +1089,12 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
             IconButton(
               icon: Icon(Icons.settings_outlined, size: 20, color: context.appTextSecondary),
               tooltip: 'Printer settings',
-              onPressed: _openSettings,
+              onPressed: context.canEditModule ? _openSettings : context.warnReadOnly,
             ),
             TextButton.icon(
               icon: Icon(Icons.library_books_outlined, size: 16, color: context.appTextSecondary),
               label: Text('Starters', style: TextStyle(fontSize: 12, color: context.appTextSecondary)),
-              onPressed: _openStarters,
+              onPressed: context.canEditModule ? _openStarters : context.warnReadOnly,
             ),
             Padding(
               padding: const EdgeInsets.only(right: 8, left: 4),
@@ -1065,7 +1106,7 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
                   minimumSize: const Size(0, 36),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: _showNewTemplateDialog,
+                onPressed: context.canEditModule ? _showNewTemplateDialog : context.warnReadOnly,
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('New Template', style: TextStyle(fontSize: 13)),
               ),
@@ -1081,9 +1122,20 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
           records: widget.initialData,
           entityType: widget.entityType,
           onSelect: (t) => setState(() => _activeTemplate = t),
-          onEdit: (t) { setState(() => _activeTemplate = t); _openBuilder(t); },
+          onEdit: (t) {
+            if (!context.canEditModule) {
+              context.warnReadOnly();
+              return;
+            }
+            setState(() => _activeTemplate = t);
+            _openBuilder(t);
+          },
           onDuplicate: _duplicateTemplate,
           onDelete: (t) {
+            if (!context.canEditModule) {
+              context.warnReadOnly();
+              return;
+            }
             setState(() {
               _templates.removeWhere((x) => x.id == t.id);
               if (_activeTemplate?.id == t.id) _activeTemplate = _templates.firstOrNull;

@@ -205,12 +205,16 @@ class _FishLinesPageState extends State<FishLinesPage> {
 
 
   void _openDetail(FishLine line) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => FishLineDetailPage(
-        fishLine: line,
-        onSaved: _loadLines,
+    Navigator.push(
+      context,
+      modulePageRoute(
+        context: context,
+        child: FishLineDetailPage(
+          fishLine: line,
+          onSaved: _loadLines,
+        ),
       ),
-    ));
+    );
   }
 
   Future<void> _exportCsv() async {

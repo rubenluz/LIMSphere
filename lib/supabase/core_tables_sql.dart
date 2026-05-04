@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS users (
         CHECK (user_table_labels IN ('read','write','none')),
     user_table_resources TEXT DEFAULT 'none'
         CHECK (user_table_resources IN ('read','write','none')),
+    user_permissions_json JSONB DEFAULT '{}'::jsonb,
 
     user_notifications_enabled BOOLEAN DEFAULT true,
 
@@ -157,18 +158,30 @@ CREATE TABLE IF NOT EXISTS strains (
     -- Identity & status
     strain_sample_code           TEXT REFERENCES samples(sample_code),  -- optional FK to samples(sample_code) for provenance
     strain_code                  TEXT UNIQUE,
+    strain_mirri_accession_number TEXT,
     strain_status                TEXT,         -- alive | dead | lost | cryopreserved | transferred
     strain_need_new_transfer     BOOLEAN DEFAULT FALSE,
     strain_origin                TEXT,
     strain_situation             TEXT,         -- in culture | deposited | lost | quarantine
     strain_toxins                TEXT,
     strain_public                TEXT,         -- yes | no | restricted
+    strain_public_data           TEXT,
     strain_private_collection    TEXT,
+    strain_organism_type         TEXT,
     strain_type_strain           TEXT,         -- yes | no
+    strain_type_status           TEXT,
     strain_last_checked          DATE,
     strain_biosafety_level       TEXT,         -- BSL-1 | BSL-2 | BSL-3
+    strain_risk_group            TEXT,
     strain_access_conditions     TEXT,
+    strain_use_restrictions      TEXT,
+    strain_nagoya_conditions     TEXT,
     strain_other_codes           TEXT,
+    strain_form_of_supply        TEXT,
+    strain_available_for_distribution TEXT,
+    strain_available_at_cc       TEXT,
+    strain_registered_collection TEXT,
+    strain_clinical              TEXT,
 
     -- Taxonomy
     strain_empire                TEXT,         -- Bacteria | Archaea | Eukaryota | Virus
@@ -181,12 +194,14 @@ CREATE TABLE IF NOT EXISTS strains (
     strain_species               TEXT,
     strain_subspecies            TEXT,
     strain_variety               TEXT,
+    strain_infrasubspecific_names TEXT,
     strain_scientific_name       TEXT,
     strain_authority             TEXT,
     strain_other_names           TEXT,
     strain_taxonomist            TEXT,
     strain_identification_method TEXT,         -- morphology | 16S | 18S | ITS | genome | combined
     strain_identification_date   DATE,
+    strain_taxonomy_comments     TEXT,
 
     -- Morphology
     strain_morphology            TEXT,         -- unicellular | filamentous | colonial | coccoid
@@ -219,6 +234,7 @@ CREATE TABLE IF NOT EXISTS strains (
     strain_light_intensity_umol  NUMERIC,      -- µmol photons m⁻² s⁻¹
     strain_temperature_c         NUMERIC,      -- incubation °C
     strain_co2_pct               NUMERIC,
+    strain_tested_temp_growth_range TEXT,
     strain_aeration              TEXT,         -- still | shaken | bubbled | perfused
     strain_culture_vessel        TEXT,         -- flask | plate | tube | bioreactor
     strain_room                  TEXT,
@@ -237,11 +253,33 @@ CREATE TABLE IF NOT EXISTS strains (
     strain_responsible_id        BIGINT REFERENCES users(user_id),
 
     -- Isolation
+    strain_depositor             TEXT,
+    strain_deposit_history       TEXT,
     strain_isolation_responsible TEXT,
     strain_isolation_responsible_id BIGINT REFERENCES users(user_id),
     strain_isolation_date        DATE,
     strain_isolation_method      TEXT,         -- single cell | serial dilution | plating
     strain_deposit_date          DATE,
+    strain_inclusion_date        TEXT,
+    strain_abs_related_files     TEXT,
+    strain_mta_file              TEXT,
+
+    -- MIRRI biological / compliance traits
+    strain_eu_quarantine         TEXT,
+    strain_gmo                   TEXT,
+    strain_gmo_construction_info TEXT,
+    strain_dual_use              TEXT,
+    strain_sexual_state          TEXT,
+    strain_mutant_information    TEXT,
+    strain_genotype              TEXT,
+    strain_ploidy                TEXT,
+    strain_interspecific_hybrid  TEXT,
+    strain_pathogenicity         TEXT,
+    strain_enzyme_production     TEXT,
+    strain_plasmids              TEXT,
+    strain_plasmids_collection_fields TEXT,
+    strain_qps                   TEXT,
+    strain_axenic               TEXT,
 
     -- Molecular — prokaryotes
     strain_seq_16s_bp            INT,
@@ -271,10 +309,14 @@ CREATE TABLE IF NOT EXISTS strains (
     strain_bioactivity           TEXT,
     strain_metabolites           TEXT,
     strain_industrial_use        TEXT,
+    strain_applications          TEXT,
     strain_growth_rate           TEXT,
 
     -- References
     strain_publications          TEXT,
+    strain_literature_ids        TEXT,
+    strain_sequence_literature_ids TEXT,
+    strain_ontobiotope_terms     TEXT,
     strain_external_links        TEXT,
     strain_notes                 TEXT,
     strain_qrcode                TEXT,
@@ -284,6 +326,46 @@ CREATE TABLE IF NOT EXISTS strains (
 );
 -- Migrate existing installations: add strain_need_new_transfer if not present
 ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_need_new_transfer BOOLEAN DEFAULT FALSE;
+-- MIRRI compatibility columns for existing installations
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_mirri_accession_number TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_public_data TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_organism_type TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_type_status TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_risk_group TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_use_restrictions TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_nagoya_conditions TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_form_of_supply TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_available_for_distribution TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_available_at_cc TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_registered_collection TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_clinical TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_infrasubspecific_names TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_taxonomy_comments TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_tested_temp_growth_range TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_depositor TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_deposit_history TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_inclusion_date TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_abs_related_files TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_mta_file TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_eu_quarantine TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_gmo TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_gmo_construction_info TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_dual_use TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_sexual_state TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_mutant_information TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_genotype TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_ploidy TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_interspecific_hybrid TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_pathogenicity TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_enzyme_production TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_plasmids TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_plasmids_collection_fields TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_qps TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_axenic TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_applications TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_literature_ids TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_sequence_literature_ids TEXT;
+ALTER TABLE strains ADD COLUMN IF NOT EXISTS strain_ontobiotope_terms TEXT;
 
 -- ── 6. requested_strains ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS requested_strains (
@@ -376,6 +458,7 @@ CREATE TABLE IF NOT EXISTS reagents (
     reagent_brand            TEXT,
     reagent_reference        TEXT,
     reagent_cas_number       TEXT,
+    reagent_synonyms         TEXT,
     reagent_category         TEXT,             -- chemical | biological | consumable | kit | standard
     reagent_subcategory      TEXT,             -- enumerated sub-classification scoped to the category (see ReagentModel.subcategoryOptions)
     reagent_tags             TEXT,             -- semicolon-separated tags for filtering ("antibody; sterile; in-house")
@@ -384,6 +467,7 @@ CREATE TABLE IF NOT EXISTS reagents (
     reagent_package_size     NUMERIC,          -- size of one container (flask/bottle) in `reagent_unit`
     reagent_container_count  INT     DEFAULT 1,-- how many containers currently in stock
     reagent_container_min    INT,              -- reorder threshold on container count
+    reagent_stock_status     TEXT    DEFAULT 'in_stock', -- in_stock | out_of_stock
     reagent_remaining_amount NUMERIC,          -- amount left in the currently-opened container, in `reagent_unit`
     reagent_concentration    TEXT,
     reagent_contamination    TEXT    DEFAULT 'none' CHECK (reagent_contamination IN ('none','bacteria','fungi','both','suspected')),
@@ -990,6 +1074,7 @@ ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_path    TEXT
 ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_name    TEXT;
 ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_doc_file_size    BIGINT;
 ALTER TABLE users             ADD COLUMN IF NOT EXISTS user_table_backups   TEXT DEFAULT 'none';
+ALTER TABLE users             ADD COLUMN IF NOT EXISTS user_permissions_json JSONB DEFAULT '{}'::jsonb;
 
 -- Reagents — category/subcategory split, per-container stock model, contamination tracking
 DO \$\$ BEGIN
@@ -1008,14 +1093,17 @@ ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_category            TEXT;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_subcategory         TEXT;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_physical_state      TEXT;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_formula             TEXT;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_synonyms            TEXT;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_package_size        NUMERIC;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_container_count     INT DEFAULT 1;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_container_min       INT;
+ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_stock_status        TEXT DEFAULT 'in_stock';
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_remaining_amount    NUMERIC;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_contamination       TEXT DEFAULT 'none';
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_contamination_notes TEXT;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_contamination_date  DATE;
 ALTER TABLE reagents ADD COLUMN IF NOT EXISTS reagent_tags                TEXT;
+UPDATE reagents SET reagent_stock_status = 'in_stock' WHERE reagent_stock_status IS NULL OR reagent_stock_status = '';
 
 -- Collapse legacy categories (ppe/media/assay_kit/cleaning) into the new
 -- 5-category model, preserving the distinction via subcategory.

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io' show Platform;
 import '../../culture_collection/strains/strain_detail_page.dart'; // adjust import path as needed
+import '../../theme/module_permission.dart';
 
 class InCareWidget extends StatefulWidget {
   const InCareWidget({super.key});
@@ -88,8 +89,10 @@ class _InCareWidgetState extends State<InCareWidget> {
   void _openDetail(dynamic strainId) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => StrainDetailPage(strainId: strainId, onSaved: _load),
+      modulePageRoute(
+        context: context,
+        moduleId: 'strains',
+        child: StrainDetailPage(strainId: strainId, onSaved: _load),
       ),
     ).then((_) => _load());
   }

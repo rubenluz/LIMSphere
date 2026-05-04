@@ -23,11 +23,13 @@ const _reagentDbFields = [
   'reagent_brand',
   'reagent_reference',
   'reagent_cas_number',
+  'reagent_synonyms',
   'reagent_supplier',
   'reagent_unit',
   'reagent_package_size',
   'reagent_container_count',
   'reagent_container_min',
+  'reagent_stock_status',
   'reagent_remaining_amount',
   'reagent_concentration',
   'reagent_storage_temp',
@@ -74,6 +76,10 @@ const Map<String, String> _autoMap = {
   'cas': 'reagent_cas_number',
   'cas number': 'reagent_cas_number',
   'cas no': 'reagent_cas_number',
+  'synonym': 'reagent_synonyms',
+  'synonyms': 'reagent_synonyms',
+  'alias': 'reagent_synonyms',
+  'aliases': 'reagent_synonyms',
   'supplier': 'reagent_supplier',
   'vendor': 'reagent_supplier',
   'unit': 'reagent_unit',
@@ -93,6 +99,10 @@ const Map<String, String> _autoMap = {
   'flask count': 'reagent_container_count',
   '# containers': 'reagent_container_count',
   'stock': 'reagent_container_count',
+  'stock status': 'reagent_stock_status',
+  'stock_status': 'reagent_stock_status',
+  'inventory status': 'reagent_stock_status',
+  'availability': 'reagent_stock_status',
   'min containers': 'reagent_container_min',
   'container min': 'reagent_container_min',
   'min quantity': 'reagent_container_min',
@@ -180,8 +190,9 @@ List<List<dynamic>> _parseXlsxBytes(List<int> bytes) {
     archive = ZipDecoder().decodeBytes(bytes);
   } catch (_) {
     throw const FormatException(
-        'Not a valid XLSX file. Old .xls format is not supported — '
-        'please save as .xlsx from Excel first.');
+      'Not a valid XLSX file. Old .xls format is not supported — '
+      'please save as .xlsx from Excel first.',
+    );
   }
 
   // 1. Shared strings table
@@ -190,11 +201,13 @@ List<List<dynamic>> _parseXlsxBytes(List<int> bytes) {
   if (ssFile != null) {
     try {
       final doc = XmlDocument.parse(
-          utf8.decode(ssFile.content as List<int>, allowMalformed: true));
+        utf8.decode(ssFile.content as List<int>, allowMalformed: true),
+      );
       for (final si in doc.findAllElements('si')) {
         // Rich-text nodes may have multiple <t> children; join them all.
-        sharedStrings
-            .add(si.findAllElements('t').map((e) => e.innerText).join());
+        sharedStrings.add(
+          si.findAllElements('t').map((e) => e.innerText).join(),
+        );
       }
     } catch (_) {}
   }
@@ -206,7 +219,8 @@ List<List<dynamic>> _parseXlsxBytes(List<int> bytes) {
   final XmlDocument sheetDoc;
   try {
     sheetDoc = XmlDocument.parse(
-        utf8.decode(sheetFile.content as List<int>, allowMalformed: true));
+      utf8.decode(sheetFile.content as List<int>, allowMalformed: true),
+    );
   } catch (_) {
     return [];
   }
@@ -236,8 +250,7 @@ List<List<dynamic>> _parseXlsxBytes(List<int> bytes) {
             ? sharedStrings[idx]
             : '';
       } else if (t == 'inlineStr') {
-        value =
-            c.findAllElements('t').map((e) => e.innerText).join();
+        value = c.findAllElements('t').map((e) => e.innerText).join();
       } else if (t == 'b') {
         value = vText == '1' ? 'TRUE' : 'FALSE';
       } else if (t == 'e') {
@@ -288,11 +301,12 @@ String _normaliseDate(String raw) {
     final p2 = int.tryParse(parts[1]);
     final p3 = int.tryParse(parts[2]);
     if (p1 != null && p2 != null && p3 != null) {
-      final year  = p3 > 31 ? p3 : (p3 < 100 ? 2000 + p3 : p3);
+      final year = p3 > 31 ? p3 : (p3 < 100 ? 2000 + p3 : p3);
       final month = p3 > 31 ? p2 : p1;
-      final day   = p3 > 31 ? p1 : p2;
+      final day = p3 > 31 ? p1 : p2;
       final d = DateTime.tryParse(
-          '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}');
+        '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}',
+      );
       if (d != null) {
         return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
       }
@@ -312,7 +326,9 @@ List<String> _detectHeaders(List<List<dynamic>> rows) {
 }
 
 List<Map<String, String>> _applyMapping(
-    List<List<dynamic>> rows, Map<int, String> colMap) {
+  List<List<dynamic>> rows,
+  Map<int, String> colMap,
+) {
   if (rows.length < 2) return [];
   final result = <Map<String, String>>[];
   for (int r = 1; r < rows.length; r++) {
@@ -320,8 +336,7 @@ List<Map<String, String>> _applyMapping(
     final record = <String, String>{};
     for (final e in colMap.entries) {
       if (e.value == '— ignore —') continue;
-      var val =
-          e.key < row.length ? (row[e.key]?.toString().trim() ?? '') : '';
+      var val = e.key < row.length ? (row[e.key]?.toString().trim() ?? '') : '';
       if (val.isNotEmpty && e.value.endsWith('_date')) {
         val = _normaliseDate(val);
       }
@@ -382,10 +397,14 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
           : _parseCsvBytes(bytes);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e is FormatException ? e.message : 'Could not parse file: $e'),
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e is FormatException ? e.message : 'Could not parse file: $e',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -437,8 +456,8 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
         final label = (name is String && name.isNotEmpty)
             ? name
             : (code is String && code.isNotEmpty)
-                ? code
-                : '(no name)';
+            ? code
+            : '(no name)';
         final row = _buildInsertRow(record);
         try {
           await db.from('reagents').insert(row);
@@ -482,7 +501,8 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
 
     void putInt(String col, String? val) {
       if (val != null && val.isNotEmpty) {
-        final n = int.tryParse(val.trim()) ??
+        final n =
+            int.tryParse(val.trim()) ??
             double.tryParse(val.replaceAll(',', '.'))?.toInt();
         if (n != null) row[col] = n;
       }
@@ -494,17 +514,26 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
       if (normalised.isNotEmpty) row[col] = normalised;
     }
 
-    if (r['reagent_name'] is String && (r['reagent_name'] as String).isNotEmpty) {
+    if (r['reagent_name'] is String &&
+        (r['reagent_name'] as String).isNotEmpty) {
       row['reagent_name'] = r['reagent_name'];
     }
 
     // Category: accept known values, else default to 'chemical'.
     const cats = [
-      'chemical', 'biological', 'consumable', 'ppe',
-      'media', 'standard', 'assay_kit', 'cleaning',
+      'chemical',
+      'biological',
+      'consumable',
+      'ppe',
+      'media',
+      'standard',
+      'assay_kit',
+      'cleaning',
     ];
     final cat = r['reagent_category']?.toLowerCase().trim();
-    row['reagent_category'] = (cat != null && cats.contains(cat)) ? cat : 'chemical';
+    row['reagent_category'] = (cat != null && cats.contains(cat))
+        ? cat
+        : 'chemical';
 
     row['reagent_created_at'] = DateTime.now().toUtc().toIso8601String();
 
@@ -513,6 +542,7 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
     putStr('reagent_brand', r['reagent_brand']);
     putStr('reagent_reference', r['reagent_reference']);
     putStr('reagent_cas_number', r['reagent_cas_number']);
+    putStr('reagent_synonyms', r['reagent_synonyms']);
     putStr('reagent_supplier', r['reagent_supplier']);
     putStr('reagent_unit', r['reagent_unit']);
     putStr('reagent_concentration', r['reagent_concentration']);
@@ -534,13 +564,23 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
     // Contamination: accept known values, default to 'none'.
     const contams = ['none', 'bacteria', 'fungi', 'both', 'suspected'];
     final contam = r['reagent_contamination']?.toLowerCase().trim();
-    row['reagent_contamination'] =
-        (contam != null && contams.contains(contam)) ? contam : 'none';
+    row['reagent_contamination'] = (contam != null && contams.contains(contam))
+        ? contam
+        : 'none';
 
-    putNum('reagent_package_size',    r['reagent_package_size']);
+    final stockStatus = r['reagent_stock_status']
+        ?.toLowerCase()
+        .trim()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+    row['reagent_stock_status'] = stockStatus == 'out_of_stock'
+        ? 'out_of_stock'
+        : 'in_stock';
+
+    putNum('reagent_package_size', r['reagent_package_size']);
     putInt('reagent_container_count', r['reagent_container_count']);
-    putInt('reagent_container_min',   r['reagent_container_min']);
-    putNum('reagent_remaining_amount',r['reagent_remaining_amount']);
+    putInt('reagent_container_min', r['reagent_container_min']);
+    putNum('reagent_remaining_amount', r['reagent_remaining_amount']);
 
     putDate('reagent_expiry_date', r['reagent_expiry_date']);
     putDate('reagent_received_date', r['reagent_received_date']);
@@ -566,25 +606,35 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
         foregroundColor: context.appTextPrimary,
         elevation: 0,
         titleSpacing: 0,
-        title: Row(children: [
-          const Icon(Icons.upload_file_outlined,
-              color: Color(0xFFF59E0B), size: 18),
-          const SizedBox(width: 8),
-          Text('Import Reagents',
+        title: Row(
+          children: [
+            const Icon(
+              Icons.upload_file_outlined,
+              color: Color(0xFFF59E0B),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Import Reagents',
               style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600)),
-        ]),
+                color: context.appTextPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: context.appBorder),
         ),
       ),
-      body: Column(children: [
-        _StepBar(current: _step),
-        Expanded(child: _buildStep()),
-      ]),
+      body: Column(
+        children: [
+          _StepBar(current: _step),
+          Expanded(child: _buildStep()),
+        ],
+      ),
     );
   }
 
@@ -620,14 +670,20 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.table_chart_outlined,
-                        color: Color(0xFFF59E0B), size: 48),
+                    const Icon(
+                      Icons.table_chart_outlined,
+                      color: Color(0xFFF59E0B),
+                      size: 48,
+                    ),
                     const SizedBox(height: 16),
-                    Text('Select a CSV or Excel file',
-                        style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      'Select a CSV or Excel file',
+                      style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       'Supported formats: .csv and .xlsx\n'
@@ -635,7 +691,9 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
                       'reagent_name is the only required field.',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.spaceGrotesk(
-                          color: context.appTextSecondary, fontSize: 13),
+                        color: context.appTextSecondary,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     FilledButton.icon(
@@ -644,18 +702,26 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
                         foregroundColor: Colors.black,
                         minimumSize: const Size(double.infinity, 44),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       onPressed: _pickFile,
                       icon: const Icon(Icons.folder_open_outlined, size: 18),
-                      label: Text('Choose file',
-                          style: GoogleFonts.spaceGrotesk(
-                              fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'Choose file',
+                        style: GoogleFonts.spaceGrotesk(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    Text('.csv  ·  .xlsx',
-                        style: GoogleFonts.jetBrainsMono(
-                            color: context.appTextMuted, fontSize: 11)),
+                    Text(
+                      '.csv  ·  .xlsx',
+                      style: GoogleFonts.jetBrainsMono(
+                        color: context.appTextMuted,
+                        fontSize: 11,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -668,186 +734,237 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
 
   // ── Step 1: Map columns ────────────────────────────────────────────────
   Widget _buildMapStep() {
-    return Column(children: [
-      Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-        decoration: BoxDecoration(
-          color: context.appSurface,
-          border: Border(bottom: BorderSide(color: context.appBorder)),
-        ),
-        child: Row(children: [
-          const Icon(Icons.insert_drive_file_outlined,
-              color: Color(0xFFF59E0B), size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(_fileName,
-                style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextSecondary, fontSize: 13),
-                overflow: TextOverflow.ellipsis),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          decoration: BoxDecoration(
+            color: context.appSurface,
+            border: Border(bottom: BorderSide(color: context.appBorder)),
           ),
-          Text('${_headers.length} columns detected',
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextMuted, fontSize: 12)),
-        ]),
-      ),
-      Expanded(
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _headers.length,
-          itemBuilder: (context, i) {
-            final header = _headers[i];
-            final mapped = _colMap[i] != '— ignore —';
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(children: [
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: context.appSurface2,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: context.appBorder2),
-                    ),
-                    child: Text(header,
-                        style: GoogleFonts.jetBrainsMono(
-                            color: context.appTextSecondary, fontSize: 12),
-                        overflow: TextOverflow.ellipsis),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.insert_drive_file_outlined,
+                color: Color(0xFFF59E0B),
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _fileName,
+                  style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextSecondary,
+                    fontSize: 13,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: 8),
-                Icon(Icons.arrow_forward_rounded,
-                    color: context.appTextMuted, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 3,
-                  child: Container(
-                    height: 40,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: context.appSurface2,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: mapped
-                              ? AppDS.accent.withValues(alpha: 0.5)
-                              : context.appBorder2),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _colMap[i] ?? '— ignore —',
-                        dropdownColor: context.appSurface,
-                        isExpanded: true,
-                        style: GoogleFonts.spaceGrotesk(
-                            color: mapped
-                                ? AppDS.accent
-                                : context.appTextMuted,
-                            fontSize: 12),
-                        items: _reagentDbFields
-                            .map((f) => DropdownMenuItem(
-                                  value: f,
-                                  child: Text(f,
-                                      style: GoogleFonts.spaceGrotesk(
-                                          color: f != '— ignore —'
-                                              ? context.appTextPrimary
-                                              : context.appTextMuted,
-                                          fontSize: 12)),
-                                ))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) setState(() => _colMap[i] = v);
-                        },
+              ),
+              Text(
+                '${_headers.length} columns detected',
+                style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextMuted,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: _headers.length,
+            itemBuilder: (context, i) {
+              final header = _headers[i];
+              final mapped = _colMap[i] != '— ignore —';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: context.appSurface2,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: context.appBorder2),
+                        ),
+                        child: Text(
+                          header,
+                          style: GoogleFonts.jetBrainsMono(
+                            color: context.appTextSecondary,
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      color: context.appTextMuted,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        height: 40,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: context.appSurface2,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: mapped
+                                ? AppDS.accent.withValues(alpha: 0.5)
+                                : context.appBorder2,
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _colMap[i] ?? '— ignore —',
+                            dropdownColor: context.appSurface,
+                            isExpanded: true,
+                            style: GoogleFonts.spaceGrotesk(
+                              color: mapped
+                                  ? AppDS.accent
+                                  : context.appTextMuted,
+                              fontSize: 12,
+                            ),
+                            items: _reagentDbFields
+                                .map(
+                                  (f) => DropdownMenuItem(
+                                    value: f,
+                                    child: Text(
+                                      f,
+                                      style: GoogleFonts.spaceGrotesk(
+                                        color: f != '— ignore —'
+                                            ? context.appTextPrimary
+                                            : context.appTextMuted,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) setState(() => _colMap[i] = v);
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ]),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
-      _BottomBar(
-        onBack: () => setState(() {
-          _step = 0;
-          _rows = null;
-        }),
-        onNext: _headers.isEmpty ? null : _goToPreview,
-        nextLabel: 'Preview',
-      ),
-    ]);
+        _BottomBar(
+          onBack: () => setState(() {
+            _step = 0;
+            _rows = null;
+          }),
+          onNext: _headers.isEmpty ? null : _goToPreview,
+          nextLabel: 'Preview',
+        ),
+      ],
+    );
   }
 
   // ── Step 2: Preview ────────────────────────────────────────────────────
   Widget _buildPreviewStep() {
-    final mappedCols = _colMap.entries
-        .where((e) => e.value != '— ignore —')
-        .toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+    final mappedCols =
+        _colMap.entries.where((e) => e.value != '— ignore —').toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
 
-    return Column(children: [
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: context.appSurface,
-          border: Border(bottom: BorderSide(color: context.appBorder)),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: context.appSurface,
+            border: Border(bottom: BorderSide(color: context.appBorder)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.preview_outlined,
+                color: Color(0xFFF59E0B),
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${_parsed.length} records will be imported',
+                style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Row(children: [
-          const Icon(Icons.preview_outlined,
-              color: Color(0xFFF59E0B), size: 16),
-          const SizedBox(width: 8),
-          Text('${_parsed.length} records will be imported',
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextSecondary, fontSize: 13)),
-        ]),
-      ),
-      Expanded(
-        child: Scrollbar(
-          controller: _previewHScroll,
-          child: SingleChildScrollView(
+        Expanded(
+          child: Scrollbar(
             controller: _previewHScroll,
-            scrollDirection: Axis.horizontal,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    for (final e in mappedCols)
-                      _PreviewCell(
-                          text: e.value,
-                          isHeader: true,
-                          width: _colWidth(e.value)),
-                  ]),
-                  for (final record in _parsed.take(50))
-                    Row(children: [
-                      for (final e in mappedCols)
-                        _PreviewCell(
-                            text: record[e.value] ?? '',
-                            isHeader: false,
-                            width: _colWidth(e.value)),
-                    ]),
-                  if (_parsed.length > 50)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        '… and ${_parsed.length - 50} more rows',
-                        style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextMuted, fontSize: 12),
-                      ),
+              controller: _previewHScroll,
+              scrollDirection: Axis.horizontal,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        for (final e in mappedCols)
+                          _PreviewCell(
+                            text: e.value,
+                            isHeader: true,
+                            width: _colWidth(e.value),
+                          ),
+                      ],
                     ),
-                ],
+                    for (final record in _parsed.take(50))
+                      Row(
+                        children: [
+                          for (final e in mappedCols)
+                            _PreviewCell(
+                              text: record[e.value] ?? '',
+                              isHeader: false,
+                              width: _colWidth(e.value),
+                            ),
+                        ],
+                      ),
+                    if (_parsed.length > 50)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '… and ${_parsed.length - 50} more rows',
+                          style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-      _BottomBar(
-        onBack: () => setState(() => _step = 1),
-        onNext: _parsed.isEmpty ? null : _runImport,
-        nextLabel: 'Import ${_parsed.length} records',
-        nextColor: AppDS.green,
-      ),
-    ]);
+        _BottomBar(
+          onBack: () => setState(() => _step = 1),
+          onNext: _parsed.isEmpty ? null : _runImport,
+          nextLabel: 'Import ${_parsed.length} records',
+          nextColor: AppDS.green,
+        ),
+      ],
+    );
   }
 
   double _colWidth(String field) {
@@ -872,8 +989,7 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
         children: [
           const CircularProgressIndicator(color: Color(0xFFF59E0B)),
           const SizedBox(height: 20),
-          Text('Importing…',
-              style: TextStyle(color: context.appTextSecondary)),
+          Text('Importing…', style: TextStyle(color: context.appTextSecondary)),
         ],
       ),
     );
@@ -894,38 +1010,43 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: context.appBorder),
             ),
-            child: Row(children: [
-              Icon(
-                hasErrors
-                    ? Icons.warning_amber_rounded
-                    : Icons.check_circle_rounded,
-                color: hasErrors ? AppDS.yellow : AppDS.green,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      hasErrors
-                          ? 'Import completed with warnings'
-                          : 'Import completed successfully',
-                      style: GoogleFonts.spaceGrotesk(
+            child: Row(
+              children: [
+                Icon(
+                  hasErrors
+                      ? Icons.warning_amber_rounded
+                      : Icons.check_circle_rounded,
+                  color: hasErrors ? AppDS.yellow : AppDS.green,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hasErrors
+                            ? 'Import completed with warnings'
+                            : 'Import completed successfully',
+                        style: GoogleFonts.spaceGrotesk(
                           color: context.appTextPrimary,
                           fontSize: 14,
-                          fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$_importedCount imported  ·  $_skippedCount skipped',
-                      style: GoogleFonts.spaceGrotesk(
-                          color: context.appTextSecondary, fontSize: 12),
-                    ),
-                  ],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$_importedCount imported  ·  $_skippedCount skipped',
+                        style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ]),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           Expanded(
@@ -940,7 +1061,9 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
                 child: SelectableText(
                   _importLog,
                   style: GoogleFonts.jetBrainsMono(
-                      color: context.appTextSecondary, fontSize: 12),
+                    color: context.appTextSecondary,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
@@ -952,12 +1075,14 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
               foregroundColor: Colors.black,
               minimumSize: const Size(double.infinity, 44),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Done — back to Reagents',
-                style:
-                    GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600)),
+            child: Text(
+              'Done — back to Reagents',
+              style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -982,47 +1107,59 @@ class _StepBar extends StatelessWidget {
         children: List.generate(_labels.length, (i) {
           final active = i == (current < 3 ? current : 3);
           final done = current > i || current == 4;
-          return Row(children: [
-            if (i > 0)
-              Container(
+          return Row(
+            children: [
+              if (i > 0)
+                Container(
                   width: 32,
                   height: 1,
-                  color: done ? AppDS.accent : context.appBorder),
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: done
-                    ? AppDS.accent
-                    : active
-                        ? AppDS.accent.withValues(alpha: 0.2)
-                        : context.appSurface3,
-                shape: BoxShape.circle,
-                border: Border.all(
+                  color: done ? AppDS.accent : context.appBorder,
+                ),
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: done
+                      ? AppDS.accent
+                      : active
+                      ? AppDS.accent.withValues(alpha: 0.2)
+                      : context.appSurface3,
+                  shape: BoxShape.circle,
+                  border: Border.all(
                     color: (active || done) ? AppDS.accent : context.appBorder,
-                    width: 1.5),
-              ),
-              child: Center(
-                child: done
-                    ? const Icon(Icons.check_rounded,
-                        color: Colors.black, size: 12)
-                    : Text('${i + 1}',
-                        style: GoogleFonts.spaceGrotesk(
+                    width: 1.5,
+                  ),
+                ),
+                child: Center(
+                  child: done
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: Colors.black,
+                          size: 12,
+                        )
+                      : Text(
+                          '${i + 1}',
+                          style: GoogleFonts.spaceGrotesk(
                             color: active ? AppDS.accent : context.appTextMuted,
                             fontSize: 10,
-                            fontWeight: FontWeight.w700)),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Text(_labels[i],
+              const SizedBox(width: 4),
+              Text(
+                _labels[i],
                 style: GoogleFonts.spaceGrotesk(
-                    color: (active || done)
-                        ? context.appTextPrimary
-                        : context.appTextMuted,
-                    fontSize: 11,
-                    fontWeight:
-                        active ? FontWeight.w600 : FontWeight.w400)),
-          ]);
+                  color: (active || done)
+                      ? context.appTextPrimary
+                      : context.appTextMuted,
+                  fontSize: 11,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          );
         }),
       ),
     );
@@ -1051,32 +1188,42 @@ class _BottomBar extends StatelessWidget {
         color: context.appSurface,
         border: Border(top: BorderSide(color: context.appBorder)),
       ),
-      child: Row(children: [
-        if (onBack != null)
-          TextButton.icon(
-            style: TextButton.styleFrom(
-                foregroundColor: context.appTextSecondary),
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back_rounded, size: 16),
-            label: Text('Back',
-                style: GoogleFonts.spaceGrotesk(fontSize: 13)),
-          ),
-        const Spacer(),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: nextColor ?? const Color(0xFFF59E0B),
-            foregroundColor: Colors.black,
-            minimumSize: const Size(0, 40),
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
-          ),
-          onPressed: onNext,
-          child: Text(nextLabel,
+      child: Row(
+        children: [
+          if (onBack != null)
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: context.appTextSecondary,
+              ),
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_rounded, size: 16),
+              label: Text(
+                'Back',
+                style: GoogleFonts.spaceGrotesk(fontSize: 13),
+              ),
+            ),
+          const Spacer(),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: nextColor ?? const Color(0xFFF59E0B),
+              foregroundColor: Colors.black,
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: onNext,
+            child: Text(
+              nextLabel,
               style: GoogleFonts.spaceGrotesk(
-                  fontWeight: FontWeight.w600, fontSize: 13)),
-        ),
-      ]),
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1087,8 +1234,11 @@ class _PreviewCell extends StatelessWidget {
   final bool isHeader;
   final double width;
 
-  const _PreviewCell(
-      {required this.text, required this.isHeader, required this.width});
+  const _PreviewCell({
+    required this.text,
+    required this.isHeader,
+    required this.width,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1110,9 +1260,12 @@ class _PreviewCell extends StatelessWidget {
             ? GoogleFonts.spaceGrotesk(
                 color: AppDS.accent,
                 fontSize: 11,
-                fontWeight: FontWeight.w600)
+                fontWeight: FontWeight.w600,
+              )
             : GoogleFonts.spaceGrotesk(
-                color: context.appTextSecondary, fontSize: 11),
+                color: context.appTextSecondary,
+                fontSize: 11,
+              ),
         overflow: TextOverflow.ellipsis,
       ),
     );

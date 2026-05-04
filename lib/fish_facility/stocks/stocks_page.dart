@@ -422,9 +422,13 @@ class _FishStocksPageState extends State<FishStocksPage> {
 
 
   Future<void> _openDetail(FishStock stock) async {
-    await Navigator.push(context, MaterialPageRoute(
-      builder: (_) => TankDetailPage(tank: ZebrafishTank(zebraTankId: stock.tankId)),
-    ));
+    await Navigator.push(
+      context,
+      modulePageRoute(
+        context: context,
+        child: TankDetailPage(tank: ZebrafishTank(zebraTankId: stock.tankId)),
+      ),
+    );
     if (mounted) _loadStocks();
   }
 

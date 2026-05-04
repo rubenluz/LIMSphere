@@ -371,8 +371,9 @@ class _SamplesPageState extends State<SamplesPage> {
   void _openDetail(Map<String, dynamic> row) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => SampleDetailPage(sampleId: row['sample_code'], onSaved: _load),
+      modulePageRoute(
+        context: context,
+        child: SampleDetailPage(sampleId: row['sample_code'], onSaved: _load),
       ),
     ).then((_) => _load());
   }

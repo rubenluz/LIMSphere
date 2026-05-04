@@ -9,6 +9,7 @@ import 'fish_lines_connection_model.dart';
 import '/core/fish_db_schema.dart';
 import '/supabase/supabase_manager.dart';
 import '../../camera/qr_scanner/qr_code_rules.dart';
+import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 import '../tanks/tanks_connection_model.dart';
 import '../stocks/stocks_detail_page.dart';
@@ -381,6 +382,10 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
   }
 
   Future<void> _save() async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     setState(() => _saving = true);
     try {
       final payload = <String, dynamic>{};
@@ -419,6 +424,10 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
   }
 
   Future<void> _delete() async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     final name = widget.fishLine.fishlineName;
     final confirm = await showDialog<bool>(
       context: context,
@@ -472,6 +481,10 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
 
   // ── Calendar date picker ───────────────────────────────────────────────────
   Future<void> _pickDate(String key, String title) async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     final cur = DateTime.tryParse(_ctrl[key]?.text ?? '') ?? DateTime.now();
     DateTime selected = cur;
     final result = await showDialog<DateTime>(
@@ -547,7 +560,7 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
             )),
           ]),
     floatingActionButton: FloatingActionButton.extended(
-      onPressed: _saving ? null : _save,
+      onPressed: _saving ? null : (context.canEditModule ? _save : context.warnReadOnly),
       backgroundColor: _DS.accent,
       foregroundColor: Colors.white,
       icon: _saving
@@ -589,7 +602,8 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
               title: Text('Delete line',
                   style: TextStyle(color: Color(0xFFDC2626), fontSize: 13)),
             )),
-        ]),
+        ],
+        enabled: context.canEditModule),
     ],
   );
 
@@ -605,6 +619,7 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
   );
 
   PreferredSizeWidget _buildDesktopAppBar() {
+    final canEdit = context.canEditModule;
     final status = _ctrl['fish_line_status']?.text
         ?? widget.fishLine.fishlineStatus ?? '';
     return AppBar(
@@ -643,11 +658,11 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
           icon: const Icon(Icons.delete_outline_rounded,
               color: Color(0xFFFC8181), size: 20),
           tooltip: 'Delete line',
-          onPressed: _delete),
+          onPressed: canEdit ? _delete : context.warnReadOnly),
         Padding(
           padding: const EdgeInsets.only(right: 12, left: 4),
           child: FilledButton.icon(
-            onPressed: _saving ? null : _save,
+            onPressed: _saving ? null : (canEdit ? _save : context.warnReadOnly),
             style: FilledButton.styleFrom(
               backgroundColor: _DS.accent,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
@@ -900,6 +915,7 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
 
   // ── Field dispatcher ───────────────────────────────────────────────────────
   Widget _buildField(_Field f) {
+    final canEdit = context.canEditModule;
     if (_readOnlyKeys.contains(f.key)) { return _buildMetaField(f); }
     if (f.key == '_breeders') { return _buildBreedersField(); }
     if (f.key == '_cryopreserved') { return _buildCryoToggle(); }
@@ -934,7 +950,7 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
               Text(v, style: TextStyle(color: context.appTextPrimary, fontSize: 13)),
             ]))),
         ],
-        onChanged: (v) => setState(() => ctrl.text = v ?? ''),
+        onChanged: canEdit ? (v) => setState(() => ctrl.text = v ?? '') : null,
       );
     }
 
@@ -943,7 +959,7 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
       return TextFormField(
         controller: ctrl,
         readOnly: true,
-        onTap: () => _pickDate(f.key, f.label),
+        onTap: canEdit ? () => _pickDate(f.key, f.label) : null,
         style: TextStyle(fontSize: 13, color: context.appTextPrimary),
         decoration: _dec(f.label).copyWith(
           suffixIcon: Icon(Icons.calendar_today_outlined,
@@ -954,6 +970,7 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
     // Standard text / multiline
     return TextFormField(
       controller: ctrl,
+      readOnly: !canEdit,
       maxLines: f.lines,
       style: TextStyle(fontSize: 13, color: context.appTextPrimary),
       decoration: _dec(f.label).copyWith(
@@ -976,12 +993,15 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
         value: _cryopreserved,
         activeThumbColor: Colors.white,
         activeTrackColor: const Color(0xFF6366F1),
-        onChanged: (v) => setState(() => _cryopreserved = v)),
+        onChanged: context.canEditModule
+            ? (v) => setState(() => _cryopreserved = v)
+            : null),
     ]),
   );
 
   // ── Breeders multi-select + custom entry ────────────────────────────────────
   Widget _buildBreedersField() {
+    final canEdit = context.canEditModule;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       InputDecorator(
         decoration: _dec('Parent Lines').copyWith(
@@ -1000,7 +1020,7 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
                   visualDensity: VisualDensity.compact,
                   deleteIcon: const Icon(Icons.close, size: 14),
                   deleteIconColor: context.appTextMuted,
-                  onDeleted: () => setState(() => _breeders.remove(b)),
+                  onDeleted: canEdit ? () => setState(() => _breeders.remove(b)) : null,
                 )).toList()),
       ),
       const SizedBox(height: 10),
@@ -1017,11 +1037,13 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
                 .map((l) => DropdownMenuItem(value: l,
                     child: Text(l, style: TextStyle(fontSize: 13, color: context.appTextPrimary))))
                 .toList(),
-            onChanged: (v) {
-              if (v != null && !_breeders.contains(v)) {
-                setState(() => _breeders.add(v));
-              }
-            },
+            onChanged: canEdit
+                ? (v) {
+                    if (v != null && !_breeders.contains(v)) {
+                      setState(() => _breeders.add(v));
+                    }
+                  }
+                : null,
           ),
         ),
         const SizedBox(width: 10),
@@ -1029,14 +1051,15 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
           flex: 2,
           child: TextFormField(
             controller: _breederCustomCtrl,
+            readOnly: !canEdit,
             style: TextStyle(fontSize: 13, color: context.appTextPrimary),
             decoration: _dec('Custom name').copyWith(isDense: true),
-            onFieldSubmitted: _addCustomBreeder,
+            onFieldSubmitted: canEdit ? _addCustomBreeder : null,
           ),
         ),
         const SizedBox(width: 8),
         FilledButton.icon(
-          onPressed: () => _addCustomBreeder(_breederCustomCtrl.text),
+          onPressed: canEdit ? () => _addCustomBreeder(_breederCustomCtrl.text) : null,
           style: FilledButton.styleFrom(
             backgroundColor: _DS.accent,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
@@ -1047,6 +1070,10 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
   }
 
   void _addCustomBreeder(String val) {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     final v = val.trim();
     if (v.isNotEmpty && !_breeders.contains(v)) {
       setState(() {
@@ -1214,8 +1241,13 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
         final status  = s[FishSch.stockStatus]  as String? ?? '';
         final tank    = ZebrafishTank.fromMap(s);
         return InkWell(
-          onTap: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => TankDetailPage(tank: tank, availableRacks: availRacks))),
+          onTap: () => Navigator.push(
+            context,
+            modulePageRoute(
+              context: context,
+              child: TankDetailPage(tank: tank, availableRacks: availRacks),
+            ),
+          ),
           child: Container(
             color: i.isEven ? context.appSurface : context.appSurface2,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

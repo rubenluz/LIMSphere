@@ -122,8 +122,8 @@ class SupabaseManager {
     try {
       final res = await client
           .from('users')
-          .select('id')
-          .eq('role', 'superadmin')
+          .select('user_id')
+          .eq('user_role', 'superadmin')
           .limit(1);
       return (res as List).isNotEmpty;
     } catch (_) {

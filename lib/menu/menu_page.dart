@@ -46,53 +46,6 @@ bool _hasRole(String userRole, String required) {
   return ui >= ri;
 }
 
-/// Maps each nav-item id to the column in the `users` table that stores the
-/// per-user permission for that module.  Items not listed here are gated only
-/// by role (admin panel items) and always grant 'write' to admins.
-const Map<String, String> _modulePermColumn = {
-  'dashboard':        'user_table_dashboard',
-  'labels':           'user_table_dashboard',
-  'chat':             'user_table_chat',
-  'backups':          'user_table_backups',
-  'strains':          'user_table_culture_collection',
-  'samples':          'user_table_culture_collection',
-  'sops_inventory':   'user_table_culture_collection',
-  'fish_stock':       'user_table_fish_facility',
-  'fish_tankmap':     'user_table_fish_facility',
-  'fish_lines':       'user_table_fish_facility',
-  'fish_water_qc':    'user_table_fish_facility',
-  'sops_fish':        'user_table_fish_facility',
-  'lab':              'user_table_resources',
-  'locations':        'user_table_resources',
-  'reagents':         'user_table_resources',
-  'equipment':        'user_table_resources',
-  'reservations':     'user_table_resources',
-};
-
-const Map<String, String?> _moduleRequiredRole = {
-  'dashboard':        'technician',
-  'labels':           'technician',
-  'chat':             'technician',
-  'requests':         null,
-  'strains':          null,
-  'samples':          'technician',
-  'sops_inventory':   'technician',
-  'fish_stock':       null,
-  'fish_tankmap':     'technician',
-  'fish_lines':       'technician',
-  'fish_water_qc':    'technician',
-  'sops_fish':        'technician',
-  'lab':              'technician',
-  'locations':        'technician',
-  'reagents':         'technician',
-  'equipment':        'technician',
-  'reservations':     'technician',
-  'audit':            'admin',
-  'users':            'admin',
-  'backups':          null,
-  'settings':         'admin',
-};
-
 class _NavItem {
   final String id;
   final String label;
@@ -369,11 +322,7 @@ class _MenuPageState extends State<MenuPage> {
   void _ensureValidSelection() {
     final userRole = _userInfo['user_role']?.toString() ?? '';
 
-    bool canAccess(String id) {
-      final req = _moduleRequiredRole[id];
-      if (req != null && !_hasRole(userRole, req)) return false;
-      return _getModulePerm(id) != 'none';
-    }
+    bool canAccess(String id) => _getModuleAccess(id).canView;
 
     // Current selection still visible and accessible?
     if (_topItems.any((i) =>
@@ -406,15 +355,15 @@ class _MenuPageState extends State<MenuPage> {
     _selectedId = 'settings';
   }
 
-  /// Returns the effective permission for [id] for the current user.
-  /// Admins/superadmins always get 'write'. Items without a perm column
-  /// (admin panel items) also return 'write' (gated by role instead).
+  /// Returns the effective access for [id] for the current user by combining
+  /// the legacy module columns with any granular per-page overrides.
+  ModuleAccess _getModuleAccess(String id) {
+    if (_userInfo.isEmpty) return const ModuleAccess.none();
+    return resolveModuleAccess(moduleId: id, userRow: _userInfo);
+  }
+
   String _getModulePerm(String id) {
-    final userRole = _userInfo['user_role']?.toString() ?? '';
-    if (_hasRole(userRole, 'admin')) return 'write';
-    final col = _modulePermColumn[id];
-    if (col == null) return 'write';
-    return _userInfo[col]?.toString() ?? 'none';
+    return _getModuleAccess(id).pagePermission;
   }
 
   Future<void> _loadUserInfo() async {
@@ -458,14 +407,7 @@ class _MenuPageState extends State<MenuPage> {
   }
 
   void _select(String id, [NavigatorState? nav]) {
-    final userRole = _userInfo['user_role']?.toString() ?? '';
-    final required = _moduleRequiredRole[id];
-    if (required != null && !_hasRole(userRole, required)) {
-      _showAccessDenied(id);
-      nav?.pop();
-      return;
-    }
-    if (_getModulePerm(id) == 'none') {
+    if (!_getModuleAccess(id).canView) {
       _showAccessDenied(id);
       nav?.pop();
       return;
@@ -573,9 +515,9 @@ class _MenuPageState extends State<MenuPage> {
   }
 
   Widget _maybeWrapReadOnly(String id, Widget content) {
-    final perm = _getModulePerm(id);
-    final permWidget = ModulePermission(permission: perm, child: content);
-    if (perm != 'read') return permWidget;
+    final access = _getModuleAccess(id);
+    final permWidget = ModulePermission(access: access, child: content);
+    if (!access.isReadOnly) return permWidget;
     return Column(
       children: [
         Container(
@@ -666,11 +608,10 @@ class _MenuPageState extends State<MenuPage> {
                       if (item.mobileOnly) return isDrawer;
                       if (item.id == 'backups') {
                         if (Platform.isAndroid || Platform.isIOS) return false;
-                        return _getModulePerm('backups') != 'none';
+                        return _getModuleAccess('backups').canView;
                       }
                       if (!_visibleGroups.contains(item.id)) return false;
-                      final req = _moduleRequiredRole[item.id];
-                      return req == null || _hasRole(userRole, req);
+                      return _getModuleAccess(item.id).canView;
                     })
                     .map((item) => _buildLeafTile(
                       item: item,
@@ -684,9 +625,7 @@ class _MenuPageState extends State<MenuPage> {
                     final isExpanded = _expandedGroups.contains(group.label);
                     final anyAccessible = group.children.any((c) {
                       if (_perItemVisibilityKeys.contains(c.id) && !_visibleGroups.contains(c.id)) return false;
-                      final req = _moduleRequiredRole[c.id];
-                      final roleOk = req == null || _hasRole(userRole, req);
-                      return roleOk && _getModulePerm(c.id) != 'none';
+                      return _getModuleAccess(c.id).canView;
                     });
 
                     // Hide groups the user has no access to (admin group always shown to admins)
@@ -876,12 +815,11 @@ class _MenuPageState extends State<MenuPage> {
     required String userRole,
     required bool indented,
   }) {
-    final required   = _moduleRequiredRole[item.id];
-    final roleOk     = required == null || _hasRole(userRole, required);
-    final perm       = _getModulePerm(item.id);
+    final access     = _getModuleAccess(item.id);
+    final perm       = access.pagePermission;
     final selected   = _selectedId == item.id;
-    final blocked    = !roleOk || perm == 'none';
-    final isReadOnly = !blocked && perm == 'read';
+    final blocked    = perm == 'none';
+    final isReadOnly = !blocked && access.isReadOnly;
 
     Color iconColor;
     Color textColor;

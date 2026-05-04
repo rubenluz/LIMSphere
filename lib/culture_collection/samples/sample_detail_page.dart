@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../strains/strains_page.dart';
+import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -223,6 +224,10 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
   // ── Save ──────────────────────────────────────────────────────────────────
   Future<void> _save() async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     setState(() => _saving = true);
     try {
       final update = <String, dynamic>{};
@@ -246,6 +251,10 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
   // ── Delete ────────────────────────────────────────────────────────────────
   Future<void> _delete() async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     final label = _data['sample_code']?.toString() ??
         '#${_data['sample_other_code']?.toString() ?? widget.sampleId.toString()}';
 
@@ -298,19 +307,31 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
   // ── Navigation ────────────────────────────────────────────────────────────
   Future<void> _openStrains() async {
-    await Navigator.push(context, MaterialPageRoute(
-      builder: (_) => StrainsPage(filterSampleId: widget.sampleId),
-    ));
+    await Navigator.push(
+      context,
+      modulePageRoute(
+        context: context,
+        child: StrainsPage(filterSampleId: widget.sampleId),
+      ),
+    );
     _load();
   }
 
   Future<void> _addStrain() async {
-    await Navigator.push(context, MaterialPageRoute(
-      builder: (_) => StrainsPage(
-        filterSampleId: widget.sampleId,
-        autoOpenNewStrainForSample: widget.sampleId,
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
+    await Navigator.push(
+      context,
+      modulePageRoute(
+        context: context,
+        child: StrainsPage(
+          filterSampleId: widget.sampleId,
+          autoOpenNewStrainForSample: widget.sampleId,
+        ),
       ),
-    ));
+    );
     _load();
   }
 
@@ -337,6 +358,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   Widget _buildMobile() {
     final code = _data['sample_code']?.toString();
     final isStrainTab = _mobileSection == _groups.length;
+    final canEdit = context.canEditModule;
 
     return Scaffold(
       backgroundColor: context.appBg,
@@ -364,31 +386,36 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
       // ── FAB: save (hidden on strains tab) ─────────────────────────────────
       floatingActionButton: isStrainTab
-          ? FloatingActionButton.extended(
-              onPressed: _addStrain,
-              backgroundColor: _DS.accent,
-              foregroundColor: context.appTextPrimary,
-              icon: const Icon(Icons.add, size: 20),
-              label: const Text('Add Strain',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-            )
-          : FloatingActionButton.extended(
-              onPressed: _saving ? null : _save,
-              backgroundColor: _DS.accent,
-              foregroundColor: context.appTextPrimary,
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18, height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.save_rounded, size: 20),
-              label: Text(_saving ? 'Saving…' : 'Save',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-            ),
+          ? (canEdit
+              ? FloatingActionButton.extended(
+                  onPressed: _addStrain,
+                  backgroundColor: _DS.accent,
+                  foregroundColor: context.appTextPrimary,
+                  icon: const Icon(Icons.add, size: 20),
+                  label: const Text('Add Strain',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                )
+              : null)
+          : (canEdit
+              ? FloatingActionButton.extended(
+                  onPressed: _saving ? null : _save,
+                  backgroundColor: _DS.accent,
+                  foregroundColor: context.appTextPrimary,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.save_rounded, size: 20),
+                  label: Text(_saving ? 'Saving…' : 'Save',
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                )
+              : null),
     );
   }
 
   PreferredSizeWidget _buildMobileAppBar(String? code) {
+    final canEdit = context.canEditModule;
     return AppBar(
       backgroundColor: context.appSurface,
       foregroundColor: context.appTextPrimary,
@@ -428,37 +455,38 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               ),
             ),
           // More menu (add strain + delete)
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: context.appTextSecondary),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            onSelected: (v) {
-              if (v == 'add_strain') _addStrain();
-              if (v == 'delete') _delete();
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'add_strain',
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(Icons.science_rounded,
-                      color: _DS.accent, size: 18),
-                  title: Text('Add strain from this sample',
-                      style: TextStyle(fontSize: 13)),
+          if (canEdit)
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: context.appTextSecondary),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              onSelected: (v) {
+                if (v == 'add_strain') _addStrain();
+                if (v == 'delete') _delete();
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'add_strain',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.science_rounded,
+                        color: _DS.accent, size: 18),
+                    title: Text('Add strain from this sample',
+                        style: TextStyle(fontSize: 13)),
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(Icons.delete_outline_rounded,
-                      color: Color(0xFFDC2626), size: 18),
-                  title: Text('Delete sample',
-                      style: TextStyle(
-                          color: Color(0xFFDC2626), fontSize: 13)),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.delete_outline_rounded,
+                        color: Color(0xFFDC2626), size: 18),
+                    title: Text('Delete sample',
+                        style: TextStyle(
+                            color: Color(0xFFDC2626), fontSize: 13)),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ],
     );
@@ -725,6 +753,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   }
 
   PreferredSizeWidget _buildDesktopAppBar(String? code, String? number) {
+    final canEdit = context.canEditModule;
     return AppBar(
       backgroundColor: context.appSurface,
       foregroundColor: context.appTextPrimary,
@@ -763,7 +792,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
           ElevatedButton.icon(
             icon: const Icon(Icons.science_rounded, size: 14),
             label: const Text('Add Strain'),
-            onPressed: _addStrain,
+            onPressed: canEdit ? _addStrain : context.warnReadOnly,
             style: ElevatedButton.styleFrom(
               backgroundColor: _DS.accent,
               foregroundColor: Colors.white,
@@ -775,12 +804,12 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
           IconButton(
             icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFC8181)),
             tooltip: 'Delete sample',
-            onPressed: _delete,
+            onPressed: canEdit ? _delete : context.warnReadOnly,
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: FilledButton.icon(
-              onPressed: _saving ? null : _save,
+              onPressed: _saving ? null : (canEdit ? _save : context.warnReadOnly),
               style: FilledButton.styleFrom(
                 backgroundColor: _DS.accent,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -990,12 +1019,13 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
   // ── Shared: individual field ──────────────────────────────────────────────
   Widget _buildField(_Field f) {
+    final canEdit = context.canEditModule;
     final ctrl = _ctrl[f.key] ??=
         TextEditingController(text: _data[f.key]?.toString() ?? '');
 
     return TextFormField(
       controller: ctrl,
-      readOnly: f.readOnly,
+      readOnly: f.readOnly || !canEdit,
       maxLines: f.lines,
       style: TextStyle(fontSize: 13, color: context.appTextPrimary),
       decoration: InputDecoration(
@@ -1003,7 +1033,7 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
         isDense: true,
         filled: true,
-        fillColor: f.readOnly ? context.appSurface2 : context.appSurface3,
+        fillColor: (f.readOnly || !canEdit) ? context.appSurface2 : context.appSurface3,
         border:         OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
         enabledBorder:  OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
         focusedBorder:  OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _DS.accent, width: 1.5)),

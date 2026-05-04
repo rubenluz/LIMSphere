@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 import '../theme/theme_controller.dart';
 
@@ -120,6 +121,7 @@ class UserDetailPage extends StatefulWidget {
 class _UserDetailPageState extends State<UserDetailPage> {
   bool _editing = false;
   bool _saving  = false;
+  bool _loadingViewerAccess = true;
 
   // Controllers for all editable fields
   late TextEditingController _name;
@@ -132,6 +134,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
   late TextEditingController _timezone;
   late TextEditingController _language;
   late TextEditingController _avatarUrl;
+  final Map<String, TextEditingController> _workflowStateCtrls = {};
 
   late String _role;
   late String _status;
@@ -143,6 +146,8 @@ class _UserDetailPageState extends State<UserDetailPage> {
   late String _permFish;
   late String _permResources;
   late bool   _notificationsEnabled;
+  late bool   _supportsGranularPermissions;
+  late Map<String, dynamic> _permissionJson;
 
   // Read-only info
   late int      _id;
@@ -150,6 +155,8 @@ class _UserDetailPageState extends State<UserDetailPage> {
   DateTime? _createdAt;
   DateTime? _updatedAt;
   DateTime? _lastLogin;
+  int? _viewerUserId;
+  String _viewerRole = '';
 
   static const _roleOptions   = ['superadmin', 'admin', 'technician', 'researcher', 'viewer'];
   static const _statusOptions = ['pending', 'active', 'inactive'];
@@ -159,7 +166,18 @@ class _UserDetailPageState extends State<UserDetailPage> {
   @override
   void initState() {
     super.initState();
+    _name = TextEditingController();
+    _email = TextEditingController();
+    _phone = TextEditingController();
+    _orcid = TextEditingController();
+    _institution = TextEditingController();
+    _group = TextEditingController();
+    _bio = TextEditingController();
+    _timezone = TextEditingController();
+    _language = TextEditingController();
+    _avatarUrl = TextEditingController();
     _loadFromMap(widget.userMap);
+    _loadViewerAccess();
   }
 
   void _loadFromMap(Map<String, dynamic> m) {
@@ -177,17 +195,22 @@ class _UserDetailPageState extends State<UserDetailPage> {
     _permCulture   = (m['user_table_culture_collection'] as String?) ?? 'none';
     _permFish      = (m['user_table_fish_facility']      as String?) ?? 'none';
     _permResources = (m['user_table_resources']          as String?) ?? 'none';
+    _supportsGranularPermissions =
+        (m['__supports_granular_permissions'] as bool?) ??
+        m.containsKey('user_permissions_json');
+    _permissionJson = normalizeUserPermissionsJson(m['user_permissions_json']);
     _notificationsEnabled = (m['user_notifications_enabled'] as bool?) ?? true;
-    _name        = TextEditingController(text: m['user_name']        as String? ?? '');
-    _email       = TextEditingController(text: m['user_email']       as String? ?? '');
-    _phone       = TextEditingController(text: m['user_phone']       as String? ?? '');
-    _orcid       = TextEditingController(text: m['user_orcid']       as String? ?? '');
-    _institution = TextEditingController(text: m['user_institution'] as String? ?? '');
-    _group       = TextEditingController(text: m['user_group']       as String? ?? '');
-    _bio         = TextEditingController(text: m['user_bio']         as String? ?? '');
-    _timezone    = TextEditingController(text: m['user_timezone']    as String? ?? '');
-    _language    = TextEditingController(text: m['user_language']    as String? ?? '');
-    _avatarUrl   = TextEditingController(text: m['user_avatar_url']  as String? ?? '');
+    _name.text        = m['user_name']        as String? ?? '';
+    _email.text       = m['user_email']       as String? ?? '';
+    _phone.text       = m['user_phone']       as String? ?? '';
+    _orcid.text       = m['user_orcid']       as String? ?? '';
+    _institution.text = m['user_institution'] as String? ?? '';
+    _group.text       = m['user_group']       as String? ?? '';
+    _bio.text         = m['user_bio']         as String? ?? '';
+    _timezone.text    = m['user_timezone']    as String? ?? '';
+    _language.text    = m['user_language']    as String? ?? '';
+    _avatarUrl.text   = m['user_avatar_url']  as String? ?? '';
+    _resetWorkflowControllers();
   }
 
   static DateTime? _dt(dynamic v) {
@@ -196,11 +219,302 @@ class _UserDetailPageState extends State<UserDetailPage> {
     return DateTime.tryParse(v.toString());
   }
 
+  bool get _isSelf => _viewerUserId != null && _viewerUserId == _id;
+  bool get _canManageUserAccess => _viewerRole == 'admin' || _viewerRole == 'superadmin';
+  bool get _canEditProfile => _canManageUserAccess || _isSelf;
+
+  Map<String, dynamic> get _draftUserMap => {
+    ...widget.userMap,
+    'user_role': _role,
+    'user_table_dashboard': _permDashboard,
+    'user_table_labels': _permLabels,
+    'user_table_chat': _permChat,
+    'user_table_backups': _permBackups,
+    'user_table_culture_collection': _permCulture,
+    'user_table_fish_facility': _permFish,
+    'user_table_resources': _permResources,
+    'user_permissions_json': _permissionJson,
+  };
+
+  Future<void> _loadViewerAccess() async {
+    try {
+      final email = Supabase.instance.client.auth.currentSession?.user.email ??
+          Supabase.instance.client.auth.currentUser?.email ??
+          '';
+      if (email.isEmpty) return;
+      final row = await Supabase.instance.client
+          .from('users')
+          .select('user_id, user_role')
+          .eq('user_email', email)
+          .maybeSingle();
+      if (!mounted) return;
+      setState(() {
+        _viewerUserId = row?['user_id'] as int?;
+        _viewerRole = row?['user_role'] as String? ?? '';
+        _loadingViewerAccess = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingViewerAccess = false);
+    }
+  }
+
+  void _resetWorkflowControllers() {
+    for (final c in _workflowStateCtrls.values) {
+      c.dispose();
+    }
+    _workflowStateCtrls.clear();
+    for (final moduleId in kPermissionModuleLabels.keys) {
+      _workflowStateCtrls[moduleId] =
+          TextEditingController(text: _workflowStatesText(moduleId));
+    }
+  }
+
+  Map<String, dynamic> _pageRule(String moduleId) {
+    final pages = Map<String, dynamic>.from(_permissionJson['pages'] as Map? ?? const {});
+    final raw = pages[moduleId];
+    return raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+  }
+
+  bool _hasPageRule(String moduleId) => _pageRule(moduleId).isNotEmpty;
+
+  String _pageAccessValue(String moduleId) {
+    final raw = _pageRule(moduleId)['page_access']?.toString();
+    return kPermissionPageAccessOptions.contains(raw) ? raw! : 'inherit';
+  }
+
+  String _pageScopeValue(String moduleId) {
+    final raw = _pageRule(moduleId)['scope']?.toString();
+    return kPermissionScopeOptions.contains(raw) ? raw! : 'all';
+  }
+
+  String _pagePublicationValue(String moduleId) {
+    final raw = _pageRule(moduleId)['publication_access']?.toString();
+    return kPermissionPublicationOptions.contains(raw) ? raw! : 'inherit';
+  }
+
+  String _pageResponsibilityValue(String moduleId) {
+    final raw = _pageRule(moduleId)['responsibility_scope']?.toString();
+    return kPermissionResponsibilityOptions.contains(raw) ? raw! : 'inherit';
+  }
+
+  bool _pageRecordLockBypass(String moduleId) =>
+      _pageRule(moduleId)['record_lock_bypass'] == true;
+
+  String _workflowStatesText(String moduleId) {
+    final states = _workflowStatesFor(moduleId);
+    return states.isEmpty ? '' : states.join(', ');
+  }
+
+  List<String> _workflowStatesFor(String moduleId) {
+    final value = _pageRule(moduleId)['workflow_edit_states'];
+    if (value is! List) return const [];
+    return value
+        .map((entry) => entry?.toString().trim() ?? '')
+        .where((entry) => entry.isNotEmpty)
+        .toList();
+  }
+
+  ModuleAccess _moduleAccess(String moduleId, {bool ignoreActionOverrides = false}) {
+    final row = Map<String, dynamic>.from(_draftUserMap);
+    if (!ignoreActionOverrides) {
+      return resolveModuleAccess(moduleId: moduleId, userRow: row);
+    }
+
+    final normalized = normalizeUserPermissionsJson(_permissionJson);
+    final pages = Map<String, dynamic>.from(normalized['pages'] as Map? ?? const {});
+    final rule = _pageRule(moduleId);
+    if (rule.isNotEmpty) {
+      final sanitized = Map<String, dynamic>.from(rule)..remove('actions');
+      if (_isDefaultRule(sanitized)) {
+        pages.remove(moduleId);
+      } else {
+        pages[moduleId] = sanitized;
+      }
+    }
+    row['user_permissions_json'] = {
+      'version': normalized['version'] ?? 1,
+      'pages': pages,
+    };
+    return resolveModuleAccess(moduleId: moduleId, userRow: row);
+  }
+
+  bool _isDefaultRule(Map<String, dynamic> rule) {
+    final pageAccess = rule['page_access']?.toString() ?? 'inherit';
+    final scope = rule['scope']?.toString() ?? 'all';
+    final publication = rule['publication_access']?.toString() ?? 'inherit';
+    final responsibility = rule['responsibility_scope']?.toString() ?? 'inherit';
+    final recordLockBypass = rule['record_lock_bypass'] == true;
+    final workflowStates = rule['workflow_edit_states'];
+    final hasWorkflowStates = workflowStates is List && workflowStates.isNotEmpty;
+    final actions = rule['actions'];
+    final hasActions = actions is Map && actions.isNotEmpty;
+    return pageAccess == 'inherit' &&
+        scope == 'all' &&
+        publication == 'inherit' &&
+        responsibility == 'inherit' &&
+        !recordLockBypass &&
+        !hasWorkflowStates &&
+        !hasActions;
+  }
+
+  void _updatePageRule(
+    String moduleId,
+    Map<String, dynamic> Function(Map<String, dynamic> rule) mutate,
+  ) {
+    setState(() {
+      final pages = Map<String, dynamic>.from(_permissionJson['pages'] as Map? ?? const {});
+      final next = mutate(_pageRule(moduleId));
+
+      if (next['page_access'] == 'inherit') next.remove('page_access');
+      if (next['scope'] == 'all') next.remove('scope');
+      if (next['publication_access'] == 'inherit') next.remove('publication_access');
+      if (next['responsibility_scope'] == 'inherit') next.remove('responsibility_scope');
+      if (next['record_lock_bypass'] != true) next.remove('record_lock_bypass');
+
+      final workflowStates = next['workflow_edit_states'];
+      if (workflowStates is List) {
+        final cleaned = workflowStates
+            .map((entry) => entry?.toString().trim() ?? '')
+            .where((entry) => entry.isNotEmpty)
+            .toList();
+        if (cleaned.isEmpty) {
+          next.remove('workflow_edit_states');
+        } else {
+          next['workflow_edit_states'] = cleaned;
+        }
+      }
+
+      final actions = next['actions'];
+      if (actions is Map) {
+        final cleaned = <String, dynamic>{};
+        for (final entry in actions.entries) {
+          if (kPermissionActionKeys.contains(entry.key)) {
+            cleaned[entry.key.toString()] = entry.value == true;
+          }
+        }
+        if (cleaned.isEmpty) {
+          next.remove('actions');
+        } else {
+          next['actions'] = cleaned;
+        }
+      }
+
+      if (_isDefaultRule(next)) {
+        pages.remove(moduleId);
+      } else {
+        pages[moduleId] = next;
+      }
+
+      _permissionJson = {
+        'version': _permissionJson['version'] ?? 1,
+        'pages': pages,
+      };
+    });
+  }
+
+  void _setPageAccess(String moduleId, String value) {
+    _updatePageRule(moduleId, (rule) {
+      if (value == 'inherit') {
+        rule.remove('page_access');
+      } else {
+        rule['page_access'] = value;
+      }
+      return rule;
+    });
+  }
+
+  void _setPageScope(String moduleId, String value) {
+    _updatePageRule(moduleId, (rule) {
+      if (value == 'all') {
+        rule.remove('scope');
+      } else {
+        rule['scope'] = value;
+      }
+      return rule;
+    });
+  }
+
+  void _setPagePublicationAccess(String moduleId, String value) {
+    _updatePageRule(moduleId, (rule) {
+      if (value == 'inherit') {
+        rule.remove('publication_access');
+      } else {
+        rule['publication_access'] = value;
+      }
+      return rule;
+    });
+  }
+
+  void _setPageResponsibilityScope(String moduleId, String value) {
+    _updatePageRule(moduleId, (rule) {
+      if (value == 'inherit') {
+        rule.remove('responsibility_scope');
+      } else {
+        rule['responsibility_scope'] = value;
+      }
+      return rule;
+    });
+  }
+
+  void _setPageRecordLockBypass(String moduleId, bool value) {
+    _updatePageRule(moduleId, (rule) {
+      if (value) {
+        rule['record_lock_bypass'] = true;
+      } else {
+        rule.remove('record_lock_bypass');
+      }
+      return rule;
+    });
+  }
+
+  void _setWorkflowStates(String moduleId, String raw) {
+    final values = raw
+        .split(',')
+        .map((entry) => entry.trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList();
+    _updatePageRule(moduleId, (rule) {
+      if (values.isEmpty) {
+        rule.remove('workflow_edit_states');
+      } else {
+        rule['workflow_edit_states'] = values;
+      }
+      return rule;
+    });
+  }
+
+  void _togglePageAction(String moduleId, String action) {
+    final effective = _moduleAccess(moduleId).allows(action);
+    final base = _moduleAccess(moduleId, ignoreActionOverrides: true).allows(action);
+    final desired = !effective;
+    _updatePageRule(moduleId, (rule) {
+      final actions = Map<String, dynamic>.from(rule['actions'] as Map? ?? const {});
+      if (desired == base) {
+        actions.remove(action);
+      } else {
+        actions[action] = desired;
+      }
+      if (actions.isEmpty) {
+        rule.remove('actions');
+      } else {
+        rule['actions'] = actions;
+      }
+      return rule;
+    });
+  }
+
+  void _resetPageRule(String moduleId) {
+    _updatePageRule(moduleId, (_) => <String, dynamic>{});
+    _workflowStateCtrls[moduleId]?.text = '';
+  }
+
   @override
   void dispose() {
     for (final c in [
       _name, _email, _phone, _orcid, _institution,
       _group, _bio, _timezone, _language, _avatarUrl,
+      ..._workflowStateCtrls.values,
     ]) { c.dispose(); }
     super.dispose();
   }
@@ -252,13 +566,11 @@ class _UserDetailPageState extends State<UserDetailPage> {
 
   // ── Save ──────────────────────────────────────────────────────────────────
   Future<void> _save() async {
+    if (!_canEditProfile) return;
     setState(() => _saving = true);
     try {
       final data = <String, dynamic>{
         'user_name':        _name.text.trim().isEmpty ? null : _name.text.trim(),
-        'user_email':       _email.text.trim(),
-        'user_role':        _role,
-        'user_status':      _status,
         'user_phone':       _phone.text.trim().isEmpty ? null : _phone.text.trim(),
         'user_orcid':       _orcid.text.trim().isEmpty ? null : _orcid.text.trim(),
         'user_institution': _institution.text.trim().isEmpty ? null : _institution.text.trim(),
@@ -267,21 +579,37 @@ class _UserDetailPageState extends State<UserDetailPage> {
         'user_timezone':    _timezone.text.trim().isEmpty ? null : _timezone.text.trim(),
         'user_language':    _language.text.trim().isEmpty ? null : _language.text.trim(),
         'user_avatar_url':  _avatarUrl.text.trim().isEmpty ? null : _avatarUrl.text.trim(),
-        'user_table_dashboard':          _permDashboard,
-        'user_table_labels':             _permLabels,
-        'user_table_chat':               _permChat,
-        'user_table_backups':            _permBackups,
-        'user_table_culture_collection': _permCulture,
-        'user_table_fish_facility':      _permFish,
-        'user_table_resources':          _permResources,
         'user_notifications_enabled':    _notificationsEnabled,
         'user_updated_at': DateTime.now().toIso8601String(),
       };
+      if (_canManageUserAccess) {
+        data.addAll({
+          'user_email':       _email.text.trim(),
+          'user_role':        _role,
+          'user_status':      _status,
+          'user_table_dashboard':          _permDashboard,
+          'user_table_labels':             _permLabels,
+          'user_table_chat':               _permChat,
+          'user_table_backups':            _permBackups,
+          'user_table_culture_collection': _permCulture,
+          'user_table_fish_facility':      _permFish,
+          'user_table_resources':          _permResources,
+          if (_supportsGranularPermissions)
+            'user_permissions_json': _permissionJson,
+        });
+      }
       await Supabase.instance.client
           .from('users')
           .update(data)
           .eq('user_id', _id);
-      setState(() { _editing = false; _updatedAt = DateTime.now(); });
+      widget.userMap.addAll(data);
+      if (_supportsGranularPermissions && _canManageUserAccess) {
+        widget.userMap['user_permissions_json'] = _permissionJson;
+      }
+      setState(() {
+        _editing = false;
+        _updatedAt = DateTime.now();
+      });
       widget.onSaved?.call();
       _snack('Saved');
     } catch (e) {
@@ -341,7 +669,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                           fontWeight: FontWeight.w600, fontSize: 13)),
             ),
             const SizedBox(width: 12),
-          ] else ...[
+          ] else if (!_loadingViewerAccess && _canEditProfile) ...[
             TextButton.icon(
               onPressed: () => setState(() => _editing = true),
               icon: const Icon(Icons.edit_outlined, size: 15,
@@ -370,53 +698,67 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 const SizedBox(height: 24),
                 _buildSection('Contact & Identity', [
                   _row2(
-                    _field('Full Name', _name, enabled: _editing),
-                    _field('Email', _email, enabled: _editing),
+                    _field('Full Name', _name, enabled: _editing && _canEditProfile),
+                    _field('Email', _email, enabled: _editing && _canManageUserAccess),
                   ),
                   _row2(
-                    _field('Phone', _phone, enabled: _editing,
+                    _field('Phone', _phone, enabled: _editing && _canEditProfile,
                         hint: '+351 912 345 678'),
-                    _field('ORCID', _orcid, enabled: _editing,
+                    _field('ORCID', _orcid, enabled: _editing && _canEditProfile,
                         hint: '0000-0000-0000-0000', mono: true),
                   ),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Organization', [
                   _row2(
-                    _field('Institution', _institution, enabled: _editing),
-                    _field('Group / Lab', _group, enabled: _editing),
+                    _field('Institution', _institution, enabled: _editing && _canEditProfile),
+                    _field('Group / Lab', _group, enabled: _editing && _canEditProfile),
                   ),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Profile', [
-                  _field('Bio', _bio, enabled: _editing, maxLines: 4,
+                  _field('Bio', _bio, enabled: _editing && _canEditProfile, maxLines: 4,
                       hint: 'Short description…'),
                   const SizedBox(height: 10),
                   _row2(
-                    _field('Timezone', _timezone, enabled: _editing,
+                    _field('Timezone', _timezone, enabled: _editing && _canEditProfile,
                         hint: 'Europe/Lisbon'),
-                    _field('Language', _language, enabled: _editing,
+                    _field('Language', _language, enabled: _editing && _canEditProfile,
                         hint: 'en, pt, de…'),
                   ),
                   const SizedBox(height: 10),
-                  _field('Avatar URL', _avatarUrl, enabled: _editing,
+                  _field('Avatar URL', _avatarUrl, enabled: _editing && _canEditProfile,
                       hint: 'https://…', mono: true),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Access & Role', [
+                  if (!_canManageUserAccess)
+                    _infoBanner(
+                      'Only admins can change roles, status, and permission assignments.',
+                    ),
+                  if (!_canManageUserAccess)
+                    const SizedBox(height: 12),
                   _row2(
                     _dropDown('Role', _role, _roleOptions,
-                        (v) => setState(() => _role = v ?? _role)),
+                        (v) => setState(() => _role = v ?? _role),
+                        enabled: _editing && _canManageUserAccess),
                     _dropDown('Status', _status, _statusOptions,
-                        (v) => setState(() => _status = v ?? _status)),
+                        (v) => setState(() => _status = v ?? _status),
+                        enabled: _editing && _canManageUserAccess),
                   ),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Module Permissions', [
+                  if (!_canManageUserAccess)
+                    _infoBanner(
+                      'Granular access is visible here, but only administrators can modify it.',
+                    ),
+                  if (!_canManageUserAccess)
+                    const SizedBox(height: 12),
                   _permTable(),
                   const SizedBox(height: 10),
                   Row(children: [
-                    _editing
+                    _editing && _canEditProfile
                         ? Switch(
                             value: _notificationsEnabled,
                             onChanged: (v) =>
@@ -442,6 +784,10 @@ class _UserDetailPageState extends State<UserDetailPage> {
                               : AppDS.textMuted),
                     ),
                   ]),
+                ]),
+                const SizedBox(height: 16),
+                _buildSection('Granular Page Permissions', [
+                  _granularPermissionsEditor(),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Metadata', [
@@ -572,7 +918,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                       style: _spaceGrotesk(
                           fontSize: 13, color: context.appTextPrimary)),
                 ),
-                if (_editing)
+                if (_editing && _canManageUserAccess)
                   Wrap(
                     spacing: 6,
                     children: m.$4.map((opt) {
@@ -615,6 +961,278 @@ class _UserDetailPageState extends State<UserDetailPage> {
         }).toList(),
       ),
     );
+  }
+
+  Widget _granularPermissionsEditor() {
+    if (!_supportsGranularPermissions) {
+      return _infoBanner(
+        'Granular permissions are unavailable for this connection because the connected users table does not have the user_permissions_json column yet. Run Setup again to apply the latest users-table migration.',
+      );
+    }
+
+    final canEditRules = _editing && _canManageUserAccess;
+    final groups = kPermissionModuleGroups.entries.toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _infoBanner(
+          'Edit access is enforced across existing pages now. The other action toggles are saved and available for page-by-page rollout.',
+        ),
+        const SizedBox(height: 12),
+        if (!_canManageUserAccess)
+          _infoBanner(
+            'These per-page rules are shown read-only. Administrators can tune page access, actions, scopes, and workflow restrictions here.',
+          ),
+        if (!_canManageUserAccess)
+          const SizedBox(height: 12),
+        ...groups.expand((group) {
+          final widgets = <Widget>[
+            Text(
+              group.key.toUpperCase(),
+              style: _spaceGrotesk(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: context.appTextMuted,
+                letterSpacing: 0.9,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ];
+
+          for (final moduleId in group.value) {
+            widgets.add(_granularPageCard(moduleId, canEditRules: canEditRules));
+            widgets.add(const SizedBox(height: 10));
+          }
+          return widgets;
+        }),
+      ],
+    );
+  }
+
+  Widget _granularPageCard(String moduleId, {required bool canEditRules}) {
+    final label = kPermissionModuleLabels[moduleId] ?? moduleId;
+    final access = _moduleAccess(moduleId);
+    final actionChips = kPermissionActionKeys.map((action) {
+      final enabled = access.allows(action);
+      final actionLabel = kPermissionActionLabels[action] ?? action;
+      return GestureDetector(
+        onTap: canEditRules ? () => _togglePageAction(moduleId, action) : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: enabled
+                ? AppDS.accent.withValues(alpha: 0.14)
+                : context.appSurface2,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: enabled ? AppDS.accent : context.appBorder2,
+            ),
+          ),
+          child: Text(
+            actionLabel,
+            style: _spaceGrotesk(
+              fontSize: 11,
+              fontWeight: enabled ? FontWeight.w700 : FontWeight.w500,
+              color: enabled ? AppDS.accent : context.appTextMuted,
+            ),
+          ),
+        ),
+      );
+    }).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.appBorder2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: _spaceGrotesk(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: context.appTextPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _accessSummary(access),
+                      style: _spaceGrotesk(
+                        fontSize: 12,
+                        color: context.appTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_hasPageRule(moduleId))
+                TextButton(
+                  onPressed: canEditRules ? () => _resetPageRule(moduleId) : null,
+                  child: Text(
+                    'Reset',
+                    style: _spaceGrotesk(fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (canEditRules) ...[
+            _row2(
+              _ruleDropdownField(
+                'Page Access',
+                _pageAccessValue(moduleId),
+                kPermissionPageAccessOptions,
+                (value) => _setPageAccess(moduleId, value),
+              ),
+              _ruleDropdownField(
+                'Record Scope',
+                _pageScopeValue(moduleId),
+                kPermissionScopeOptions,
+                (value) => _setPageScope(moduleId, value),
+              ),
+            ),
+            _row2(
+              _ruleDropdownField(
+                'Publication Access',
+                _pagePublicationValue(moduleId),
+                kPermissionPublicationOptions,
+                (value) => _setPagePublicationAccess(moduleId, value),
+              ),
+              _ruleDropdownField(
+                'Responsibility Scope',
+                _pageResponsibilityValue(moduleId),
+                kPermissionResponsibilityOptions,
+                (value) => _setPageResponsibilityScope(moduleId, value),
+              ),
+            ),
+            Row(
+              children: [
+                Switch(
+                  value: _pageRecordLockBypass(moduleId),
+                  onChanged: (value) => _setPageRecordLockBypass(moduleId, value),
+                  activeThumbColor: AppDS.accent,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Allow this page to bypass record locks.',
+                    style: _spaceGrotesk(
+                      fontSize: 12,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ] else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _miniBadge(
+                  access.pagePermission.toUpperCase(),
+                  access.canMutate ? AppDS.green : AppDS.accent,
+                ),
+                _miniBadge('Scope: ${access.scope}', context.appTextSecondary),
+                _miniBadge(
+                  'Publication: ${access.publicationAccess}',
+                  context.appTextSecondary,
+                ),
+                _miniBadge(
+                  'Responsibility: ${access.responsibilityScope}',
+                  context.appTextSecondary,
+                ),
+                if (access.recordLockBypass)
+                  _miniBadge('Bypass Locks', AppDS.orange),
+              ],
+            ),
+          Text(
+            'Actions',
+            style: _spaceGrotesk(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: context.appTextMuted,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 6, children: actionChips),
+          const SizedBox(height: 12),
+          Text(
+            'Workflow Edit States',
+            style: _spaceGrotesk(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: context.appTextMuted,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          if (canEditRules)
+            TextField(
+              controller: _workflowStateCtrls[moduleId],
+              onChanged: (value) => _setWorkflowStates(moduleId, value),
+              style: _spaceGrotesk(
+                fontSize: 12,
+                color: context.appTextPrimary,
+              ),
+              decoration: InputDecoration(
+                hintText: 'draft, active, approved',
+                hintStyle: _spaceGrotesk(
+                  fontSize: 12,
+                  color: context.appTextMuted,
+                ),
+                filled: true,
+                fillColor: context.appSurface,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: context.appBorder2),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: context.appBorder2),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppDS.accent),
+                ),
+              ),
+            )
+          else
+            Text(
+              access.workflowEditStates.isEmpty
+                  ? 'Any workflow state'
+                  : access.workflowEditStates.join(', '),
+              style: _spaceGrotesk(
+                fontSize: 12,
+                color: access.workflowEditStates.isEmpty
+                    ? context.appTextMuted
+                    : context.appTextPrimary,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _accessSummary(ModuleAccess access) {
+    if (!access.canView) return 'No page access';
+    if (access.isReadOnly) return 'View only access';
+    return 'Editable with ${access.scope} scope';
   }
 
   // ── Section / field helpers ───────────────────────────────────────────────
@@ -722,8 +1340,9 @@ class _UserDetailPageState extends State<UserDetailPage> {
     String label,
     String value,
     List<String> options,
-    ValueChanged<String?> onChanged,
-  ) {
+    ValueChanged<String?> onChanged, {
+    required bool enabled,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -734,7 +1353,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 color: context.appTextMuted,
                 letterSpacing: 0.5)),
         const SizedBox(height: 4),
-        _editing
+        enabled
             ? Container(
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -765,6 +1384,56 @@ class _UserDetailPageState extends State<UserDetailPage> {
             : Text(value,
                 style: _spaceGrotesk(
                     fontSize: 13, color: context.appTextPrimary)),
+        const SizedBox(height: 10),
+      ],
+    );
+  }
+
+  Widget _ruleDropdownField(
+    String label,
+    String value,
+    List<String> options,
+    ValueChanged<String> onChanged,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: _spaceGrotesk(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: context.appTextMuted,
+                letterSpacing: 0.5)),
+        const SizedBox(height: 4),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: context.appSurface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: context.appBorder2),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              dropdownColor: context.appSurface,
+              style: _spaceGrotesk(
+                  fontSize: 13, color: context.appTextPrimary),
+              items: options
+                  .map((o) => DropdownMenuItem<String>(
+                        value: o,
+                        child: Text(o),
+                      ))
+                  .toList(),
+              onChanged: (next) {
+                if (next != null) onChanged(next);
+              },
+              icon: Icon(Icons.expand_more,
+                  size: 16, color: context.appTextMuted),
+            ),
+          ),
+        ),
         const SizedBox(height: 10),
       ],
     );
@@ -808,6 +1477,33 @@ class _UserDetailPageState extends State<UserDetailPage> {
     );
   }
 
+  Widget _infoBanner(String text) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppDS.accent.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: AppDS.accent.withValues(alpha: 0.22)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.info_outline_rounded, size: 16, color: AppDS.accent),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: _spaceGrotesk(
+              fontSize: 12,
+              color: context.appTextPrimary,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
   Widget _badge(String label, Color color) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
     decoration: BoxDecoration(
@@ -843,6 +1539,23 @@ class _UserDetailPageState extends State<UserDetailPage> {
       ),
     );
   }
+
+  Widget _miniBadge(String label, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: color.withValues(alpha: 0.22)),
+    ),
+    child: Text(
+      label,
+      style: _spaceGrotesk(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: color,
+      ),
+    ),
+  );
 
   static Color _permColor(String p) {
     switch (p) {

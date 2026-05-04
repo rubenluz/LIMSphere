@@ -17,16 +17,16 @@ class MaintenanceOverviewWidget extends StatefulWidget {
       _MaintenanceOverviewWidgetState();
 }
 
-class _MaintenanceOverviewWidgetState
-    extends State<MaintenanceOverviewWidget> {
+class _MaintenanceOverviewWidgetState extends State<MaintenanceOverviewWidget> {
   static const _accent = Color(0xFFA855F7); // purple
 
   static const _labels = <String, String>{
-    'ph_calibration':           'pH Calibration',
+    'ph_calibration': 'pH Calibration',
     'conductivity_calibration': 'Conductivity Calibration',
-    'temperature_check':        'Temperature Check',
-    'ro_filter_sediment':       'RO pre-filter (Sediments 5µm)',
-    'ro_filter_carbon':         'RO pre-filter (Active carbon)',
+    'temperature_check': 'Temperature Check',
+    'ro_filter_sediment': 'RO pre-filter (Sediments 5µm)',
+    'ro_filter_carbon': 'RO pre-filter (Active carbon)',
+    'sop_filter_exchange': 'SOP Filter Exchange',
   };
 
   List<Map<String, dynamic>> _items = [];
@@ -98,7 +98,9 @@ class _MaintenanceOverviewWidgetState
         child: Text(
           'No maintenance data',
           style: GoogleFonts.spaceGrotesk(
-              color: context.appTextMuted, fontSize: 13),
+            color: context.appTextMuted,
+            fontSize: 13,
+          ),
         ),
       );
     }
@@ -110,15 +112,20 @@ class _MaintenanceOverviewWidgetState
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: _sorted.length,
-      separatorBuilder: (_, _) =>
-          Divider(height: 1, color: context.appBorder, indent: 12, endIndent: 12),
+      separatorBuilder: (_, _) => Divider(
+        height: 1,
+        color: context.appBorder,
+        indent: 12,
+        endIndent: 12,
+      ),
       itemBuilder: (ctx, i) {
         final row = _sorted[i];
         final key = row['key']?.toString() ?? '';
         final label = _labels[key] ?? key;
         final rawDate = row['last_done_date'];
-        final lastDate =
-            rawDate != null ? DateTime.tryParse(rawDate.toString()) : null;
+        final lastDate = rawDate != null
+            ? DateTime.tryParse(rawDate.toString())
+            : null;
         final optimalDays = (row['optimal_days'] as num?)?.toInt() ?? 30;
 
         String lastStr = '—';
@@ -151,62 +158,81 @@ class _MaintenanceOverviewWidgetState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    style: GoogleFonts.spaceGrotesk(
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: GoogleFonts.spaceGrotesk(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: context.appTextPrimary),
-                    overflow: TextOverflow.ellipsis,
+                        color: context.appTextPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: badgeColor.withValues(alpha: 0.15),
-                    border: Border.all(
-                        color: badgeColor.withValues(alpha: 0.5)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    badgeStr,
-                    style: GoogleFonts.spaceGrotesk(
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: badgeColor.withValues(alpha: 0.15),
+                      border: Border.all(
+                        color: badgeColor.withValues(alpha: 0.5),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      badgeStr,
+                      style: GoogleFonts.spaceGrotesk(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: badgeColor),
+                        color: badgeColor,
+                      ),
+                    ),
                   ),
-                ),
-              ]),
+                ],
+              ),
               const SizedBox(height: 4),
-              Row(children: [
-                Icon(Icons.history_rounded,
-                    size: 11, color: context.appTextMuted),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    'Last: $lastStr',
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.jetBrainsMono(
-                        fontSize: 10, color: context.appTextMuted),
+              Row(
+                children: [
+                  Icon(
+                    Icons.history_rounded,
+                    size: 11,
+                    color: context.appTextMuted,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Icon(Icons.event_outlined,
-                    size: 11, color: context.appTextMuted),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    'Next: $nextStr',
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.jetBrainsMono(
-                        fontSize: 10, color: context.appTextSecondary),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      'Last: $lastStr',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 10,
+                        color: context.appTextMuted,
+                      ),
+                    ),
                   ),
-                ),
-              ]),
+                  const SizedBox(width: 12),
+                  Icon(
+                    Icons.event_outlined,
+                    size: 11,
+                    color: context.appTextMuted,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      'Next: $nextStr',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 10,
+                        color: context.appTextSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         );
@@ -230,53 +256,66 @@ class _MaintenanceOverviewWidgetState
           // ── Header ────────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.build_circle_outlined, size: 18, color: _accent),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Fish Facility Maintenance',
-                  style: GoogleFonts.spaceGrotesk(
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.build_circle_outlined,
+                  size: 18,
+                  color: _accent,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Fish Facility Maintenance',
+                    style: GoogleFonts.spaceGrotesk(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: context.appTextPrimary),
-                ),
-              ),
-              if (!_loading)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: _accent,
-                    borderRadius: BorderRadius.circular(12),
+                      color: context.appTextPrimary,
+                    ),
                   ),
-                  child: Text(
-                    '${_items.length}',
-                    style: const TextStyle(
+                ),
+                if (!_loading)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _accent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_items.length}',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
-                        fontWeight: FontWeight.bold),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: Icon(
+                    Icons.refresh,
+                    size: 16,
+                    color: context.appTextMuted,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  tooltip: 'Refresh',
+                  onPressed: _load,
                 ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: Icon(Icons.refresh,
-                    size: 16, color: context.appTextMuted),
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 24, minHeight: 24),
-                tooltip: 'Refresh',
-                onPressed: _load,
-              ),
-            ]),
+              ],
+            ),
           ),
           Divider(height: 1, color: context.appBorder),
 
           // ── List ──────────────────────────────────────────────────────────
           if (desktop)
-            Expanded(
-              child: SingleChildScrollView(child: _buildList(context)),
-            )
+            Expanded(child: SingleChildScrollView(child: _buildList(context)))
           else
             _buildList(context),
         ],

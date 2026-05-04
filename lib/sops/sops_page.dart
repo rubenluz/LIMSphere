@@ -16,6 +16,7 @@ import '/core/data_cache.dart';
 import '/core/sop_db_schema.dart';
 import '/supabase/supabase_manager.dart';
 import '../camera/qr_scanner/qr_code_rules.dart';
+import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 import '../fish_facility/shared_widgets.dart';
 import 'sop_model.dart';
@@ -174,6 +175,10 @@ class _SopPageState extends State<SopPage> {
   }
 
   Future<void> _deleteSop(FacilitySop sop) async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (dlgCtx) => AlertDialog(
@@ -240,6 +245,10 @@ class _SopPageState extends State<SopPage> {
   }
 
   void _showDialog({FacilitySop? sop}) async {
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     final saved = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -456,14 +465,15 @@ class _SopPageState extends State<SopPage> {
                   Text('Export CSV', style: GoogleFonts.spaceGrotesk(
                       fontSize: 13, color: context.appTextPrimary)),
                 ])),
-              PopupMenuItem(
-                value: 'add',
-                child: Row(children: [
-                  const Icon(Icons.add, size: 16, color: AppDS.accent),
-                  const SizedBox(width: 10),
-                  Text('New SOP', style: GoogleFonts.spaceGrotesk(
-                      fontSize: 13, color: AppDS.accent)),
-                ])),
+              if (context.canEditModule)
+                PopupMenuItem(
+                  value: 'add',
+                  child: Row(children: [
+                    const Icon(Icons.add, size: 16, color: AppDS.accent),
+                    const SizedBox(width: 10),
+                    Text('New SOP', style: GoogleFonts.spaceGrotesk(
+                        fontSize: 13, color: AppDS.accent)),
+                  ])),
             ],
           )
         else ...[
@@ -507,19 +517,20 @@ class _SopPageState extends State<SopPage> {
               onPressed: _exportCsv,
             ),
           ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: AppDS.accent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-              minimumSize: const Size(0, 36),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+          if (context.canEditModule)
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppDS.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                minimumSize: const Size(0, 36),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+              ),
+              onPressed: () => _showDialog(),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('New SOP'),
             ),
-            onPressed: () => _showDialog(),
-            icon: const Icon(Icons.add, size: 16),
-            label: const Text('New SOP'),
-          ),
         ],
       ]),
     );
@@ -557,7 +568,7 @@ class _SopPageState extends State<SopPage> {
         final sop = _filtered[i];
         return _SopCard(
           sop: sop,
-          onEdit:     () => _showDialog(sop: sop),
+          onEdit:     () => context.canEditModule ? _showDialog(sop: sop) : context.warnReadOnly(),
           onDelete:   () => _deleteSop(sop),
           onOpenPdf:  sop.hasPdfFile ? () => _openSopFile(sop, sop.filePath!,    sop.fileName    ?? 'document.pdf',  DocViewMode.pdf) : null,
           onOpenTxt:  sop.hasTxtFile ? () => _openSopFile(sop, sop.txtFilePath!, sop.txtFileName ?? 'document.txt',  DocViewMode.txt) : null,

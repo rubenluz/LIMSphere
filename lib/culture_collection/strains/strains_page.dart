@@ -2,7 +2,6 @@
 // Excel import trigger, and navigation to StrainDetailPage.
 // Has its own Scaffold + AppBar (exception to the no-scaffold page rule).
 
-
 import 'dart:async';
 import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
@@ -18,6 +17,7 @@ import 'dart:io';
 import '/core/data_cache.dart';
 import 'strains_columns.dart';
 import 'strains_design_tokens.dart';
+import 'strains_mirri_export.dart';
 import '/theme/theme.dart';
 import 'strains_grid_widgets.dart';
 import 'strains_appbars.dart';
@@ -34,10 +34,31 @@ List<Map<String, dynamic>> _parseStrainRows(List<dynamic> raw) {
     final row = Map<String, dynamic>.from(r as Map);
     final s = row['samples'] as Map<String, dynamic>? ?? {};
     for (final k in [
-      'rebeca', 'ccpi', 'date', 'country', 'archipelago', 'island',
-      'municipality', 'local', 'habitat_type', 'habitat_1', 'habitat_2',
-      'habitat_3', 'method', 'gps', 'temperature', 'ph', 'conductivity',
-      'oxygen', 'salinity', 'radiation', 'responsible', 'observations',
+      'rebeca',
+      'ccpi',
+      'date',
+      'collector',
+      'country',
+      'archipelago',
+      'island',
+      'region',
+      'municipality',
+      'local',
+      'habitat_type',
+      'habitat_1',
+      'habitat_2',
+      'habitat_3',
+      'substrate',
+      'method',
+      'gps',
+      'temperature',
+      'ph',
+      'conductivity',
+      'oxygen',
+      'salinity',
+      'radiation',
+      'responsible',
+      'observations',
     ]) {
       row['s_$k'] = s['sample_$k'];
     }
@@ -79,32 +100,32 @@ class StrainsPage extends StatefulWidget {
 
 class _StrainsPageState extends State<StrainsPage> {
   // ── State ──────────────────────────────────────────────────────────────────
-  List<Map<String, dynamic>> _rows     = [];
+  List<Map<String, dynamic>> _rows = [];
   List<Map<String, dynamic>> _filtered = [];
   bool _loading = true;
 
   bool _selectionMode = false;
-  final Set<dynamic> _selectedRowIds  = {};
-  final Set<String>  _selectedColKeys = {};
+  final Set<dynamic> _selectedRowIds = {};
+  final Set<String> _selectedColKeys = {};
 
-  String            _search = '';
-  List<String>      _sortKeys = [];
+  String _search = '';
+  List<String> _sortKeys = [];
   final Map<String, bool> _sortDirs = {};
   final _searchController = TextEditingController();
-  bool _showFilters    = false;
+  bool _showFilters = false;
   bool _showColManager = false;
   final List<ActiveFilter> _activeFilters = [];
   List<int> _periodicityOptions = [];
-  int?      _selectedPeriodicity;
+  int? _selectedPeriodicity;
 
-  bool        _hideEmpty    = false;
-  Set<String> _hiddenCols   = {};
+  bool _hideEmpty = true;
+  Set<String> _hiddenCols = {};
   Set<String> _emptyColKeys = {};
 
   final Map<String, double> _colWidths = {};
   List<String>? _colOrder;
   String? _draggingColKey;
-  int?    _dropTargetIndex;
+  int? _dropTargetIndex;
 
   Map<String, dynamic>? _editingCell;
   final _editController = TextEditingController();
@@ -119,16 +140,17 @@ class _StrainsPageState extends State<StrainsPage> {
     final ordered = _colOrder == null
         ? List<StrainColDef>.from(strainAllColumns)
         : [
-            ..._colOrder!
-                .map((k) {
-                  try { return strainAllColumns.firstWhere((c) => c.key == k); }
-                  catch (_) { return null; }
-                })
-                .whereType<StrainColDef>(),
+            ..._colOrder!.map((k) {
+              try {
+                return strainAllColumns.firstWhere((c) => c.key == k);
+              } catch (_) {
+                return null;
+              }
+            }).whereType<StrainColDef>(),
             ...strainAllColumns.where((c) => !_colOrder!.contains(c.key)),
           ];
     return ordered.where((col) {
-      if (_hiddenCols.contains(col.key))   return false;
+      if (_hiddenCols.contains(col.key)) return false;
       if (_emptyColKeys.contains(col.key)) return false;
       return true;
     }).toList();
@@ -138,7 +160,9 @@ class _StrainsPageState extends State<StrainsPage> {
 
   List<StrainColDef> get _exportCols {
     if (_selectionMode && _selectedColKeys.isNotEmpty) {
-      return _visibleCols.where((c) => _selectedColKeys.contains(c.key)).toList();
+      return _visibleCols
+          .where((c) => _selectedColKeys.contains(c.key))
+          .toList();
     }
     return _visibleCols;
   }
@@ -150,11 +174,14 @@ class _StrainsPageState extends State<StrainsPage> {
   @override
   void initState() {
     super.initState();
-    _loadPrefs().then((_) => _load().then((_) {
+    unawaited(_loadPrefs());
+    _load().then((_) {
       if (widget.autoOpenNewStrainForSample != null && mounted) {
-        _showAddStrainDialog(preselectedSampleId: widget.autoOpenNewStrainForSample);
+        _showAddStrainDialog(
+          preselectedSampleId: widget.autoOpenNewStrainForSample,
+        );
       }
-    }));
+    });
   }
 
   @override
@@ -171,6 +198,7 @@ class _StrainsPageState extends State<StrainsPage> {
   // ── Prefs ──────────────────────────────────────────────────────────────────
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       final keysStr = prefs.getString(strainPrefSortKeys);
       if (keysStr != null && keysStr.isNotEmpty) {
@@ -186,15 +214,26 @@ class _StrainsPageState extends State<StrainsPage> {
       for (final k in prefs.getKeys()) {
         if (k.startsWith('$strainPrefColWidths.')) {
           final w = prefs.getDouble(k);
-          if (w != null) _colWidths[k.substring('$strainPrefColWidths.'.length)] = w;
+          if (w != null) {
+            _colWidths[k.substring('$strainPrefColWidths.'.length)] = w;
+          }
         }
       }
       final saved = prefs.getString(strainPrefColOrder);
       if (saved != null && saved.isNotEmpty) {
         _colOrder = saved.split(',').where((s) => s.isNotEmpty).toList();
       }
-      _hideEmpty = prefs.getBool(strainPrefHideEmpty) ?? false;
+      _hideEmpty = prefs.getBool(strainPrefHideEmpty) ?? true;
     });
+    if (_rows.isNotEmpty) {
+      if (_hideEmpty) {
+        _detectEmptyCols();
+      } else {
+        _emptyColKeys = {};
+      }
+      _buildPeriodicityOptions();
+      _applyFilter();
+    }
   }
 
   Future<void> _saveHideEmptyPref(bool v) async =>
@@ -207,18 +246,28 @@ class _StrainsPageState extends State<StrainsPage> {
       await prefs.remove(strainPrefSortDirs);
     } else {
       await prefs.setString(strainPrefSortKeys, _sortKeys.join(','));
-      await prefs.setString(strainPrefSortDirs,
-          _sortKeys.map((k) => '$k:${_sortDirs[k] == true ? "asc" : "desc"}').join('|'));
+      await prefs.setString(
+        strainPrefSortDirs,
+        _sortKeys
+            .map((k) => '$k:${_sortDirs[k] == true ? "asc" : "desc"}')
+            .join('|'),
+      );
     }
   }
 
   Future<void> _saveColWidth(String key, double w) async =>
-      (await SharedPreferences.getInstance()).setDouble('$strainPrefColWidths.$key', w);
+      (await SharedPreferences.getInstance()).setDouble(
+        '$strainPrefColWidths.$key',
+        w,
+      );
 
   Future<void> _resetColWidths() async {
     final prefs = await SharedPreferences.getInstance();
-    for (final k in prefs.getKeys()
-        .where((k) => k.startsWith('$strainPrefColWidths.')).toList()) {
+    for (final k
+        in prefs
+            .getKeys()
+            .where((k) => k.startsWith('$strainPrefColWidths.'))
+            .toList()) {
       await prefs.remove(k);
     }
     setState(() => _colWidths.clear());
@@ -226,8 +275,10 @@ class _StrainsPageState extends State<StrainsPage> {
 
   Future<void> _saveColOrder() async {
     if (_colOrder == null) return;
-    await (await SharedPreferences.getInstance())
-        .setString(strainPrefColOrder, _colOrder!.join(','));
+    await (await SharedPreferences.getInstance()).setString(
+      strainPrefColOrder,
+      _colOrder!.join(','),
+    );
   }
 
   Future<void> _resetColOrder() async {
@@ -237,35 +288,47 @@ class _StrainsPageState extends State<StrainsPage> {
 
   void _reorderCol(String colKey, int toVisibleIndex) {
     final mutable = List<String>.from(
-        _colOrder ?? strainAllColumns.map((c) => c.key).toList())
-      ..remove(colKey);
+      _colOrder ?? strainAllColumns.map((c) => c.key).toList(),
+    )..remove(colKey);
     final visible = _visibleCols;
     String? anchor;
     if (toVisibleIndex < visible.length) {
       anchor = visible[toVisibleIndex].key;
       if (anchor == colKey) {
-        setState(() { _draggingColKey = null; _dropTargetIndex = null; });
+        setState(() {
+          _draggingColKey = null;
+          _dropTargetIndex = null;
+        });
         return;
       }
     }
     if (anchor == null) {
       final lv = visible.isNotEmpty ? visible.last.key : null;
       if (lv != null) {
-        mutable.insert((mutable.indexOf(lv) + 1).clamp(0, mutable.length), colKey);
+        mutable.insert(
+          (mutable.indexOf(lv) + 1).clamp(0, mutable.length),
+          colKey,
+        );
       } else {
         mutable.add(colKey);
       }
     } else {
       mutable.insert(mutable.indexOf(anchor).clamp(0, mutable.length), colKey);
     }
-    setState(() { _colOrder = mutable; _draggingColKey = null; _dropTargetIndex = null; });
+    setState(() {
+      _colOrder = mutable;
+      _draggingColKey = null;
+      _dropTargetIndex = null;
+    });
     _saveColOrder();
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
   Future<void> _load() async {
     setState(() => _loading = true);
-    final cacheKey = widget.filterSampleId != null ? 'strains_${widget.filterSampleId}' : 'strains';
+    final cacheKey = widget.filterSampleId != null
+        ? 'strains_${widget.filterSampleId}'
+        : 'strains';
     List<dynamic>? cached;
     try {
       cached = await DataCache.read(cacheKey);
@@ -273,7 +336,11 @@ class _StrainsPageState extends State<StrainsPage> {
         debugPrint('[StrainsPage] cache hit: ${cached.length} rows');
         _rows = await compute(_parseStrainRows, cached);
         if (!mounted) return;
-        if (_hideEmpty) { _detectEmptyCols(); } else { _emptyColKeys = {}; }
+        if (_hideEmpty) {
+          _detectEmptyCols();
+        } else {
+          _emptyColKeys = {};
+        }
         _buildPeriodicityOptions();
         _applyFilter();
         setState(() => _loading = false);
@@ -289,22 +356,28 @@ class _StrainsPageState extends State<StrainsPage> {
         *,
         samples (
           sample_code, sample_rebeca, sample_ccpi, sample_date,
-          sample_country, sample_archipelago, sample_island,
-          sample_municipality, sample_local,
+          sample_collector, sample_country, sample_archipelago, sample_island,
+          sample_region, sample_municipality, sample_local,
           sample_habitat_type, sample_habitat_1, sample_habitat_2, sample_habitat_3,
-          sample_method, sample_gps, sample_temperature, sample_ph,
+          sample_substrate, sample_method, sample_gps, sample_temperature, sample_ph,
           sample_conductivity, sample_oxygen, sample_salinity, sample_radiation,
           sample_responsible, sample_observations
         )
       ''');
-      if (widget.filterSampleId != null) q = q.eq('strain_sample_code', widget.filterSampleId);
+      if (widget.filterSampleId != null) {
+        q = q.eq('strain_sample_code', widget.filterSampleId);
+      }
       final res = await q.order('strain_code', ascending: true);
       debugPrint('[StrainsPage] fetch OK: ${(res as List).length} rows');
       await DataCache.write(cacheKey, res);
       if (!mounted) return;
       _rows = await compute(_parseStrainRows, res);
       if (!mounted) return;
-      if (_hideEmpty) { _detectEmptyCols(); } else { _emptyColKeys = {}; }
+      if (_hideEmpty) {
+        _detectEmptyCols();
+      } else {
+        _emptyColKeys = {};
+      }
       _buildPeriodicityOptions();
       _applyFilter();
       _syncNextTransferDates(); // background — no await
@@ -325,7 +398,7 @@ class _StrainsPageState extends State<StrainsPage> {
       try {
         final next = DateTime.parse(lastStr).add(Duration(days: days));
         row['strain_next_transfer'] =
-            '${next.year.toString().padLeft(4,"0")}-${next.month.toString().padLeft(2,"0")}-${next.day.toString().padLeft(2,"0")}';
+            '${next.year.toString().padLeft(4, "0")}-${next.month.toString().padLeft(2, "0")}-${next.day.toString().padLeft(2, "0")}';
         row['_next_transfer_computed'] = true;
       } catch (_) {}
     }
@@ -335,42 +408,50 @@ class _StrainsPageState extends State<StrainsPage> {
   // Updates Supabase silently for mismatches; clears next_transfer when
   // last_transfer or periodicity is missing.
   Future<void> _syncNextTransferDates() async {
-    final List<({String id, String date})> toFix   = [];
-    final List<String>                     toClear = [];
+    final List<({String id, String date})> toFix = [];
+    final List<String> toClear = [];
     for (final row in _rows) {
-      final lastStr    = row['strain_last_transfer']?.toString() ?? '';
-      final days       = int.tryParse(row['strain_periodicity']?.toString() ?? '');
+      final lastStr = row['strain_last_transfer']?.toString() ?? '';
+      final days = int.tryParse(row['strain_periodicity']?.toString() ?? '');
       final currentNext = row['strain_next_transfer']?.toString() ?? '';
       if (lastStr.isEmpty || days == null) {
         if (currentNext.isNotEmpty) {
-          row['strain_next_transfer']    = null;
+          row['strain_next_transfer'] = null;
           row['_next_transfer_computed'] = false;
           toClear.add(row['strain_id'].toString());
         }
         continue;
       }
       DateTime computed;
-      try { computed = DateTime.parse(lastStr).add(Duration(days: days)); }
-      catch (_) { continue; }
-      final expected = '${computed.year.toString().padLeft(4, '0')}-'
+      try {
+        computed = DateTime.parse(lastStr).add(Duration(days: days));
+      } catch (_) {
+        continue;
+      }
+      final expected =
+          '${computed.year.toString().padLeft(4, '0')}-'
           '${computed.month.toString().padLeft(2, '0')}-'
           '${computed.day.toString().padLeft(2, '0')}';
       if (currentNext == expected) continue;
-      row['strain_next_transfer']    = expected;
+      row['strain_next_transfer'] = expected;
       row['_next_transfer_computed'] = false;
       toFix.add((id: row['strain_id'].toString(), date: expected));
     }
     if (toFix.isEmpty && toClear.isEmpty) return;
     try {
       await Future.wait([
-        ...toFix.map((u) => Supabase.instance.client
-            .from('strains')
-            .update({'strain_next_transfer': u.date})
-            .eq('strain_id', u.id)),
-        ...toClear.map((id) => Supabase.instance.client
-            .from('strains')
-            .update({'strain_next_transfer': null})
-            .eq('strain_id', id)),
+        ...toFix.map(
+          (u) => Supabase.instance.client
+              .from('strains')
+              .update({'strain_next_transfer': u.date})
+              .eq('strain_id', u.id),
+        ),
+        ...toClear.map(
+          (id) => Supabase.instance.client
+              .from('strains')
+              .update({'strain_next_transfer': null})
+              .eq('strain_id', id),
+        ),
       ]);
       unawaited(BackupService.instance.notifyCrudChange('strains'));
       if (mounted) {
@@ -385,21 +466,24 @@ class _StrainsPageState extends State<StrainsPage> {
 
   void _detectEmptyCols() {
     _emptyColKeys = strainAllColumns
-        .where((col) => !_rows.any((r) {
-              final v = r[col.key];
-              return v != null && v.toString().isNotEmpty;
-            }))
+        .where(
+          (col) => !_rows.any((r) {
+            final v = r[col.key];
+            return v != null && v.toString().isNotEmpty;
+          }),
+        )
         .map((c) => c.key)
         .toSet();
   }
 
   void _buildPeriodicityOptions() {
-    _periodicityOptions = _rows
-        .map((r) => int.tryParse(r['strain_periodicity']?.toString() ?? ''))
-        .whereType<int>()
-        .toSet()
-        .toList()
-      ..sort();
+    _periodicityOptions =
+        _rows
+            .map((r) => int.tryParse(r['strain_periodicity']?.toString() ?? ''))
+            .whereType<int>()
+            .toSet()
+            .toList()
+          ..sort();
   }
 
   // ── Filter / sort ──────────────────────────────────────────────────────────
@@ -407,39 +491,63 @@ class _StrainsPageState extends State<StrainsPage> {
     var list = List<Map<String, dynamic>>.from(_rows);
     if (_search.isNotEmpty) {
       final q = _search.toLowerCase();
-      list = list.where((r) =>
-          r.values.any((v) => v?.toString().toLowerCase().contains(q) == true)).toList();
+      list = list
+          .where(
+            (r) => r.values.any(
+              (v) => v?.toString().toLowerCase().contains(q) == true,
+            ),
+          )
+          .toList();
     }
     for (final f in _activeFilters) {
       if (f.value.isEmpty) continue;
       final q = f.value.toLowerCase();
       list = list
-          .where((r) => r[f.column]?.toString().toLowerCase().contains(q) == true).toList();
+          .where(
+            (r) => r[f.column]?.toString().toLowerCase().contains(q) == true,
+          )
+          .toList();
     }
     if (_selectedPeriodicity != null) {
-      list = list.where((r) =>
-          int.tryParse(r['strain_periodicity']?.toString() ?? '') == _selectedPeriodicity).toList();
+      list = list
+          .where(
+            (r) =>
+                int.tryParse(r['strain_periodicity']?.toString() ?? '') ==
+                _selectedPeriodicity,
+          )
+          .toList();
     }
     _filtered = list;
     _applySort();
   }
 
   static const _intSortCols = {
-    'strain_periodicity', 'strain_seq_16s_bp', 'strain_seq_18s_bp',
-    'strain_its2_bp', 'strain_rbcl_bp', 'strain_tufa_bp', 'strain_cox1_bp',
-    'strain_genome_cont', 'strain_cryo_vials',
+    'strain_periodicity',
+    'strain_seq_16s_bp',
+    'strain_seq_18s_bp',
+    'strain_its2_bp',
+    'strain_rbcl_bp',
+    'strain_tufa_bp',
+    'strain_cox1_bp',
+    'strain_genome_cont',
+    'strain_cryo_vials',
   };
 
   void _applySort() {
-    if (_sortKeys.isEmpty) { if (mounted) setState(() {}); return; }
+    if (_sortKeys.isEmpty) {
+      if (mounted) setState(() {});
+      return;
+    }
     _filtered.sort((a, b) {
       for (final key in _sortKeys) {
         final isInt = _intSortCols.contains(key);
         final isAsc = _sortDirs[key] ?? true;
         late int cmp;
         if (isInt) {
-          final ai = int.tryParse(a[key]?.toString() ?? '') ?? (isAsc ? 999999 : -1);
-          final bi = int.tryParse(b[key]?.toString() ?? '') ?? (isAsc ? 999999 : -1);
+          final ai =
+              int.tryParse(a[key]?.toString() ?? '') ?? (isAsc ? 999999 : -1);
+          final bi =
+              int.tryParse(b[key]?.toString() ?? '') ?? (isAsc ? 999999 : -1);
           cmp = ai.compareTo(bi);
         } else {
           cmp = (a[key]?.toString() ?? '').compareTo(b[key]?.toString() ?? '');
@@ -455,20 +563,30 @@ class _StrainsPageState extends State<StrainsPage> {
     setState(() {
       if (_sortKeys.contains(key)) {
         _sortDirs[key] = !(_sortDirs[key] ?? true);
-      } else { _sortKeys.add(key); _sortDirs[key] = true; }
+      } else {
+        _sortKeys.add(key);
+        _sortDirs[key] = true;
+      }
     });
     _saveSortPrefs();
     _applySort();
   }
 
   void _resetSort() {
-    setState(() { _sortKeys.clear(); _sortDirs.clear(); });
+    setState(() {
+      _sortKeys.clear();
+      _sortDirs.clear();
+    });
     _saveSortPrefs();
     _applySort();
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
-  Future<void> _commitEdit(Map<String, dynamic> row, String key, String value) async {
+  Future<void> _commitEdit(
+    Map<String, dynamic> row,
+    String key,
+    String value,
+  ) async {
     final id = row['strain_id'];
     try {
       final Map<String, dynamic> patch = {key: value.isEmpty ? null : value};
@@ -485,7 +603,8 @@ class _StrainsPageState extends State<StrainsPage> {
           final last = DateTime.tryParse(lastStr);
           if (last != null) {
             final next = last.add(Duration(days: days));
-            nextDate = '${next.year.toString().padLeft(4, '0')}-'
+            nextDate =
+                '${next.year.toString().padLeft(4, '0')}-'
                 '${next.month.toString().padLeft(2, '0')}-'
                 '${next.day.toString().padLeft(2, '0')}';
           }
@@ -507,7 +626,9 @@ class _StrainsPageState extends State<StrainsPage> {
         }
       }
       _applyFilter();
-    } catch (e) { _snack('Save error: $e'); }
+    } catch (e) {
+      _snack('Save error: $e');
+    }
     setState(() => _editingCell = null);
   }
 
@@ -517,96 +638,157 @@ class _StrainsPageState extends State<StrainsPage> {
       context: context,
       position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 1, pos.dy + 1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      items: strainStatusOptions.map((s) => PopupMenuItem<String>(
-        value: s,
-        child: Row(children: [
-          _statusIcon(s, size: 16),
-          const SizedBox(width: 10),
-          Text(s, style: TextStyle(
-              fontWeight: current == s ? FontWeight.bold : FontWeight.normal,
-              color: _statusColor(s), fontSize: 13)),
-          if (current == s) ...[const Spacer(), const Icon(Icons.check, size: 14)],
-        ]),
-      )).toList(),
+      items: strainStatusOptions
+          .map(
+            (s) => PopupMenuItem<String>(
+              value: s,
+              child: Row(
+                children: [
+                  _statusIcon(s, size: 16),
+                  const SizedBox(width: 10),
+                  Text(
+                    s,
+                    style: TextStyle(
+                      fontWeight: current == s
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: _statusColor(s),
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (current == s) ...[
+                    const Spacer(),
+                    const Icon(Icons.check, size: 14),
+                  ],
+                ],
+              ),
+            ),
+          )
+          .toList(),
     );
-    if (result != null && result != current) await _commitEdit(row, 'strain_status', result);
+    if (result != null && result != current) {
+      await _commitEdit(row, 'strain_status', result);
+    }
   }
 
   Future<void> _showTransferDatePicker(Map<String, dynamic> row) async {
     DateTime? selectedDate;
-    final currentDate = DateTime.tryParse(row['strain_last_transfer']?.toString() ?? '');
+    final currentDate = DateTime.tryParse(
+      row['strain_last_transfer']?.toString() ?? '',
+    );
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setDs) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                title: const Text('Set Last Transfer Date'),
-                content: Column(mainAxisSize: MainAxisSize.min, children: [
-                  SizedBox(
-                      width: 300,
-                      child: CalendarDatePicker(
-                        initialDate: currentDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime.now(),
-                        onDateChanged: (d) => setDs(() => selectedDate = d),
-                      )),
-                  if (selectedDate != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                          color: AppDS.tableRowSel,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFBFDBFE))),
-                      child: Text(
-                          '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2,"0")}-${selectedDate!.day.toString().padLeft(2,"0")}',
-                          style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8))),
+        builder: (ctx, setDs) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          title: const Text('Set Last Transfer Date'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 300,
+                child: CalendarDatePicker(
+                  initialDate: currentDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime.now(),
+                  onDateChanged: (d) => setDs(() => selectedDate = d),
+                ),
+              ),
+              if (selectedDate != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppDS.tableRowSel,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Text(
+                    '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, "0")}-${selectedDate!.day.toString().padLeft(2, "0")}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1D4ED8),
                     ),
-                  ],
-                ]),
-                actions: [
-                  TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-                  FilledButton.icon(
-                      icon: const Icon(Icons.check, size: 16),
-                      label: const Text('This strain'),
-                      onPressed: selectedDate != null ? () => Navigator.of(ctx).pop('insert_single') : null),
-                  FilledButton.tonal(
-                      onPressed: selectedDate != null ? () => Navigator.of(ctx).pop('insert_all') : null,
-                      child: const Text('All same cycle')),
-                ],
-              )),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.check, size: 16),
+              label: const Text('This strain'),
+              onPressed: selectedDate != null
+                  ? () => Navigator.of(ctx).pop('insert_single')
+                  : null,
+            ),
+            FilledButton.tonal(
+              onPressed: selectedDate != null
+                  ? () => Navigator.of(ctx).pop('insert_all')
+                  : null,
+              child: const Text('All same cycle'),
+            ),
+          ],
+        ),
+      ),
     );
     if (selectedDate == null || result == null) return;
     final dateStr =
-        '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2,"0")}-${selectedDate!.day.toString().padLeft(2,"0")}';
+        '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, "0")}-${selectedDate!.day.toString().padLeft(2, "0")}';
     if (result == 'insert_single') {
       await _commitEdit(row, 'strain_last_transfer', dateStr);
       if (mounted) _snack('Last transfer updated for ${row["strain_code"]}');
     } else {
       final periodicity = row['strain_periodicity'];
       if (periodicity == null || periodicity <= 0) {
-        _snack('Cannot use "All same cycle" — strain_periodicity not set'); return;
+        _snack('Cannot use "All same cycle" — strain_periodicity not set');
+        return;
       }
       try {
-        await Supabase.instance.client.from('strains')
-            .update({'strain_last_transfer': dateStr}).eq('strain_periodicity', periodicity);
+        await Supabase.instance.client
+            .from('strains')
+            .update({'strain_last_transfer': dateStr})
+            .eq('strain_periodicity', periodicity);
         unawaited(BackupService.instance.notifyCrudChange('strains'));
-        if (mounted) { _snack('Updated all strains with $periodicity-day cycle'); _load(); }
-      } catch (e) { if (mounted) _snack('Error: $e'); }
+        if (mounted) {
+          _snack('Updated all strains with $periodicity-day cycle');
+          _load();
+        }
+      } catch (e) {
+        if (mounted) _snack('Error: $e');
+      }
     }
   }
 
   void _openDetail(Map<String, dynamic> row) {
-    Navigator.push(context,
-        MaterialPageRoute(builder: (_) =>
-            StrainDetailPage(strainId: row['strain_id'], onSaved: _load)))
-        .then((_) => _load());
+    Navigator.push(
+      context,
+      modulePageRoute(
+        context: context,
+        child: StrainDetailPage(strainId: row['strain_id'], onSaved: _load),
+      ),
+    ).then((_) => _load());
   }
 
-  Future<void> _onRowActionSelected(String action, Map<String, dynamic> row) async {
+  Future<void> _onRowActionSelected(
+    String action,
+    Map<String, dynamic> row,
+  ) async {
     switch (action) {
       case 'need_transfer':
-        if (!context.canEditModule) { context.warnReadOnly(); return; }
+        if (!context.canEditModule) {
+          context.warnReadOnly();
+          return;
+        }
         await _toggleNeedNewTransfer(row);
         break;
       case 'request':
@@ -622,17 +804,21 @@ class _StrainsPageState extends State<StrainsPage> {
           category: 'Strains',
           entityId: row['strain_id']?.toString(),
           data: {
-            'strain_code':           row['strain_code']?.toString() ?? '',
-            'strain_scientific_name':row['strain_scientific_name']?.toString() ?? '',
-            'strain_status':         row['strain_status']?.toString() ?? '',
-            'strain_origin':         row['strain_origin']?.toString() ?? '',
-            'strain_subspecies':     row['strain_subspecies']?.toString() ?? '',
-            'strain_variety':        row['strain_variety']?.toString() ?? '',
+            'strain_code': row['strain_code']?.toString() ?? '',
+            'strain_scientific_name':
+                row['strain_scientific_name']?.toString() ?? '',
+            'strain_status': row['strain_status']?.toString() ?? '',
+            'strain_origin': row['strain_origin']?.toString() ?? '',
+            'strain_subspecies': row['strain_subspecies']?.toString() ?? '',
+            'strain_variety': row['strain_variety']?.toString() ?? '',
           },
         );
         break;
       case 'delete':
-        if (!context.canEditModule) { context.warnReadOnly(); return; }
+        if (!context.canEditModule) {
+          context.warnReadOnly();
+          return;
+        }
         await _deleteStrain(row);
         break;
     }
@@ -656,9 +842,11 @@ class _StrainsPageState extends State<StrainsPage> {
           .update({'strain_need_new_transfer': next})
           .eq('strain_id', id);
       unawaited(BackupService.instance.notifyCrudChange('strains'));
-      _snack(next
-          ? 'Marked ${row['strain_code'] ?? ''} as needing new transfer'
-          : 'Removed need-new-transfer mark for ${row['strain_code'] ?? ''}');
+      _snack(
+        next
+            ? 'Marked ${row['strain_code'] ?? ''} as needing new transfer'
+            : 'Removed need-new-transfer mark for ${row['strain_code'] ?? ''}',
+      );
     } catch (e, st) {
       debugPrint(st.toString());
       setState(() {
@@ -677,27 +865,52 @@ class _StrainsPageState extends State<StrainsPage> {
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: context.appSurface,
-        icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 40),
-        title: Text('Delete Strain?', textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
+        icon: const Icon(
+          Icons.delete_forever_rounded,
+          color: Color(0xFFDC2626),
+          size: 40,
+        ),
+        title: Text(
+          'Delete Strain?',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: context.appTextPrimary,
+          ),
+        ),
         content: RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
-            style: TextStyle(fontSize: 14, color: context.appTextSecondary, height: 1.5),
+            style: TextStyle(
+              fontSize: 14,
+              color: context.appTextSecondary,
+              height: 1.5,
+            ),
             children: [
               const TextSpan(text: 'You are about to permanently delete\n'),
-              TextSpan(text: code,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: context.appTextPrimary)),
+              TextSpan(
+                text: code,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: context.appTextPrimary,
+                ),
+              ),
               const TextSpan(text: '.\n\nThis action cannot be undone.'),
             ],
           ),
         ),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
-          OutlinedButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           const SizedBox(width: 8),
           FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+            ),
             icon: const Icon(Icons.delete_forever_rounded, size: 16),
             label: const Text('Delete'),
             onPressed: () => Navigator.pop(context, true),
@@ -724,35 +937,48 @@ class _StrainsPageState extends State<StrainsPage> {
   void _snack(String m) {
     debugPrint('[StrainsPage] $m');
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(m), behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(m),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   Color _statusColor(String? s) {
-    if (s == 'ALIVE')  return AppDS.green;
-    if (s == 'DEAD')   return AppDS.red;
+    if (s == 'ALIVE') return AppDS.green;
+    if (s == 'DEAD') return AppDS.red;
     if (s == 'INCARE') return AppDS.yellow;
     return AppDS.textMuted;
   }
 
   Widget _statusIcon(String? s, {double size = 11}) {
     return Icon(
-      s == 'ALIVE'  ? Icons.check_circle_rounded
-        : s == 'DEAD'   ? Icons.cancel_rounded
-        : s == 'INCARE' ? Icons.medical_services_rounded
-        : Icons.help_outline_rounded,
-      size: size, color: _statusColor(s));
+      s == 'ALIVE'
+          ? Icons.check_circle_rounded
+          : s == 'DEAD'
+          ? Icons.cancel_rounded
+          : s == 'INCARE'
+          ? Icons.medical_services_rounded
+          : Icons.help_outline_rounded,
+      size: size,
+      color: _statusColor(s),
+    );
   }
 
   // ── Selection ─────────────────────────────────────────────────────────────
   void _enterSelectionMode() => setState(() {
     _selectionMode = true;
     _selectedRowIds.clear();
-    _selectedColKeys..clear()..addAll(_visibleCols.map((c) => c.key));
+    _selectedColKeys
+      ..clear()
+      ..addAll(_visibleCols.map((c) => c.key));
   });
   void _exitSelectionMode() => setState(() {
-    _selectionMode = false; _selectedRowIds.clear(); _selectedColKeys.clear();
+    _selectionMode = false;
+    _selectedRowIds.clear();
+    _selectedColKeys.clear();
   });
   void _toggleRowSelection(dynamic id) => setState(() {
     if (_selectedRowIds.contains(id)) {
@@ -786,8 +1012,12 @@ class _StrainsPageState extends State<StrainsPage> {
 
   // ── Export ────────────────────────────────────────────────────────────────
   Future<void> _copySelectedInfo() async {
-    final rows = _selectedRows; final cols = _exportCols;
-    if (rows.isEmpty) { _snack('Select at least one row'); return; }
+    final rows = _selectedRows;
+    final cols = _exportCols;
+    if (rows.isEmpty) {
+      _snack('Select at least one row');
+      return;
+    }
     final buf = StringBuffer()..writeln(cols.map((c) => c.label).join('\t'));
     for (final row in rows) {
       buf.writeln(cols.map((c) => row[c.key]?.toString() ?? '').join('\t'));
@@ -799,28 +1029,62 @@ class _StrainsPageState extends State<StrainsPage> {
   Future<void> _exportSelectedCsv() async {
     final rows = _selectedRows;
     final cols = _exportCols;
-    if (rows.isEmpty) { _snack('Select at least one row'); return; }
-    final buf = StringBuffer()..writeln(cols.map((c) => '"${c.label}"').join(','));
+    if (rows.isEmpty) {
+      _snack('Select at least one row');
+      return;
+    }
+    final buf = StringBuffer()
+      ..writeln(cols.map((c) => '"${c.label}"').join(','));
     for (final row in rows) {
-      buf.writeln(cols.map((c) {
-        final v = row[c.key]?.toString() ?? '';
-        return '"${v.replaceAll('"', '""')}"';
-      }).join(','));
+      buf.writeln(
+        cols
+            .map((c) {
+              final v = row[c.key]?.toString() ?? '';
+              return '"${v.replaceAll('"', '""')}"';
+            })
+            .join(','),
+      );
     }
     final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/strains_export_${DateTime.now().millisecondsSinceEpoch}.csv';
-    File(path)..createSync(recursive: true)..writeAsStringSync(buf.toString());
+    final path =
+        '${dir.path}/strains_export_${DateTime.now().millisecondsSinceEpoch}.csv';
+    File(path)
+      ..createSync(recursive: true)
+      ..writeAsStringSync(buf.toString());
     await OpenFilex.open(path);
     _snack('CSV exported (${rows.length} rows)');
   }
 
+  Future<void> _exportMirriCsv() async {
+    final rows = _filtered;
+    if (rows.isEmpty) {
+      _snack('No strains to export');
+      return;
+    }
+    final csv = buildMirriMicroorganismsCsv(rows);
+    final dir = await getTemporaryDirectory();
+    final path =
+        '${dir.path}/mirri_microorganisms_${DateTime.now().millisecondsSinceEpoch}.csv';
+    File(path)
+      ..createSync(recursive: true)
+      ..writeAsStringSync('\uFEFF$csv');
+    await OpenFilex.open(path);
+    _snack('MIRRI CSV exported (${rows.length} rows)');
+  }
+
   Future<void> _showAddStrainDialog({dynamic preselectedSampleId}) async {
-    if (!context.canEditModule) { context.warnReadOnly(); return; }
+    if (!context.canEditModule) {
+      context.warnReadOnly();
+      return;
+    }
     List<Map<String, dynamic>> samples = [];
     try {
-      samples = List<Map<String, dynamic>>.from(await Supabase.instance.client
-          .from('samples').select('sample_id, sample_code, sample_rebeca, sample_ccpi')
-          .order('sample_code'));
+      samples = List<Map<String, dynamic>>.from(
+        await Supabase.instance.client
+            .from('samples')
+            .select('sample_id, sample_code, sample_rebeca, sample_ccpi')
+            .order('sample_code'),
+      );
     } catch (e, st) {
       debugPrint(st.toString());
       _snack('Could not load samples: $e');
@@ -829,21 +1093,27 @@ class _StrainsPageState extends State<StrainsPage> {
     if (!mounted) return;
 
     dynamic selId = preselectedSampleId;
-    debugPrint('[StrainsPage] _showAddStrainDialog '
-        'preselect=$preselectedSampleId (${preselectedSampleId?.runtimeType}) '
-        'samplesLoaded=${samples.length}');
+    debugPrint(
+      '[StrainsPage] _showAddStrainDialog '
+      'preselect=$preselectedSampleId (${preselectedSampleId?.runtimeType}) '
+      'samplesLoaded=${samples.length}',
+    );
 
     if (selId != null) {
       final byCode = samples.where((s) => s['sample_code'] == selId).toList();
       if (byCode.isEmpty) {
         final byId = samples.where((s) => s['sample_id'] == selId).toList();
         if (byId.isNotEmpty) {
-          debugPrint('[StrainsPage] preselect $selId matched sample_id; '
-              'coercing to sample_code=${byId.first['sample_code']}');
+          debugPrint(
+            '[StrainsPage] preselect $selId matched sample_id; '
+            'coercing to sample_code=${byId.first['sample_code']}',
+          );
           selId = byId.first['sample_code'];
         } else {
-          debugPrint('[StrainsPage] preselect $selId matched neither '
-              'sample_code nor sample_id — clearing preselect');
+          debugPrint(
+            '[StrainsPage] preselect $selId matched neither '
+            'sample_code nor sample_id — clearing preselect',
+          );
           selId = null;
         }
       }
@@ -852,43 +1122,72 @@ class _StrainsPageState extends State<StrainsPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setDs) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                title: const Text('New Strain'),
-                content: SizedBox(width: 360, child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text('A strain must originate from a sample.',
-                      style: TextStyle(fontSize: 13, color: ctx.appTextMuted)),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<dynamic>(
-                    initialValue: selId,
-                    decoration: const InputDecoration(labelText: 'Source Sample *',
-                        border: OutlineInputBorder(), isDense: true),
-                    items: samples.map((s) {
-                      final lbl = [s['sample_code']?.toString()]
-                          .where((v) => v != null && v.isNotEmpty).join(' — ');
-                      return DropdownMenuItem(value: s['sample_code'],
-                          child: Text(lbl, overflow: TextOverflow.ellipsis));
-                    }).toList(),
-                    onChanged: (v) => setDs(() => selId = v),
+        builder: (ctx, setDs) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          title: const Text('New Strain'),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'A strain must originate from a sample.',
+                  style: TextStyle(fontSize: 13, color: ctx.appTextMuted),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<dynamic>(
+                  initialValue: selId,
+                  decoration: const InputDecoration(
+                    labelText: 'Source Sample *',
+                    border: OutlineInputBorder(),
+                    isDense: true,
                   ),
-                  const SizedBox(height: 16),
-                  TextField(controller: codeCtrl, decoration: const InputDecoration(
-                      labelText: 'Strain Code', border: OutlineInputBorder(), isDense: true)),
-                ])),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: selId == null ? null : () => Navigator.pop(ctx, true),
-                      child: const Text('Create')),
-                ],
-              )),
+                  items: samples.map((s) {
+                    final lbl = [
+                      s['sample_code']?.toString(),
+                    ].where((v) => v != null && v.isNotEmpty).join(' — ');
+                    return DropdownMenuItem(
+                      value: s['sample_code'],
+                      child: Text(lbl, overflow: TextOverflow.ellipsis),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setDs(() => selId = v),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: codeCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Strain Code',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: selId == null ? null : () => Navigator.pop(ctx, true),
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
     );
     if (ok != true || selId == null) return;
 
     final match = samples.where((s) => s['sample_code'] == selId).toList();
     if (match.isEmpty) {
-      debugPrint('[StrainsPage] CREATE BLOCKED: selId=$selId not found in '
-          'loaded samples (${samples.length}). Refusing to insert to avoid FK error.');
+      debugPrint(
+        '[StrainsPage] CREATE BLOCKED: selId=$selId not found in '
+        'loaded samples (${samples.length}). Refusing to insert to avoid FK error.',
+      );
       _snack('Selected sample not found — please reopen and pick again.');
       return;
     }
@@ -905,14 +1204,20 @@ class _StrainsPageState extends State<StrainsPage> {
           .insert(payload)
           .select()
           .single();
-      debugPrint('[StrainsPage] insert OK: strain_id=${res['strain_id']} '
-          'strain_code=${res['strain_code']}');
+      debugPrint(
+        '[StrainsPage] insert OK: strain_id=${res['strain_id']} '
+        'strain_code=${res['strain_code']}',
+      );
       unawaited(BackupService.instance.notifyCrudChange('strains'));
-      if (mounted) {
-        Navigator.push(context, MaterialPageRoute(builder: (_) =>
-            StrainDetailPage(strainId: res['strain_id'], onSaved: _load)))
-            .then((_) => _load());
-      }
+        if (mounted) {
+          Navigator.push(
+            context,
+            modulePageRoute(
+              context: context,
+              child: StrainDetailPage(strainId: res['strain_id'], onSaved: _load),
+            ),
+          ).then((_) => _load());
+        }
     } catch (e, st) {
       debugPrint(st.toString());
       _snack('Error creating strain: $e');
@@ -942,492 +1247,828 @@ class _StrainsPageState extends State<StrainsPage> {
               onExport: _exportSelectedCsv,
             )
           : null,
-      body: Column(children: [
-        if (!_selectionMode)
-          buildStrainsToolbar(
-            context: context,
-            desktop: desktop,
-            filterSampleId: widget.filterSampleId,
-            showFilters: _showFilters,
-            filteredCount: _filtered.length,
-            totalCount: _rows.length,
-            search: _search,
-            searchController: _searchController,
-            onSearchChanged: (v) { setState(() => _search = v); _applyFilter(); },
-            onToggleFilters: () => setState(() => _showFilters = !_showFilters),
-            onToggleColManager: () => setState(() => _showColManager = !_showColManager),
-            onImport: () async {
-              final ok = await Navigator.push<bool>(context,
-                  MaterialPageRoute(builder: (_) => const ExcelImportPage(mode: 'strains')));
-              if (ok == true) _load();
-            },
-            onExport: _enterSelectionMode,
-            onAdd: _showAddStrainDialog,
-          ),
-        StrainsToolbar(
-          activeFilters: _activeFilters,
-          sortKeys: _sortKeys,
-          sortDirs: _sortDirs,
-          periodicityOptions: _periodicityOptions,
-          selectedPeriodicity: _selectedPeriodicity,
-          onClearSort: _resetSort,
-          onRemoveSortKey: (i, key) {
-            setState(() { _sortKeys.removeAt(i); _sortDirs.remove(key); });
-            _saveSortPrefs(); _applySort();
-          },
-          onPeriodicityChanged: (v) { setState(() => _selectedPeriodicity = v); _applyFilter(); },
-          onClearFilters: () {
-            setState(() { _activeFilters.clear(); _selectedPeriodicity = null; });
-            _applyFilter();
-          },
-        ),
-        if (_showFilters)
-          StrainsFilterPanel(
+      body: Column(
+        children: [
+          if (!_selectionMode)
+            buildStrainsToolbar(
+              context: context,
+              desktop: desktop,
+              filterSampleId: widget.filterSampleId,
+              showFilters: _showFilters,
+              filteredCount: _filtered.length,
+              totalCount: _rows.length,
+              search: _search,
+              searchController: _searchController,
+              onSearchChanged: (v) {
+                setState(() => _search = v);
+                _applyFilter();
+              },
+              onToggleFilters: () =>
+                  setState(() => _showFilters = !_showFilters),
+              onToggleColManager: () =>
+                  setState(() => _showColManager = !_showColManager),
+              onImport: () async {
+                final ok = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ExcelImportPage(mode: 'strains'),
+                  ),
+                );
+                if (ok == true) _load();
+              },
+              onExport: _enterSelectionMode,
+              onExportMirri: _exportMirriCsv,
+              onAdd: _showAddStrainDialog,
+            ),
+          StrainsToolbar(
             activeFilters: _activeFilters,
-            hideEmpty: _hideEmpty,
-            onDetectEmpty: () {
-              setState(() { _hideEmpty = true; _detectEmptyCols(); });
-              _saveHideEmptyPref(true);
+            sortKeys: _sortKeys,
+            sortDirs: _sortDirs,
+            periodicityOptions: _periodicityOptions,
+            selectedPeriodicity: _selectedPeriodicity,
+            onClearSort: _resetSort,
+            onRemoveSortKey: (i, key) {
+              setState(() {
+                _sortKeys.removeAt(i);
+                _sortDirs.remove(key);
+              });
+              _saveSortPrefs();
+              _applySort();
             },
-            onShowEmpty: () {
-              setState(() { _hideEmpty = false; _emptyColKeys = {}; });
-              _saveHideEmptyPref(false);
+            onPeriodicityChanged: (v) {
+              setState(() => _selectedPeriodicity = v);
+              _applyFilter();
             },
-            onAddFilter: (f) { setState(() => _activeFilters.add(f)); },
-            onRemoveFilter: (f) { setState(() => _activeFilters.remove(f)); _applyFilter(); },
-            onFilterChanged: (f, v) { f.value = v; _applyFilter(); },
+            onClearFilters: () {
+              setState(() {
+                _activeFilters.clear();
+                _selectedPeriodicity = null;
+              });
+              _applyFilter();
+            },
           ),
-        if (_showColManager)
-          StrainsColumnManager(
-            colOrder: _colOrder,
-            colWidths: _colWidths,
-            hiddenCols: _hiddenCols,
-            emptyColKeys: _emptyColKeys,
-            onClose: () => setState(() => _showColManager = false),
-            onResetAll: () async {
-              await _resetColWidths(); await _resetColOrder();
-              setState(() => _hiddenCols = {});
-              _snack('All column settings reset');
-            },
-            onReorder: (key, newPos) {
-              final base = _colOrder ?? strainAllColumns.map((c) => c.key).toList();
-              final extra = strainAllColumns.map((c) => c.key).where((k) => !base.contains(k));
-              final display = [...base, ...extra];
-              final m = List<String>.from(display)..remove(key);
-              m.insert(newPos.clamp(1, display.length) - 1, key);
-              setState(() => _colOrder = m);
-              _saveColOrder();
-            },
-            onWidthChanged: (key, w) { setState(() => _colWidths[key] = w); _saveColWidth(key, w); },
-            onVisibilityChanged: (key, v) => setState(() {
-              if (v) {
-                _hiddenCols.remove(key);
-              } else {
-                _hiddenCols.add(key);
-              }
-            }),
-          ),
-        if (_loading)
-          Expanded(child: Center(child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text('Loading strains…', style: TextStyle(color: context.appTextSecondary, fontSize: 14)),
-            ],
-          )))
-        else
-          Expanded(child: _buildGrid()),
-      ]),
+          if (_showFilters)
+            StrainsFilterPanel(
+              activeFilters: _activeFilters,
+              hideEmpty: _hideEmpty,
+              onDetectEmpty: () {
+                setState(() {
+                  _hideEmpty = true;
+                  _detectEmptyCols();
+                });
+                _saveHideEmptyPref(true);
+              },
+              onShowEmpty: () {
+                setState(() {
+                  _hideEmpty = false;
+                  _emptyColKeys = {};
+                });
+                _saveHideEmptyPref(false);
+              },
+              onAddFilter: (f) {
+                setState(() => _activeFilters.add(f));
+              },
+              onRemoveFilter: (f) {
+                setState(() => _activeFilters.remove(f));
+                _applyFilter();
+              },
+              onFilterChanged: (f, v) {
+                f.value = v;
+                _applyFilter();
+              },
+            ),
+          if (_showColManager)
+            StrainsColumnManager(
+              colOrder: _colOrder,
+              colWidths: _colWidths,
+              hiddenCols: _hiddenCols,
+              emptyColKeys: _emptyColKeys,
+              onClose: () => setState(() => _showColManager = false),
+              onResetAll: () async {
+                await _resetColWidths();
+                await _resetColOrder();
+                setState(() => _hiddenCols = {});
+                _snack('All column settings reset');
+              },
+              onReorder: (key, newPos) {
+                final base =
+                    _colOrder ?? strainAllColumns.map((c) => c.key).toList();
+                final extra = strainAllColumns
+                    .map((c) => c.key)
+                    .where((k) => !base.contains(k));
+                final display = [...base, ...extra];
+                final m = List<String>.from(display)..remove(key);
+                m.insert(newPos.clamp(1, display.length) - 1, key);
+                setState(() => _colOrder = m);
+                _saveColOrder();
+              },
+              onWidthChanged: (key, w) {
+                setState(() => _colWidths[key] = w);
+                _saveColWidth(key, w);
+              },
+              onVisibilityChanged: (key, v) => setState(() {
+                if (v) {
+                  _hiddenCols.remove(key);
+                } else {
+                  _hiddenCols.add(key);
+                }
+              }),
+            ),
+          if (_loading)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Loading strains…',
+                      style: TextStyle(
+                        color: context.appTextSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(child: _buildGrid()),
+        ],
+      ),
     );
   }
 
   // ── Grid ──────────────────────────────────────────────────────────────────
   Widget _buildGrid() {
     if (_filtered.isEmpty) {
-      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.science_outlined, size: 56, color: context.appTextMuted),
-        const SizedBox(height: 12),
-        Text('No strains found', style: TextStyle(color: context.appTextMuted, fontSize: 15)),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-            onPressed: _showAddStrainDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Add First Strain'),
-            style: FilledButton.styleFrom(backgroundColor: context.appSurface2)),
-      ]));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.science_outlined, size: 56, color: context.appTextMuted),
+            const SizedBox(height: 12),
+            Text(
+              'No strains found',
+              style: TextStyle(color: context.appTextMuted, fontSize: 15),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _showAddStrainDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Add First Strain'),
+              style: FilledButton.styleFrom(
+                backgroundColor: context.appSurface2,
+              ),
+            ),
+          ],
+        ),
+      );
     }
     final cols = _visibleCols;
-    final totalWidth = (_selectionMode ? AppDS.tableCheckW : 0.0) +
-        AppDS.tableOpenW * 2 + cols.fold(0.0, (s, c) => s + _colWidth(c));
+    final totalWidth =
+        (_selectionMode ? AppDS.tableCheckW : 0.0) +
+        AppDS.tableOpenW * 2 +
+        cols.fold(0.0, (s, c) => s + _colWidth(c));
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Column(children: [
-        Expanded(
-          child: Row(children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: context.appSurface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: context.appBorder),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: (n) {
-                    if (n is ScrollUpdateNotification) {
-                      if (n.metrics.axis == Axis.horizontal) {
-                        _hOffset.value = _hScroll.hasClients ? _hScroll.offset : 0.0;
-                      } else if (n.metrics.axis == Axis.vertical) {
-                        _vOffset.value = _vScroll.hasClients ? _vScroll.offset : 0.0;
-                      }
-                    }
-                    return false;
-                  },
-                  child: SingleChildScrollView(
-                    controller: _hScroll,
-                    scrollDirection: Axis.horizontal,
-                    child: SizedBox(
-                      width: totalWidth,
-                      child: Column(children: [
-                        _buildHeaderRow(cols),
-                        Expanded(
-                          child: ListView.builder(
-                            controller: _vScroll,
-                            itemCount: _filtered.length,
-                            itemExtent: AppDS.tableRowH,
-                            itemBuilder: (ctx, i) {
-                              final row = _filtered[i];
-                              return _buildDataRow(row, i, cols,
-                                  highlight: widget.highlightStrainId != null &&
-                                      row['strain_id'] == widget.highlightStrainId);
-                            },
+      child: Column(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: context.appSurface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: context.appBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (n) {
+                        if (n is ScrollUpdateNotification) {
+                          if (n.metrics.axis == Axis.horizontal) {
+                            _hOffset.value = _hScroll.hasClients
+                                ? _hScroll.offset
+                                : 0.0;
+                          } else if (n.metrics.axis == Axis.vertical) {
+                            _vOffset.value = _vScroll.hasClients
+                                ? _vScroll.offset
+                                : 0.0;
+                          }
+                        }
+                        return false;
+                      },
+                      child: SingleChildScrollView(
+                        controller: _hScroll,
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: totalWidth,
+                          child: Column(
+                            children: [
+                              _buildHeaderRow(cols),
+                              Expanded(
+                                child: ListView.builder(
+                                  controller: _vScroll,
+                                  itemCount: _filtered.length,
+                                  itemExtent: AppDS.tableRowH,
+                                  itemBuilder: (ctx, i) {
+                                    final row = _filtered[i];
+                                    return _buildDataRow(
+                                      row,
+                                      i,
+                                      cols,
+                                      highlight:
+                                          widget.highlightStrainId != null &&
+                                          row['strain_id'] ==
+                                              widget.highlightStrainId,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ]),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 4),
+                VerticalThumb(
+                  contentLength: _filtered.length * AppDS.tableRowH,
+                  topPadding: AppDS.tableHeaderH,
+                  offset: _vOffset,
+                  onScrollTo: (y) {
+                    final max = _vScroll.hasClients
+                        ? _vScroll.position.maxScrollExtent
+                        : 0.0;
+                    final clamped = y.clamp(0.0, max);
+                    _vScroll.jumpTo(clamped);
+                    _vOffset.value = clamped;
+                  },
+                ),
+              ],
             ),
-            const SizedBox(width: 4),
-            VerticalThumb(
-              contentLength: _filtered.length * AppDS.tableRowH,
-              topPadding: AppDS.tableHeaderH,
-              offset: _vOffset,
-              onScrollTo: (y) {
-                final max = _vScroll.hasClients ? _vScroll.position.maxScrollExtent : 0.0;
-                final clamped = y.clamp(0.0, max);
-                _vScroll.jumpTo(clamped);
-                _vOffset.value = clamped;
-              },
-            ),
-          ]),
-        ),
-        const SizedBox(height: 4),
-        HorizontalThumb(
-          contentWidth: totalWidth,
-          offset: _hOffset,
-          onScrollTo: (x) {
-            final max = (totalWidth - 400).clamp(0.0, double.infinity);
-            _hScroll.jumpTo(x.clamp(0.0, max));
-            _hOffset.value = x.clamp(0.0, max);
-          },
-        ),
-        const SizedBox(height: 8),
-      ]),
+          ),
+          const SizedBox(height: 4),
+          HorizontalThumb(
+            contentWidth: totalWidth,
+            offset: _hOffset,
+            onScrollTo: (x) {
+              final max = (totalWidth - 400).clamp(0.0, double.infinity);
+              _hScroll.jumpTo(x.clamp(0.0, max));
+              _hOffset.value = x.clamp(0.0, max);
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 
   // ── Header row ────────────────────────────────────────────────────────────
   Widget _buildHeaderRow(List<StrainColDef> cols) {
-    final allRowsSel = _filtered.isNotEmpty && _selectedRowIds.length == _filtered.length;
+    final allRowsSel =
+        _filtered.isNotEmpty && _selectedRowIds.length == _filtered.length;
     return Container(
       height: AppDS.tableHeaderH,
       decoration: BoxDecoration(
-          color: context.appHeaderBg,
-          border: Border(bottom: BorderSide(color: context.appBorder))),
-      child: Row(children: [
-        if (_selectionMode)
-          SizedBox(width: AppDS.tableCheckW, child: Center(child: Checkbox(
-            value: allRowsSel ? true : (_selectedRowIds.isEmpty ? false : null),
-            tristate: true, onChanged: (_) => _selectAllRows(),
-            activeColor: AppDS.accent, checkColor: Colors.white,
-            side: BorderSide(color: context.appBorder2, width: 1.5),
-          ))),
-        SizedBox(width: AppDS.tableOpenW * 2),
-        ...List.generate(cols.length, (i) {
-          final col = cols[i];
-          return Row(mainAxisSize: MainAxisSize.min, children: [
-            if (_dropTargetIndex == i)
-              Container(width: 2, height: AppDS.tableHeaderH, color: AppDS.blue),
-            Opacity(
-              opacity: _draggingColKey == col.key ? 0.35 : 1.0,
-              child: DraggableHeader(
-                col: col, allVisibleCols: cols, colWidthFn: _colWidth,
-                onDragStart: () => setState(() { _draggingColKey = col.key; _dropTargetIndex = null; }),
-                onDragUpdate: (lx) {
-                  double acc = 0; int slot = cols.length;
-                  for (int j = 0; j < cols.length; j++) {
-                    if (lx < acc + _colWidth(cols[j]) / 2) { slot = j; break; }
-                    acc += _colWidth(cols[j]);
-                  }
-                  if (_dropTargetIndex != slot) setState(() => _dropTargetIndex = slot);
-                },
-                onDragEnd: () {
-                  if (_dropTargetIndex != null && _draggingColKey != null) {
-                    _reorderCol(_draggingColKey!, _dropTargetIndex!);
-                  } else {
-                    setState(() { _draggingColKey = null; _dropTargetIndex = null; });
-                  }
-                },
-                onTapSort: () => _onSort(col.key),
-                onTapInSelectionMode: _selectionMode ? () => _toggleColSelection(col.key) : null,
-                child: _buildHeaderCell(col,
-                    isColSelected: _selectionMode && _selectedColKeys.contains(col.key)),
+        color: context.appHeaderBg,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
+      child: Row(
+        children: [
+          if (_selectionMode)
+            SizedBox(
+              width: AppDS.tableCheckW,
+              child: Center(
+                child: Checkbox(
+                  value: allRowsSel
+                      ? true
+                      : (_selectedRowIds.isEmpty ? false : null),
+                  tristate: true,
+                  onChanged: (_) => _selectAllRows(),
+                  activeColor: AppDS.accent,
+                  checkColor: Colors.white,
+                  side: BorderSide(color: context.appBorder2, width: 1.5),
+                ),
               ),
             ),
-            if (i == cols.length - 1 && _dropTargetIndex == cols.length)
-              Container(width: 2, height: AppDS.tableHeaderH, color: AppDS.blue),
-          ]);
-        }),
-      ]),
+          SizedBox(width: AppDS.tableOpenW * 2),
+          ...List.generate(cols.length, (i) {
+            final col = cols[i];
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_dropTargetIndex == i)
+                  Container(
+                    width: 2,
+                    height: AppDS.tableHeaderH,
+                    color: AppDS.blue,
+                  ),
+                Opacity(
+                  opacity: _draggingColKey == col.key ? 0.35 : 1.0,
+                  child: DraggableHeader(
+                    col: col,
+                    allVisibleCols: cols,
+                    colWidthFn: _colWidth,
+                    onDragStart: () => setState(() {
+                      _draggingColKey = col.key;
+                      _dropTargetIndex = null;
+                    }),
+                    onDragUpdate: (lx) {
+                      double acc = 0;
+                      int slot = cols.length;
+                      for (int j = 0; j < cols.length; j++) {
+                        if (lx < acc + _colWidth(cols[j]) / 2) {
+                          slot = j;
+                          break;
+                        }
+                        acc += _colWidth(cols[j]);
+                      }
+                      if (_dropTargetIndex != slot) {
+                        setState(() => _dropTargetIndex = slot);
+                      }
+                    },
+                    onDragEnd: () {
+                      if (_dropTargetIndex != null && _draggingColKey != null) {
+                        _reorderCol(_draggingColKey!, _dropTargetIndex!);
+                      } else {
+                        setState(() {
+                          _draggingColKey = null;
+                          _dropTargetIndex = null;
+                        });
+                      }
+                    },
+                    onTapSort: () => _onSort(col.key),
+                    onTapInSelectionMode: _selectionMode
+                        ? () => _toggleColSelection(col.key)
+                        : null,
+                    child: _buildHeaderCell(
+                      col,
+                      isColSelected:
+                          _selectionMode && _selectedColKeys.contains(col.key),
+                    ),
+                  ),
+                ),
+                if (i == cols.length - 1 && _dropTargetIndex == cols.length)
+                  Container(
+                    width: 2,
+                    height: AppDS.tableHeaderH,
+                    color: AppDS.blue,
+                  ),
+              ],
+            );
+          }),
+        ],
+      ),
     );
   }
 
   Widget _buildHeaderCell(StrainColDef col, {required bool isColSelected}) {
     final sortIndex = _sortKeys.indexOf(col.key);
-    final width     = _colWidth(col);
+    final width = _colWidth(col);
     Color bg = isColSelected ? AppDS.blue800 : Colors.transparent;
 
     return SizedBox(
-      width: width, height: AppDS.tableHeaderH,
-      child: Stack(clipBehavior: Clip.none, children: [
-        MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: Container(
-            width: width, height: AppDS.tableHeaderH,
-            decoration: BoxDecoration(
+      width: width,
+      height: AppDS.tableHeaderH,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: Container(
+              width: width,
+              height: AppDS.tableHeaderH,
+              decoration: BoxDecoration(
                 color: bg,
-                border: Border(right: BorderSide(color: context.appBorder))),
-            padding: const EdgeInsets.only(left: 8, right: 14),
-            child: Row(children: [
-              if (isColSelected)
-                Padding(padding: const EdgeInsets.only(right: 5),
-                    child: Icon(Icons.check_box_rounded, size: 11, color: Colors.white.withValues(alpha: 0.85))),
-              Expanded(child: Text(col.label,
-                  style: AppDS.tableHeaderStyle.copyWith(
-                    color: isColSelected ? Colors.white
-                        : col.readOnly ? context.appTextMuted
-                        : context.appHeaderText),
-                  overflow: TextOverflow.ellipsis)),
-              if (!_selectionMode)
-                if (sortIndex >= 0)
-                  Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(_sortDirs[col.key] == true
-                        ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                        size: 11, color: AppDS.blue),
-                    if (_sortKeys.length > 1) ...[
-                      const SizedBox(width: 2),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                        decoration: BoxDecoration(color: AppDS.blue,
-                            borderRadius: BorderRadius.circular(2)),
-                        child: Text('${sortIndex + 1}', style: const TextStyle(
-                            fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                border: Border(right: BorderSide(color: context.appBorder)),
+              ),
+              padding: const EdgeInsets.only(left: 8, right: 14),
+              child: Row(
+                children: [
+                  if (isColSelected)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 5),
+                      child: Icon(
+                        Icons.check_box_rounded,
+                        size: 11,
+                        color: Colors.white.withValues(alpha: 0.85),
                       ),
-                    ],
-                  ]),
-            ]),
+                    ),
+                  Expanded(
+                    child: Text(
+                      col.label,
+                      style: AppDS.tableHeaderStyle.copyWith(
+                        color: isColSelected
+                            ? Colors.white
+                            : col.readOnly
+                            ? context.appTextMuted
+                            : context.appHeaderText,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (!_selectionMode)
+                    if (sortIndex >= 0)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _sortDirs[col.key] == true
+                                ? Icons.arrow_upward_rounded
+                                : Icons.arrow_downward_rounded,
+                            size: 11,
+                            color: AppDS.blue,
+                          ),
+                          if (_sortKeys.length > 1) ...[
+                            const SizedBox(width: 2),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 3,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppDS.blue,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                              child: Text(
+                                '${sortIndex + 1}',
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                ],
+              ),
+            ),
           ),
-        ),
-        if (!_selectionMode)
-          Positioned(right: -4, top: 0, bottom: 0, width: 8,
+          if (!_selectionMode)
+            Positioned(
+              right: -4,
+              top: 0,
+              bottom: 0,
+              width: 8,
               child: ColResizeHandle(
-                onDrag: (d) => setState(() =>
-                    _colWidths[col.key] = (_colWidth(col) + d).clamp(strainMinColWidth, 600.0)),
+                onDrag: (d) => setState(
+                  () => _colWidths[col.key] = (_colWidth(col) + d).clamp(
+                    strainMinColWidth,
+                    600.0,
+                  ),
+                ),
                 onDragEnd: () => _saveColWidth(col.key, _colWidth(col)),
-              )),
-      ]),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
   // ── Data row ──────────────────────────────────────────────────────────────
-  Widget _buildDataRow(Map<String, dynamic> row, int index, List<StrainColDef> cols,
-      {bool highlight = false}) {
+  Widget _buildDataRow(
+    Map<String, dynamic> row,
+    int index,
+    List<StrainColDef> cols, {
+    bool highlight = false,
+  }) {
     final isSelected = _selectedRowIds.contains(row['strain_id']);
-    final isDark     = Theme.of(context).brightness == Brightness.dark;
-    final baseEven   = context.appSurface;
-    final baseOdd    = context.appSurface2;
-    final selColor   = isDark ? const Color(0xFF1E3A5F) : AppDS.tableRowSel;
-    final status     = row['strain_status']?.toString().toUpperCase();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseEven = context.appSurface;
+    final baseOdd = context.appSurface2;
+    final selColor = isDark ? const Color(0xFF1E3A5F) : AppDS.tableRowSel;
+    final status = row['strain_status']?.toString().toUpperCase();
     final needNewTransfer = row['strain_need_new_transfer'] == true;
     Color? statusBg;
     if (status == 'DEAD') {
-      statusBg = isDark ? AppDS.red.withValues(alpha: 0.22) : const Color(0xFFFECACA);
+      statusBg = isDark
+          ? AppDS.red.withValues(alpha: 0.22)
+          : const Color(0xFFFECACA);
     } else if (status == 'INCARE') {
-      statusBg = isDark ? AppDS.yellow.withValues(alpha: 0.18) : const Color(0xFFFEF3C7);
+      statusBg = isDark
+          ? AppDS.yellow.withValues(alpha: 0.18)
+          : const Color(0xFFFEF3C7);
     } else if (needNewTransfer) {
-      statusBg = isDark ? AppDS.orange.withValues(alpha: 0.20) : const Color(0xFFFED7AA);
+      statusBg = isDark
+          ? AppDS.orange.withValues(alpha: 0.20)
+          : const Color(0xFFFED7AA);
     }
-    Color rowBg = isSelected ? selColor
-        : highlight ? (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFDEF1FF))
+    Color rowBg = isSelected
+        ? selColor
+        : highlight
+        ? (isDark ? const Color(0xFF1E3A5F) : const Color(0xFFDEF1FF))
         : statusBg ?? (index.isEven ? baseEven : baseOdd);
-    final cellBase = isSelected ? selColor
+    final cellBase = isSelected
+        ? selColor
         : statusBg ?? (index.isEven ? baseEven : baseOdd);
 
     return GestureDetector(
-      onTap: _selectionMode ? () => _toggleRowSelection(row['strain_id']) : null,
+      onTap: _selectionMode
+          ? () => _toggleRowSelection(row['strain_id'])
+          : null,
       child: Container(
         height: AppDS.tableRowH,
-        decoration: BoxDecoration(color: rowBg,
-            border: Border(bottom: BorderSide(color: context.appBorder, width: 0.5))),
-        child: Row(children: [
-          if (_selectionMode)
-            Container(width: AppDS.tableCheckW, height: AppDS.tableRowH, color: cellBase,
-                child: Center(child: Checkbox(
-                  value: isSelected, onChanged: (_) => _toggleRowSelection(row['strain_id']),
-                  visualDensity: VisualDensity.compact, activeColor: AppDS.blue800,
-                ))),
-          Container(width: AppDS.tableOpenW * 2, height: AppDS.tableRowH, color: cellBase,
-              child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                IconButton(
-                  icon: Icon(Icons.launch_rounded, size: 14,
-                      color: _selectionMode ? AppDS.textSecondary : AppDS.textSecondary),
-                  tooltip: 'Open strain', padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 12, minHeight: 16, maxWidth: 16),
-                  style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                  onPressed: _selectionMode ? null : () => _openDetail(row),
-                ),
-                SizedBox(
-                  width: 16, height: 16,
-                  child: PopupMenuButton<String>(
-                    tooltip: 'More actions',
-                    padding: EdgeInsets.zero,
-                    enabled: !_selectionMode,
-                    icon: Icon(Icons.more_vert_rounded, size: 16, color: AppDS.textSecondary),
-                    iconSize: 16,
-                    splashRadius: 12,
-                    position: PopupMenuPosition.under,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    onSelected: (v) => _onRowActionSelected(v, row),
-                    itemBuilder: (ctx) {
-                      final marked = row['strain_need_new_transfer'] == true;
-                      return [
-                    PopupMenuItem(
-                      value: 'need_transfer',
-                      child: Row(children: [
-                        Icon(marked ? Icons.event_available_rounded : Icons.event_repeat_rounded,
-                            size: 16, color: AppDS.orange),
-                        const SizedBox(width: 10),
-                        Text(marked ? 'Remove need new transfer mark' : 'Mark needs new transfer',
-                            style: const TextStyle(fontSize: 13)),
-                      ]),
-                    ),
-                    PopupMenuItem(
-                      value: 'request',
-                      child: Row(children: [
-                        Icon(Icons.outbox_outlined, size: 16, color: AppDS.textSecondary),
-                        const SizedBox(width: 10),
-                        const Text('Quick request', style: TextStyle(fontSize: 13)),
-                      ]),
-                    ),
-                    PopupMenuItem(
-                      value: 'print',
-                      child: Row(children: [
-                        Icon(Icons.print_outlined, size: 16, color: AppDS.textSecondary),
-                        const SizedBox(width: 10),
-                        const Text('Quick print', style: TextStyle(fontSize: 13)),
-                      ]),
-                    ),
-                    const PopupMenuDivider(),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(children: [
-                        Icon(Icons.delete_forever_rounded, size: 16, color: AppDS.red),
-                        const SizedBox(width: 10),
-                        Text('Delete', style: TextStyle(fontSize: 13, color: AppDS.red)),
-                      ]),
-                    ),
-                    ];
-                    },
+        decoration: BoxDecoration(
+          color: rowBg,
+          border: Border(
+            bottom: BorderSide(color: context.appBorder, width: 0.5),
+          ),
+        ),
+        child: Row(
+          children: [
+            if (_selectionMode)
+              Container(
+                width: AppDS.tableCheckW,
+                height: AppDS.tableRowH,
+                color: cellBase,
+                child: Center(
+                  child: Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggleRowSelection(row['strain_id']),
+                    visualDensity: VisualDensity.compact,
+                    activeColor: AppDS.blue800,
                   ),
                 ),
-              ])),
-          ...cols.map((col) => _buildDataCell(row, col, cellBase)),
-        ]),
+              ),
+            Container(
+              width: AppDS.tableOpenW * 2,
+              height: AppDS.tableRowH,
+              color: cellBase,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.launch_rounded,
+                      size: 14,
+                      color: _selectionMode
+                          ? AppDS.textSecondary
+                          : AppDS.textSecondary,
+                    ),
+                    tooltip: 'Open strain',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 12,
+                      minHeight: 16,
+                      maxWidth: 16,
+                    ),
+                    style: IconButton.styleFrom(
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: _selectionMode ? null : () => _openDetail(row),
+                  ),
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: PopupMenuButton<String>(
+                      tooltip: 'More actions',
+                      padding: EdgeInsets.zero,
+                      enabled: !_selectionMode,
+                      icon: Icon(
+                        Icons.more_vert_rounded,
+                        size: 16,
+                        color: AppDS.textSecondary,
+                      ),
+                      iconSize: 16,
+                      splashRadius: 12,
+                      position: PopupMenuPosition.under,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      onSelected: (v) => _onRowActionSelected(v, row),
+                      itemBuilder: (ctx) {
+                        final marked = row['strain_need_new_transfer'] == true;
+                        return [
+                          PopupMenuItem(
+                            value: 'need_transfer',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  marked
+                                      ? Icons.event_available_rounded
+                                      : Icons.event_repeat_rounded,
+                                  size: 16,
+                                  color: AppDS.orange,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  marked
+                                      ? 'Remove need new transfer mark'
+                                      : 'Mark needs new transfer',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'request',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.outbox_outlined,
+                                  size: 16,
+                                  color: AppDS.textSecondary,
+                                ),
+                                const SizedBox(width: 10),
+                                const Text(
+                                  'Quick request',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'print',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.print_outlined,
+                                  size: 16,
+                                  color: AppDS.textSecondary,
+                                ),
+                                const SizedBox(width: 10),
+                                const Text(
+                                  'Quick print',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.delete_forever_rounded,
+                                  size: 16,
+                                  color: AppDS.red,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppDS.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ];
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...cols.map((col) => _buildDataCell(row, col, cellBase)),
+          ],
+        ),
       ),
     );
   }
 
   // ── Data cell ─────────────────────────────────────────────────────────────
-  Widget _buildDataCell(Map<String, dynamic> row, StrainColDef col, Color cellBase) {
-    final isEditing  = _editingCell?['rowId'] == row['strain_id'] && _editingCell?['key'] == col.key;
+  Widget _buildDataCell(
+    Map<String, dynamic> row,
+    StrainColDef col,
+    Color cellBase,
+  ) {
+    final isEditing =
+        _editingCell?['rowId'] == row['strain_id'] &&
+        _editingCell?['key'] == col.key;
     final isReadOnly = col.readOnly;
-    final isStatus   = col.key == 'strain_status';
-    final isComputed = col.key == 'strain_next_transfer' && row['_next_transfer_computed'] == true;
+    final isStatus = col.key == 'strain_status';
+    final isComputed =
+        col.key == 'strain_next_transfer' &&
+        row['_next_transfer_computed'] == true;
 
     return GestureDetector(
-      onDoubleTap: (_selectionMode || isReadOnly) ? null : () async {
-        if (!context.canEditModule) { context.warnReadOnly(); return; }
-        if (isStatus) {
-          final box = context.findRenderObject() as RenderBox?;
-          final pos = box?.localToGlobal(Offset.zero) ?? Offset.zero;
-          await _showStatusPicker(row, pos + const Offset(200, 200));
-        } else if (col.key == 'strain_last_transfer') {
-          await _showTransferDatePicker(row);
-        } else {
-          setState(() {
-            _editingCell = {'rowId': row['strain_id'], 'key': col.key};
-            _editController.text = row[col.key]?.toString() ?? '';
-          });
-        }
-      },
-      onLongPress: (_selectionMode || isReadOnly || !isStatus) ? null : () async {
-        if (!context.canEditModule) { context.warnReadOnly(); return; }
-        final box = context.findRenderObject() as RenderBox?;
-        final pos = box?.localToGlobal(Offset.zero) ?? Offset.zero;
-        await _showStatusPicker(row, pos + const Offset(200, 200));
-      },
+      onDoubleTap: (_selectionMode || isReadOnly)
+          ? null
+          : () async {
+              if (!context.canEditModule) {
+                context.warnReadOnly();
+                return;
+              }
+              if (isStatus) {
+                final box = context.findRenderObject() as RenderBox?;
+                final pos = box?.localToGlobal(Offset.zero) ?? Offset.zero;
+                await _showStatusPicker(row, pos + const Offset(200, 200));
+              } else if (col.key == 'strain_last_transfer') {
+                await _showTransferDatePicker(row);
+              } else {
+                setState(() {
+                  _editingCell = {'rowId': row['strain_id'], 'key': col.key};
+                  _editController.text = row[col.key]?.toString() ?? '';
+                });
+              }
+            },
+      onLongPress: (_selectionMode || isReadOnly || !isStatus)
+          ? null
+          : () async {
+              if (!context.canEditModule) {
+                context.warnReadOnly();
+                return;
+              }
+              final box = context.findRenderObject() as RenderBox?;
+              final pos = box?.localToGlobal(Offset.zero) ?? Offset.zero;
+              await _showStatusPicker(row, pos + const Offset(200, 200));
+            },
       child: Container(
-        width: _colWidth(col), height: AppDS.tableRowH,
+        width: _colWidth(col),
+        height: AppDS.tableRowH,
         decoration: BoxDecoration(
-            color: cellBase,
-            border: Border(right: BorderSide(color: context.appBorder))),
+          color: cellBase,
+          border: Border(right: BorderSide(color: context.appBorder)),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: isEditing
-            ? Center(child: TextField(
-                controller: _editController, autofocus: true,
-                style: TextStyle(fontSize: 12, color: context.appTextPrimary),
-                decoration: InputDecoration(
+            ? Center(
+                child: TextField(
+                  controller: _editController,
+                  autofocus: true,
+                  style: TextStyle(fontSize: 12, color: context.appTextPrimary),
+                  decoration: InputDecoration(
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                     focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: const BorderSide(color: AppDS.blue500, width: 1.5))),
-                onSubmitted: (v) => _commitEdit(row, col.key, v),
-                onTapOutside: (_) => _commitEdit(row, col.key, _editController.text),
-              ))
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: const BorderSide(
+                        color: AppDS.blue500,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  onSubmitted: (v) => _commitEdit(row, col.key, v),
+                  onTapOutside: (_) =>
+                      _commitEdit(row, col.key, _editController.text),
+                ),
+              )
             : Align(
                 alignment: Alignment.centerLeft,
                 child: isStatus
                     ? StatusCell(status: row['strain_status']?.toString())
-                    : Row(mainAxisSize: MainAxisSize.min, children: [
-                        if (isComputed) ...[
-                          Tooltip(message: 'Calculated from last transfer + cycle days',
-                              child: Icon(Icons.calculate_outlined, size: 11, color: AppDS.blue)),
-                          const SizedBox(width: 4),
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isComputed) ...[
+                            Tooltip(
+                              message:
+                                  'Calculated from last transfer + cycle days',
+                              child: Icon(
+                                Icons.calculate_outlined,
+                                size: 11,
+                                color: AppDS.blue,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              row[col.key]?.toString() ?? '',
+                              style: isReadOnly
+                                  ? TextStyle(
+                                      fontSize: 12,
+                                      color: context.appTextMuted,
+                                    )
+                                  : isComputed
+                                  ? const TextStyle(
+                                      fontSize: 12,
+                                      color: AppDS.blue500,
+                                      fontStyle: FontStyle.italic,
+                                    )
+                                  : TextStyle(
+                                      fontSize: 12,
+                                      color: context.appTextPrimary,
+                                    ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
-                        Flexible(child: Text(
-                          row[col.key]?.toString() ?? '',
-                          style: isReadOnly ? TextStyle(fontSize: 12, color: context.appTextMuted)
-                              : isComputed  ? const TextStyle(fontSize: 12, color: AppDS.blue500, fontStyle: FontStyle.italic)
-                              : TextStyle(fontSize: 12, color: context.appTextPrimary),
-                          overflow: TextOverflow.ellipsis)),
-                      ]),
+                      ),
               ),
       ),
     );
