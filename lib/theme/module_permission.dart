@@ -78,7 +78,13 @@ const kPermissionModuleLabels = <String, String>{
 const kPermissionModuleGroups = <String, List<String>>{
   'Overview': ['dashboard', 'labels', 'chat', 'backups', 'requests', 'tools'],
   'Culture Collection': ['strains', 'samples', 'sops_inventory'],
-  'Fish Facility': ['fish_stock', 'fish_tankmap', 'fish_lines', 'fish_water_qc', 'sops_fish'],
+  'Fish Facility': [
+    'fish_stock',
+    'fish_tankmap',
+    'fish_lines',
+    'fish_water_qc',
+    'sops_fish',
+  ],
   'Resources': ['lab', 'locations', 'reagents', 'equipment', 'reservations'],
   'Admin': ['audit', 'users', 'settings'],
 };
@@ -112,12 +118,7 @@ const kPermissionPageAccessOptions = <String>[
   'write',
 ];
 
-const kPermissionScopeOptions = <String>[
-  'own',
-  'team',
-  'institution',
-  'all',
-];
+const kPermissionScopeOptions = <String>['own', 'team', 'institution', 'all'];
 
 const kPermissionPublicationOptions = <String>[
   'inherit',
@@ -136,7 +137,13 @@ const kPermissionResponsibilityOptions = <String>[
   'all',
 ];
 
-const _roleOrder = ['viewer', 'technician', 'researcher', 'admin', 'superadmin'];
+const _roleOrder = [
+  'viewer',
+  'technician',
+  'researcher',
+  'admin',
+  'superadmin',
+];
 const _mutatingActionKeys = <String>{
   'insert',
   'edit',
@@ -155,6 +162,19 @@ bool _hasRole(String userRole, String requiredRole) {
 String _normalizeOption(String? value, List<String> options, String fallback) {
   if (value == null) return fallback;
   return options.contains(value) ? value : fallback;
+}
+
+String _normalizeLegacyPermissionValue(String? value) {
+  switch (value?.trim().toLowerCase()) {
+    case 'write':
+      return 'write';
+    case 'read':
+    case 'see':
+    case 'view':
+      return 'read';
+    default:
+      return 'none';
+  }
 }
 
 bool _asBool(dynamic value) {
@@ -187,11 +207,14 @@ String resolveLegacyModulePermission({
 
   final col = kModulePermissionColumns[moduleId];
   if (col == null) return 'write';
-  return userRow[col]?.toString() ?? 'none';
+  return _normalizeLegacyPermissionValue(userRow[col]?.toString());
 }
 
 Map<String, dynamic> normalizeUserPermissionsJson(dynamic raw) {
-  final normalized = <String, dynamic>{'version': 1, 'pages': <String, dynamic>{}};
+  final normalized = <String, dynamic>{
+    'version': 1,
+    'pages': <String, dynamic>{},
+  };
   if (raw is! Map) return normalized;
 
   final result = Map<String, dynamic>.from(raw);
@@ -200,7 +223,9 @@ Map<String, dynamic> normalizeUserPermissionsJson(dynamic raw) {
   if (pagesRaw is Map) {
     for (final entry in pagesRaw.entries) {
       if (entry.key is String && entry.value is Map) {
-        pages[entry.key as String] = Map<String, dynamic>.from(entry.value as Map);
+        pages[entry.key as String] = Map<String, dynamic>.from(
+          entry.value as Map,
+        );
       }
     }
   }
@@ -221,12 +246,11 @@ Set<String> _defaultActionsForPagePermission(String permission) {
   }
 }
 
-ModuleAccess moduleAccessFromPagePermission(String moduleId, String permission) {
-  final normalized = permission == 'write'
-      ? 'write'
-      : permission == 'read'
-          ? 'read'
-          : 'none';
+ModuleAccess moduleAccessFromPagePermission(
+  String moduleId,
+  String permission,
+) {
+  final normalized = _normalizeLegacyPermissionValue(permission);
   return ModuleAccess(
     moduleId: moduleId,
     pagePermission: normalized,
@@ -254,10 +278,16 @@ ModuleAccess resolveModuleAccess({
     userRow: userRow,
   );
 
-  final permissionJson = normalizeUserPermissionsJson(userRow['user_permissions_json']);
-  final pages = Map<String, dynamic>.from(permissionJson['pages'] as Map? ?? const {});
+  final permissionJson = normalizeUserPermissionsJson(
+    userRow['user_permissions_json'],
+  );
+  final pages = Map<String, dynamic>.from(
+    permissionJson['pages'] as Map? ?? const {},
+  );
   final rawRule = pages[moduleId];
-  final rule = rawRule is Map ? Map<String, dynamic>.from(rawRule) : <String, dynamic>{};
+  final rule = rawRule is Map
+      ? Map<String, dynamic>.from(rawRule)
+      : <String, dynamic>{};
   final hasGranularRules = rule.isNotEmpty;
 
   final pageAccess = _normalizeOption(
@@ -265,7 +295,9 @@ ModuleAccess resolveModuleAccess({
     kPermissionPageAccessOptions,
     'inherit',
   );
-  final basePermission = pageAccess == 'inherit' ? legacyPermission : pageAccess;
+  final basePermission = pageAccess == 'inherit'
+      ? legacyPermission
+      : pageAccess;
 
   final actions = _defaultActionsForPagePermission(basePermission);
   final rawActions = rule['actions'];
@@ -336,33 +368,33 @@ class ModuleAccess {
   });
 
   const ModuleAccess.full({this.moduleId = ''})
-      : pagePermission = 'write',
-        actions = const {
-          'view',
-          'insert',
-          'edit',
-          'delete',
-          'approve',
-          'export',
-          'print',
-          'bulk_update',
-        },
-        scope = 'all',
-        publicationAccess = 'public',
-        responsibilityScope = 'all',
-        recordLockBypass = true,
-        workflowEditStates = const [],
-        hasGranularRules = false;
+    : pagePermission = 'write',
+      actions = const {
+        'view',
+        'insert',
+        'edit',
+        'delete',
+        'approve',
+        'export',
+        'print',
+        'bulk_update',
+      },
+      scope = 'all',
+      publicationAccess = 'public',
+      responsibilityScope = 'all',
+      recordLockBypass = true,
+      workflowEditStates = const [],
+      hasGranularRules = false;
 
   const ModuleAccess.none({this.moduleId = ''})
-      : pagePermission = 'none',
-        actions = const {},
-        scope = 'own',
-        publicationAccess = 'none',
-        responsibilityScope = 'inherit',
-        recordLockBypass = false,
-        workflowEditStates = const [],
-        hasGranularRules = false;
+    : pagePermission = 'none',
+      actions = const {},
+      scope = 'own',
+      publicationAccess = 'none',
+      responsibilityScope = 'inherit',
+      recordLockBypass = false,
+      workflowEditStates = const [],
+      hasGranularRules = false;
 
   bool allows(String action) => actions.contains(action);
   bool get canView => allows('view');
@@ -397,7 +429,8 @@ class ModulePermission extends InheritedWidget {
   static ModuleAccess? maybeAccessOf(BuildContext context) =>
       maybeOfWidget(context)?.access;
 
-  static String? maybeOf(BuildContext context) => maybeAccessOf(context)?.pagePermission;
+  static String? maybeOf(BuildContext context) =>
+      maybeAccessOf(context)?.pagePermission;
 
   static ModuleAccess accessOf(BuildContext context) =>
       maybeAccessOf(context) ?? const ModuleAccess.full();
@@ -424,7 +457,8 @@ class ResolvedModulePermission extends StatefulWidget {
   });
 
   @override
-  State<ResolvedModulePermission> createState() => _ResolvedModulePermissionState();
+  State<ResolvedModulePermission> createState() =>
+      _ResolvedModulePermissionState();
 }
 
 class _ResolvedModulePermissionState extends State<ResolvedModulePermission> {
@@ -444,7 +478,10 @@ class _ResolvedModulePermissionState extends State<ResolvedModulePermission> {
     }
 
     if (widget.permission != null) {
-      _access = moduleAccessFromPagePermission(widget.moduleId, widget.permission!);
+      _access = moduleAccessFromPagePermission(
+        widget.moduleId,
+        widget.permission!,
+      );
       _resolved = true;
       return;
     }
@@ -454,7 +491,8 @@ class _ResolvedModulePermissionState extends State<ResolvedModulePermission> {
   }
 
   Future<void> _resolvePermission() async {
-    final email = Supabase.instance.client.auth.currentUser?.email ??
+    final email =
+        Supabase.instance.client.auth.currentUser?.email ??
         Supabase.instance.client.auth.currentSession?.user.email ??
         '';
     if (email.isEmpty) return;
@@ -516,10 +554,7 @@ extension ModulePermissionContext on BuildContext {
     return allowed.contains(state.trim());
   }
 
-  bool canEditLockedRecord({
-    bool isLocked = false,
-    String? workflowState,
-  }) {
+  bool canEditLockedRecord({bool isLocked = false, String? workflowState}) {
     if (!canEditModule) return false;
     if (isLocked && !canBypassRecordLocks) return false;
     return canEditWorkflowState(workflowState);
@@ -527,18 +562,22 @@ extension ModulePermissionContext on BuildContext {
 
   /// Shows a read-only snackbar for blocked edit attempts.
   void warnReadOnly() {
-    ScaffoldMessenger.of(this).showSnackBar(const SnackBar(
-      duration: Duration(seconds: 3),
-      content: Row(children: [
-        Icon(Icons.visibility_outlined, color: Color(0xFFD97706), size: 16),
-        SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'View only — contact an admin to request edit access.',
-            style: TextStyle(color: Color(0xFF334155), fontSize: 13),
-          ),
+    ScaffoldMessenger.of(this).showSnackBar(
+      const SnackBar(
+        duration: Duration(seconds: 3),
+        content: Row(
+          children: [
+            Icon(Icons.visibility_outlined, color: Color(0xFFD97706), size: 16),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'View only — contact an admin to request edit access.',
+                style: TextStyle(color: Color(0xFF334155), fontSize: 13),
+              ),
+            ),
+          ],
         ),
-      ]),
-    ));
+      ),
+    );
   }
 }

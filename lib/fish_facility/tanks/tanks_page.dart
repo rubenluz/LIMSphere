@@ -14,6 +14,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'tanks_connection_model.dart';
+import '../feeding_options.dart';
 import '../shared_widgets.dart';
 import '../stocks/stocks_detail_page.dart';
 import '/theme/module_permission.dart';

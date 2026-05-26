@@ -7,8 +7,8 @@ part of 'tanks_page.dart';
 
 class _EditTankDialogMobile extends StatefulWidget {
   final ZebrafishTank tank;
-  final Set<String>   occupiedTankIds;
-  final List<String>  availableRacks;
+  final Set<String> occupiedTankIds;
+  final List<String> availableRacks;
   final ValueChanged<ZebrafishTank> onSave;
   const _EditTankDialogMobile({
     required this.tank,
@@ -22,11 +22,23 @@ class _EditTankDialogMobile extends StatefulWidget {
 }
 
 class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
-  late TextEditingController _males, _females, _juvs, _resp, _exp, _notes, _foodAmount;
+  late TextEditingController _males,
+      _females,
+      _juvs,
+      _resp,
+      _exp,
+      _notes,
+      _foodOther,
+      _mixtureOtherA,
+      _mixtureOtherB,
+      _foodAmount;
   late String _status, _health, _type;
   String? _selectedLine;
-  int?    _selectedLineId;
+  int? _selectedLineId;
   String? _foodType;
+  bool _isFoodMixture = false;
+  String? _mixtureFoodA;
+  String? _mixtureFoodB;
   String? _foodFrequency;
   String? _foodSource;
   DateTime? _lastCleaning;
@@ -34,14 +46,27 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
   Map<String, int> _lineIdByName = {};
   bool _loadingLines = true;
 
-  static const _foodTypes   = ['GEMMA 75', 'GEMMA 150', 'GEMMA 300', 'SPAROS 400-600'];
-  static const _frequencies = ['1x', '2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x'];
-  static const _sources     = ['dry', 'live', 'mixed'];
+  static const _frequencies = [
+    '1x',
+    '2x',
+    '3x',
+    '4x',
+    '5x',
+    '6x',
+    '7x',
+    '8x',
+    '9x',
+  ];
+  static const _sources = ['dry', 'live', 'mixed'];
 
   late String _rack;
   late String _row;
-  late int    _col;
+  late int _col;
   String? _posError;
+  String? _foodError;
+
+  DateTime get _today => DateUtils.dateOnly(DateTime.now());
+  DateTime get _futureDateLimit => DateTime(2100);
 
   bool _isOccupied(int col) =>
       widget.occupiedTankIds.contains('$_rack-$_row$col');
@@ -52,49 +77,74 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
   void initState() {
     super.initState();
     final t = widget.tank;
-    _males      = TextEditingController(text: '${t.zebraMales ?? 0}');
-    _females    = TextEditingController(text: '${t.zebraFemales ?? 0}');
-    _juvs       = TextEditingController(text: '${t.zebraJuveniles ?? 0}');
-    _resp       = TextEditingController(text: t.zebraResponsible ?? '');
-    _exp        = TextEditingController(text: t.zebraExperimentId ?? '');
-    _notes      = TextEditingController(text: t.zebraNotes ?? '');
+    _males = TextEditingController(text: '${t.zebraMales ?? 0}');
+    _females = TextEditingController(text: '${t.zebraFemales ?? 0}');
+    _juvs = TextEditingController(text: '${t.zebraJuveniles ?? 0}');
+    _resp = TextEditingController(text: t.zebraResponsible ?? '');
+    _exp = TextEditingController(text: t.zebraExperimentId ?? '');
+    _notes = TextEditingController(text: t.zebraNotes ?? '');
     _foodAmount = TextEditingController(
-      text: t.zebraFoodAmount != null ? '${t.zebraFoodAmount}' : '');
-    _status       = t.zebraStatus ?? 'active';
-    _health       = t.zebraHealthStatus ?? 'healthy';
-    _type         = t.zebraTankType ?? 'holding';
-    _selectedLine   = t.zebraLine;
+      text: t.zebraFoodAmount != null ? '${t.zebraFoodAmount}' : '',
+    );
+    final mixtureParts = fishFoodMixtureParts(t.zebraFoodType);
+    _foodOther = TextEditingController(
+      text: isFishFoodMixture(t.zebraFoodType)
+          ? ''
+          : fishFoodCustomText(t.zebraFoodType),
+    );
+    _mixtureOtherA = TextEditingController(
+      text: fishFoodCustomText(mixtureParts[0]),
+    );
+    _mixtureOtherB = TextEditingController(
+      text: fishFoodCustomText(mixtureParts[1]),
+    );
+    _status = t.zebraStatus ?? 'active';
+    _health = t.zebraHealthStatus ?? 'healthy';
+    _type = t.zebraTankType ?? 'holding';
+    _selectedLine = t.zebraLine;
     _selectedLineId = t.zebraLineId;
-    _foodType     = _foodTypes.contains(t.zebraFoodType) ? t.zebraFoodType : null;
-    _foodFrequency = _frequencies.contains(t.zebraFeedingSchedule) ? t.zebraFeedingSchedule : null;
-    _foodSource   = _sources.contains(t.zebraFoodSource) ? t.zebraFoodSource : null;
+    _foodType = fishFoodTypeSelection(t.zebraFoodType);
+    _isFoodMixture = isFishFoodMixture(t.zebraFoodType);
+    _mixtureFoodA = fishFoodTypeSelection(mixtureParts[0]);
+    _mixtureFoodB = fishFoodTypeSelection(mixtureParts[1]);
+    _foodFrequency = _frequencies.contains(t.zebraFeedingSchedule)
+        ? t.zebraFeedingSchedule
+        : null;
+    _foodSource = _sources.contains(t.zebraFoodSource)
+        ? t.zebraFoodSource
+        : null;
     _lastCleaning = t.zebraLastTankCleaning;
-    _rack = t.zebraRack   ?? 'R1';
-    _row  = t.zebraRow    ?? 'B';
-    _col  = int.tryParse(t.zebraColumn ?? '1') ?? 1;
+    _rack = t.zebraRack ?? 'R1';
+    _row = t.zebraRow ?? 'B';
+    _col = int.tryParse(t.zebraColumn ?? '1') ?? 1;
     _fetchLines();
   }
 
   Future<void> _fetchLines() async {
     try {
-      final rows = (await Supabase.instance.client
-          .from('fish_lines')
-          .select('fish_line_id, fish_line_name')
-          .eq('fish_line_status', 'active')
-          .order('fish_line_name') as List<dynamic>)
-          .cast<Map<String, dynamic>>();
+      final rows =
+          (await Supabase.instance.client
+                      .from('fish_lines')
+                      .select('fish_line_id, fish_line_name')
+                      .eq('fish_line_status', 'active')
+                      .order('fish_line_name')
+                  as List<dynamic>)
+              .cast<Map<String, dynamic>>();
       if (mounted) {
         setState(() {
-        _lineIdByName = { for (final r in rows) r['fish_line_name'] as String: r['fish_line_id'] as int };
-        _lines = rows.map((r) => r['fish_line_name'] as String).toList();
-        if (_selectedLine != null && !_lines.contains(_selectedLine)) {
-          _lines.insert(0, _selectedLine!);
-        }
-        if (_selectedLineId == null && _selectedLine != null) {
-          _selectedLineId = _lineIdByName[_selectedLine];
-        }
-        _loadingLines = false;
-      });
+          _lineIdByName = {
+            for (final r in rows)
+              r['fish_line_name'] as String: r['fish_line_id'] as int,
+          };
+          _lines = rows.map((r) => r['fish_line_name'] as String).toList();
+          if (_selectedLine != null && !_lines.contains(_selectedLine)) {
+            _lines.insert(0, _selectedLine!);
+          }
+          if (_selectedLineId == null && _selectedLine != null) {
+            _selectedLineId = _lineIdByName[_selectedLine];
+          }
+          _loadingLines = false;
+        });
       }
     } catch (_) {
       if (mounted) setState(() => _loadingLines = false);
@@ -103,8 +153,15 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
 
   @override
   void dispose() {
-    _males.dispose(); _females.dispose(); _juvs.dispose();
-    _resp.dispose();  _exp.dispose();    _notes.dispose();
+    _males.dispose();
+    _females.dispose();
+    _juvs.dispose();
+    _resp.dispose();
+    _exp.dispose();
+    _notes.dispose();
+    _foodOther.dispose();
+    _mixtureOtherA.dispose();
+    _mixtureOtherB.dispose();
     _foodAmount.dispose();
     super.dispose();
   }
@@ -114,37 +171,58 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
       setState(() => _posError = 'Tank $_newTankId is already occupied.');
       return;
     }
+    final foodType = normalizedFishFoodType(
+      isMixture: _isFoodMixture,
+      selected: _foodType,
+      selectedCustom: _foodOther.text,
+      mixtureFirst: _mixtureFoodA,
+      mixtureFirstCustom: _mixtureOtherA.text,
+      mixtureSecond: _mixtureFoodB,
+      mixtureSecondCustom: _mixtureOtherB.text,
+    );
+    if ((_isFoodMixture || _foodType == fishFoodOtherOption) &&
+        foodType == null) {
+      setState(
+        () => _foodError = _isFoodMixture
+            ? 'Select both foods for the mixture.'
+            : 'Enter the custom food.',
+      );
+      return;
+    }
     final t = widget.tank;
     final isTop = _row == 'A';
-    widget.onSave(ZebrafishTank(
-      zebraId:           t.zebraId,
-      zebraTankId:       _newTankId,
-      zebraRack:         _rack,
-      zebraRow:          _row,
-      zebraColumn:       '$_col',
-      zebraVolumeL:      t.zebraVolumeL,
-      isEightLiter:      t.isEightLiter,
-      isTopRow:          isTop,
-      rackRowIndex:      _rowLabels.indexOf(_row),
-      rackColIndex:      _col - 1,
-      zebraLine:         _selectedLine,
-      zebraLineId:       _selectedLineId,
-      zebraMales:        int.tryParse(_males.text) ?? 0,
-      zebraFemales:      int.tryParse(_females.text) ?? 0,
-      zebraJuveniles:    int.tryParse(_juvs.text) ?? 0,
-      zebraResponsible:  _resp.text.trim().isEmpty ? null : _resp.text.trim(),
-      zebraStatus:       _status,
-      zebraHealthStatus: _health,
-      zebraTankType:     _type,
-      zebraFoodType:     _foodType,
-      zebraFoodSource:   _foodSource,
-      zebraFoodAmount:   _foodAmount.text.trim().isEmpty
-          ? null : double.tryParse(_foodAmount.text.trim()),
-      zebraFeedingSchedule: _foodFrequency,
-      zebraExperimentId:     _exp.text.trim().isEmpty ? null : _exp.text.trim(),
-      zebraNotes:            _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-      zebraLastTankCleaning: _lastCleaning,
-    ));
+    widget.onSave(
+      ZebrafishTank(
+        zebraId: t.zebraId,
+        zebraTankId: _newTankId,
+        zebraRack: _rack,
+        zebraRow: _row,
+        zebraColumn: '$_col',
+        zebraVolumeL: t.zebraVolumeL,
+        isEightLiter: t.isEightLiter,
+        isTopRow: isTop,
+        rackRowIndex: _rowLabels.indexOf(_row),
+        rackColIndex: _col - 1,
+        zebraLine: _selectedLine,
+        zebraLineId: _selectedLineId,
+        zebraMales: int.tryParse(_males.text) ?? 0,
+        zebraFemales: int.tryParse(_females.text) ?? 0,
+        zebraJuveniles: int.tryParse(_juvs.text) ?? 0,
+        zebraResponsible: _resp.text.trim().isEmpty ? null : _resp.text.trim(),
+        zebraStatus: _status,
+        zebraHealthStatus: _health,
+        zebraTankType: _type,
+        zebraFoodType: foodType,
+        zebraFoodSource: _foodSource,
+        zebraFoodAmount: _foodAmount.text.trim().isEmpty
+            ? null
+            : double.tryParse(_foodAmount.text.trim()),
+        zebraFeedingSchedule: _foodFrequency,
+        zebraExperimentId: _exp.text.trim().isEmpty ? null : _exp.text.trim(),
+        zebraNotes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+        zebraLastTankCleaning: _lastCleaning,
+      ),
+    );
     Navigator.pop(context);
   }
 
@@ -166,39 +244,58 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
             Padding(
               padding: const EdgeInsets.only(top: 10, bottom: 2),
               child: Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 decoration: BoxDecoration(
                   color: context.appBorder2,
-                  borderRadius: BorderRadius.circular(2))),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             ),
             // ── Header ───────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 8, 8),
-              child: Row(children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Edit ${widget.tank.zebraTankId}',
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 17, fontWeight: FontWeight.w700,
-                          color: context.appTextPrimary)),
-                      const SizedBox(height: 3),
-                      Row(children: [
-                        StatusBadge(label: _status),
-                        const SizedBox(width: 6),
-                        Text(widget.tank.volumeLabel,
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 10, color: context.appTextMuted)),
-                      ]),
-                    ],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Edit ${widget.tank.zebraTankId}',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: context.appTextPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            StatusBadge(label: _status),
+                            const SizedBox(width: 6),
+                            Text(
+                              widget.tank.volumeLabel,
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 10,
+                                color: context.appTextMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.close, size: 20, color: context.appTextMuted),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ]),
+                  IconButton(
+                    icon: Icon(
+                      Icons.close,
+                      size: 20,
+                      color: context.appTextMuted,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
             ),
             Divider(height: 1, color: context.appBorder),
             // ── Scrollable body ──────────────────────────────────────────
@@ -214,8 +311,13 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
                     _buildPositionPicker(),
                     if (_posError != null) ...[
                       const SizedBox(height: 4),
-                      Text(_posError!, style: GoogleFonts.spaceGrotesk(
-                        fontSize: 11, color: AppDS.red)),
+                      Text(
+                        _posError!,
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 11,
+                          color: AppDS.red,
+                        ),
+                      ),
                     ],
                     const SizedBox(height: 14),
                     // Fish line
@@ -224,62 +326,125 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
                     _loadingLines
                         ? const LinearProgressIndicator()
                         : DropdownButtonFormField<String>(
-                            initialValue: (_selectedLine != null && _lines.contains(_selectedLine))
-                                ? _selectedLine : null,
+                            initialValue:
+                                (_selectedLine != null &&
+                                    _lines.contains(_selectedLine))
+                                ? _selectedLine
+                                : null,
                             dropdownColor: context.appSurface2,
                             style: GoogleFonts.spaceGrotesk(
-                                color: context.appTextPrimary, fontSize: 13),
-                            hint: Text('Select line', style: GoogleFonts.spaceGrotesk(
-                              color: context.appTextMuted, fontSize: 13)),
-                            items: _lines.map((l) =>
-                              DropdownMenuItem(value: l, child: Text(l))).toList(),
+                              color: context.appTextPrimary,
+                              fontSize: 13,
+                            ),
+                            hint: Text(
+                              'Select line',
+                              style: GoogleFonts.spaceGrotesk(
+                                color: context.appTextMuted,
+                                fontSize: 13,
+                              ),
+                            ),
+                            items: _lines
+                                .map(
+                                  (l) => DropdownMenuItem(
+                                    value: l,
+                                    child: Text(l),
+                                  ),
+                                )
+                                .toList(),
                             onChanged: (v) => setState(() {
-                              _selectedLine   = v;
-                              _selectedLineId = v != null ? _lineIdByName[v] : null;
+                              _selectedLine = v;
+                              _selectedLineId = v != null
+                                  ? _lineIdByName[v]
+                                  : null;
                             }),
-                            decoration: _inputDec()),
+                            decoration: _inputDec(),
+                          ),
                     const SizedBox(height: 14),
                     // Fish counts — 3 compact fields in one row
-                    Row(children: [
-                      Expanded(child: _f('Males ♂', _males)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _f('Females ♀', _females)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _f('Juveniles', _juvs)),
-                    ]),
+                    Row(
+                      children: [
+                        Expanded(child: _f('Males ♂', _males)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _f('Females ♀', _females)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _f('Juveniles', _juvs)),
+                      ],
+                    ),
                     const SizedBox(height: 14),
                     // Status / Health / Type — each full width
-                    _dd('Status', _status,
-                      ['active', 'empty', 'quarantine', 'retired'],
-                      (v) => setState(() => _status = v ?? _status)),
+                    _dd('Status', _status, [
+                      'active',
+                      'empty',
+                      'quarantine',
+                      'retired',
+                    ], (v) => setState(() => _status = v ?? _status)),
                     const SizedBox(height: 10),
-                    _dd('Health', _health,
-                      ['healthy', 'observation', 'treatment', 'sick'],
-                      (v) => setState(() => _health = v ?? _health)),
+                    _dd('Health', _health, [
+                      'healthy',
+                      'observation',
+                      'treatment',
+                      'sick',
+                    ], (v) => setState(() => _health = v ?? _health)),
                     const SizedBox(height: 10),
-                    _dd('Type', _type,
-                      ['holding', 'breeding', 'quarantine', 'experimental', 'sentinel'],
-                      (v) => setState(() => _type = v ?? _type)),
+                    _dd('Type', _type, [
+                      'holding',
+                      'breeding',
+                      'quarantine',
+                      'experimental',
+                      'sentinel',
+                    ], (v) => setState(() => _type = v ?? _type)),
                     const SizedBox(height: 14),
                     // Feeding
-                    Text('Feeding', style: GoogleFonts.spaceGrotesk(
-                      fontSize: 12, fontWeight: FontWeight.w700,
-                      color: AppDS.accent)),
+                    Text(
+                      'Feeding',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppDS.accent,
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    Row(children: [
-                      Expanded(child: _ddOpt('Food Type', _foodType, _foodTypes,
-                        (v) => setState(() => _foodType = v))),
-                      const SizedBox(width: 8),
-                      Expanded(child: _ddOpt('Frequency', _foodFrequency, _frequencies,
-                        (v) => setState(() => _foodFrequency = v))),
-                    ]),
+                    Row(
+                      children: [
+                        Expanded(child: _foodTypeField()),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _ddOpt(
+                            'Frequency',
+                            _foodFrequency,
+                            _frequencies,
+                            (v) => setState(() => _foodFrequency = v),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_foodError != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _foodError!,
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 11,
+                          color: AppDS.red,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
-                    Row(children: [
-                      Expanded(child: _ddOpt('Food Source', _foodSource, _sources,
-                        (v) => setState(() => _foodSource = v))),
-                      const SizedBox(width: 8),
-                      Expanded(child: _f('Amount (g)', _foodAmount, mono: true)),
-                    ]),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ddOpt(
+                            'Food Source',
+                            _foodSource,
+                            _sources,
+                            (v) => setState(() => _foodSource = v),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _f('Amount (g)', _foodAmount, mono: true),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 14),
                     // Last cleaning
                     _label('Last Cleaning'),
@@ -301,29 +466,39 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
             Divider(height: 1, color: context.appBorder),
             Padding(
               padding: EdgeInsets.fromLTRB(
-                  16, 10, 16, 10 + MediaQuery.of(context).padding.bottom),
-              child: Row(children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: context.appTextSecondary,
-                      side: BorderSide(color: context.appBorder),
-                      padding: const EdgeInsets.symmetric(vertical: 14)),
-                    child: const Text('Cancel')),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppDS.accent,
-                      foregroundColor: AppDS.bg,
-                      padding: const EdgeInsets.symmetric(vertical: 14)),
-                    onPressed: _save,
-                    child: const Text('Save')),
-                ),
-              ]),
+                16,
+                10,
+                16,
+                10 + MediaQuery.of(context).padding.bottom,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: context.appTextSecondary,
+                        side: BorderSide(color: context.appBorder),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppDS.accent,
+                        foregroundColor: AppDS.bg,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: _save,
+                      child: const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -339,132 +514,226 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
       decoration: BoxDecoration(
         color: context.appSurface3,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: context.appBorder)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Rack
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(children: [
-            Text('Rack:', style: GoogleFonts.spaceGrotesk(
-              fontSize: 11, color: context.appTextMuted,
-              fontWeight: FontWeight.w700)),
-            const SizedBox(width: 10),
-            ...rackList.map((r) => Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: InkWell(
-                onTap: () => setState(() { _rack = r; _posError = null; }),
-                borderRadius: BorderRadius.circular(6),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
-                  width: 44, height: 36,
-                  decoration: BoxDecoration(
-                    color: _rack == r
-                        ? AppDS.accent.withValues(alpha: 0.2) : context.appSurface2,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: _rack == r ? AppDS.accent : context.appBorder,
-                      width: _rack == r ? 1.5 : 1)),
-                  child: Center(child: Text(r, style: GoogleFonts.jetBrainsMono(
-                    fontSize: 12, fontWeight: FontWeight.w700,
-                    color: _rack == r ? AppDS.accent : context.appTextSecondary))),
+        border: Border.all(color: context.appBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Rack
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Text(
+                  'Rack:',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 11,
+                    color: context.appTextMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            )),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        // Row
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(children: [
-            Text('Row:', style: GoogleFonts.spaceGrotesk(
-              fontSize: 11, color: context.appTextMuted,
-              fontWeight: FontWeight.w700)),
-            const SizedBox(width: 10),
-            ..._rowLabels.map((r) => Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: InkWell(
+                const SizedBox(width: 10),
+                ...rackList.map(
+                  (r) => Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: InkWell(
+                      onTap: () => setState(() {
+                        _rack = r;
+                        _posError = null;
+                      }),
+                      borderRadius: BorderRadius.circular(6),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        width: 44,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: _rack == r
+                              ? AppDS.accent.withValues(alpha: 0.2)
+                              : context.appSurface2,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: _rack == r
+                                ? AppDS.accent
+                                : context.appBorder,
+                            width: _rack == r ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            r,
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _rack == r
+                                  ? AppDS.accent
+                                  : context.appTextSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Text(
+                  'Row:',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 11,
+                    color: context.appTextMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ..._rowLabels.map(
+                  (r) => Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: InkWell(
+                      onTap: () => setState(() {
+                        _row = r;
+                        if (_col > _maxCol) _col = 1;
+                        _posError = null;
+                      }),
+                      borderRadius: BorderRadius.circular(6),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        width: 44,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: _row == r
+                              ? AppDS.accent.withValues(alpha: 0.2)
+                              : context.appSurface2,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: _row == r ? AppDS.accent : context.appBorder,
+                            width: _row == r ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              r,
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _row == r
+                                    ? AppDS.accent
+                                    : context.appTextSecondary,
+                              ),
+                            ),
+                            Text(
+                              r == 'A' ? '1.1L' : '3.5L',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 8,
+                                color: _row == r
+                                    ? AppDS.accent.withValues(alpha: 0.8)
+                                    : context.appTextMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Column
+          Text(
+            'Column:',
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 11,
+              color: context.appTextMuted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: List.generate(_maxCol, (i) {
+              final c = i + 1;
+              final sel = _col == c;
+              final occupied = _isOccupied(c);
+              return InkWell(
                 onTap: () => setState(() {
-                  _row = r;
-                  if (_col > _maxCol) _col = 1;
+                  _col = c;
                   _posError = null;
                 }),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(5),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 120),
-                  width: 44, height: 48,
+                  width: 36,
+                  height: 34,
                   decoration: BoxDecoration(
-                    color: _row == r
-                        ? AppDS.accent.withValues(alpha: 0.2) : context.appSurface2,
-                    borderRadius: BorderRadius.circular(6),
+                    color: occupied
+                        ? AppDS.red.withValues(alpha: 0.12)
+                        : (sel
+                              ? AppDS.accent.withValues(alpha: 0.18)
+                              : context.appSurface2),
+                    borderRadius: BorderRadius.circular(5),
                     border: Border.all(
-                      color: _row == r ? AppDS.accent : context.appBorder,
-                      width: _row == r ? 1.5 : 1)),
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(r, style: GoogleFonts.jetBrainsMono(
-                        fontSize: 13, fontWeight: FontWeight.w700,
-                        color: _row == r ? AppDS.accent : context.appTextSecondary)),
-                      Text(r == 'A' ? '1.1L' : '3.5L',
-                        style: GoogleFonts.jetBrainsMono(fontSize: 8,
-                          color: _row == r
-                              ? AppDS.accent.withValues(alpha: 0.8)
-                              : context.appTextMuted)),
-                    ]),
+                      color: occupied
+                          ? AppDS.red.withValues(alpha: 0.5)
+                          : (sel ? AppDS.accent : context.appBorder),
+                      width: sel ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$c',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: occupied
+                            ? AppDS.red
+                            : (sel ? AppDS.accent : context.appTextSecondary),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Red = already occupied.',
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 10,
+              color: context.appTextMuted,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                size: 13,
+                color: AppDS.accent,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Selected: $_newTankId',
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppDS.accent,
                 ),
               ),
-            )),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        // Column
-        Text('Column:', style: GoogleFonts.spaceGrotesk(
-          fontSize: 11, color: context.appTextMuted,
-          fontWeight: FontWeight.w700)),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 6, runSpacing: 6,
-          children: List.generate(_maxCol, (i) {
-            final c = i + 1;
-            final sel      = _col == c;
-            final occupied = _isOccupied(c);
-            return InkWell(
-              onTap: () => setState(() { _col = c; _posError = null; }),
-              borderRadius: BorderRadius.circular(5),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                width: 36, height: 34,
-                decoration: BoxDecoration(
-                  color: occupied
-                      ? AppDS.red.withValues(alpha: 0.12)
-                      : (sel ? AppDS.accent.withValues(alpha: 0.18) : context.appSurface2),
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(
-                    color: occupied
-                        ? AppDS.red.withValues(alpha: 0.5)
-                        : (sel ? AppDS.accent : context.appBorder),
-                    width: sel ? 1.5 : 1)),
-                child: Center(child: Text('$c', style: GoogleFonts.jetBrainsMono(
-                  fontSize: 12, fontWeight: FontWeight.w600,
-                  color: occupied
-                      ? AppDS.red
-                      : (sel ? AppDS.accent : context.appTextSecondary)))),
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 8),
-        Text('Red = already occupied.',
-          style: GoogleFonts.jetBrainsMono(fontSize: 10, color: context.appTextMuted)),
-        const SizedBox(height: 4),
-        Row(children: [
-          const Icon(Icons.location_on_outlined, size: 13, color: AppDS.accent),
-          const SizedBox(width: 4),
-          Text('Selected: $_newTankId',
-            style: GoogleFonts.jetBrainsMono(
-              fontSize: 12, fontWeight: FontWeight.w700, color: AppDS.accent)),
-        ]),
-      ]),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -472,125 +741,283 @@ class _EditTankDialogMobileState extends State<_EditTankDialogMobile> {
   Widget _buildCleaningRow() {
     final label = _lastCleaning != null
         ? '${_lastCleaning!.day.toString().padLeft(2, '0')}/'
-          '${_lastCleaning!.month.toString().padLeft(2, '0')}/'
-          '${_lastCleaning!.year}'
+              '${_lastCleaning!.month.toString().padLeft(2, '0')}/'
+              '${_lastCleaning!.year}'
         : '—';
-    return Row(children: [
-      Expanded(
-        child: InkWell(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: _lastCleaning ?? DateTime.now(),
-              firstDate: DateTime(2000),
-              lastDate: DateTime.now(),
-              builder: (ctx, child) => Theme(
-                data: Theme.of(ctx).copyWith(
-                  colorScheme: ColorScheme.dark(
-                    primary: AppDS.accent,
-                    surface: AppDS.surface2,
+    return Row(
+      children: [
+        Expanded(
+          child: InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _lastCleaning ?? _today,
+                firstDate: DateTime(2000),
+                lastDate: _futureDateLimit,
+                builder: (ctx, child) => Theme(
+                  data: Theme.of(ctx).copyWith(
+                    colorScheme: ColorScheme.dark(
+                      primary: AppDS.accent,
+                      surface: AppDS.surface2,
+                    ),
                   ),
+                  child: child!,
                 ),
-                child: child!,
+              );
+              if (picked != null) setState(() => _lastCleaning = picked);
+            },
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: context.appSurface3,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: context.appBorder),
               ),
-            );
-            if (picked != null) setState(() => _lastCleaning = picked);
-          },
-          borderRadius: BorderRadius.circular(6),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-              color: context.appSurface3,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: context.appBorder)),
-            child: Row(children: [
-              Icon(Icons.calendar_today_outlined, size: 14,
-                color: _lastCleaning != null ? AppDS.accent : context.appTextMuted),
-              const SizedBox(width: 8),
-              Text(label, style: GoogleFonts.jetBrainsMono(
-                fontSize: 14,
-                color: _lastCleaning != null
-                    ? context.appTextPrimary : context.appTextMuted)),
-            ]),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 14,
+                    color: _lastCleaning != null
+                        ? AppDS.accent
+                        : context.appTextMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 14,
+                      color: _lastCleaning != null
+                          ? context.appTextPrimary
+                          : context.appTextMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
-      const SizedBox(width: 8),
-      OutlinedButton(
-        onPressed: () => setState(() => _lastCleaning = DateTime.now()),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppDS.green,
-          side: BorderSide(color: AppDS.green.withValues(alpha: 0.5)),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () => setState(() => _lastCleaning = _today),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppDS.green,
+            side: BorderSide(color: AppDS.green.withValues(alpha: 0.5)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
+          child: Text(
+            'Today',
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
-        child: Text('Today', style: GoogleFonts.spaceGrotesk(
-          fontSize: 13, fontWeight: FontWeight.w600)),
-      ),
-      if (_lastCleaning != null) ...[
-        const SizedBox(width: 6),
-        InkWell(
-          onTap: () => setState(() => _lastCleaning = null),
-          borderRadius: BorderRadius.circular(4),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Icon(Icons.close, size: 16, color: context.appTextMuted)),
-        ),
+        if (_lastCleaning != null) ...[
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () => setState(() => _lastCleaning = null),
+            borderRadius: BorderRadius.circular(4),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(Icons.close, size: 16, color: context.appTextMuted),
+            ),
+          ),
+        ],
       ],
-    ]);
+    );
   }
 
   // ── Field helpers ──────────────────────────────────────────────────────────
-  Widget _label(String t) => Text(t, style: GoogleFonts.spaceGrotesk(
-    fontSize: 11, color: context.appTextMuted, fontWeight: FontWeight.w700));
+  Widget _label(String t) => Text(
+    t,
+    style: GoogleFonts.spaceGrotesk(
+      fontSize: 11,
+      color: context.appTextMuted,
+      fontWeight: FontWeight.w700,
+    ),
+  );
 
-  Widget _f(String l, TextEditingController c, {bool mono = false}) =>
-    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _f(String l, TextEditingController c, {bool mono = false}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
       _label(l),
       const SizedBox(height: 3),
       TextField(
         controller: c,
-        style: (mono ? GoogleFonts.jetBrainsMono(fontSize: 14)
-            : GoogleFonts.spaceGrotesk(fontSize: 14))
-            .copyWith(color: context.appTextPrimary),
-        decoration: _inputDec()),
-    ]);
+        style:
+            (mono
+                    ? GoogleFonts.jetBrainsMono(fontSize: 14)
+                    : GoogleFonts.spaceGrotesk(fontSize: 14))
+                .copyWith(color: context.appTextPrimary),
+        decoration: _inputDec(),
+      ),
+    ],
+  );
 
-  Widget _ddOpt(String l, String? val, List<String> opts, ValueChanged<String?> cb) =>
-    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _ddOpt(
+    String l,
+    String? val,
+    List<String> opts,
+    ValueChanged<String?> cb,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
       _label(l),
       const SizedBox(height: 3),
       DropdownButtonFormField<String>(
         initialValue: opts.contains(val) ? val : null,
         dropdownColor: context.appSurface2,
-        style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13),
-        hint: Text('—', style: GoogleFonts.spaceGrotesk(
-          color: context.appTextMuted, fontSize: 13)),
-        items: opts.map((v) =>
-          DropdownMenuItem(value: v, child: Text(v))).toList(),
+        style: GoogleFonts.spaceGrotesk(
+          color: context.appTextPrimary,
+          fontSize: 13,
+        ),
+        hint: Text(
+          '—',
+          style: GoogleFonts.spaceGrotesk(
+            color: context.appTextMuted,
+            fontSize: 13,
+          ),
+        ),
+        items: opts
+            .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+            .toList(),
         onChanged: cb,
-        decoration: _inputDec()),
-    ]);
+        decoration: _inputDec(),
+      ),
+    ],
+  );
 
-  Widget _dd(String l, String val, List<String> opts, ValueChanged<String?> cb) =>
-    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _foodTypeField() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      CheckboxListTile(
+        value: _isFoodMixture,
+        onChanged: (v) => setState(() {
+          _isFoodMixture = v ?? false;
+          _foodError = null;
+        }),
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        controlAffinity: ListTileControlAffinity.leading,
+        title: Text(
+          'Mixture',
+          style: GoogleFonts.spaceGrotesk(
+            fontSize: 12,
+            color: context.appTextPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      if (_isFoodMixture)
+        _mixtureSelectors()
+      else ...[
+        _ddOpt(
+          'Food Type',
+          _foodType,
+          fishFoodTypeOptions,
+          (v) => setState(() {
+            _foodType = v;
+            _foodError = null;
+          }),
+        ),
+        if (_foodType == fishFoodOtherOption) ...[
+          const SizedBox(height: 8),
+          _f('Custom food', _foodOther),
+        ],
+      ],
+    ],
+  );
+
+  Widget _mixtureSelectors() => Column(
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: _ddOpt(
+              'Food 1',
+              _mixtureFoodA,
+              fishFoodTypeOptions,
+              (v) => setState(() {
+                _mixtureFoodA = v;
+                _foodError = null;
+              }),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _ddOpt(
+              'Food 2',
+              _mixtureFoodB,
+              fishFoodTypeOptions,
+              (v) => setState(() {
+                _mixtureFoodB = v;
+                _foodError = null;
+              }),
+            ),
+          ),
+        ],
+      ),
+      if (_mixtureFoodA == fishFoodOtherOption ||
+          _mixtureFoodB == fishFoodOtherOption) ...[
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _mixtureFoodA == fishFoodOtherOption
+                  ? _f('Custom food 1', _mixtureOtherA)
+                  : const SizedBox.shrink(),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _mixtureFoodB == fishFoodOtherOption
+                  ? _f('Custom food 2', _mixtureOtherB)
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ],
+    ],
+  );
+
+  Widget _dd(
+    String l,
+    String val,
+    List<String> opts,
+    ValueChanged<String?> cb,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
       _label(l),
       const SizedBox(height: 3),
       DropdownButtonFormField<String>(
         initialValue: opts.contains(val) ? val : opts.first,
         dropdownColor: context.appSurface2,
-        style: GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13),
-        items: opts.map((v) =>
-          DropdownMenuItem(value: v, child: Text(v))).toList(),
+        style: GoogleFonts.spaceGrotesk(
+          color: context.appTextPrimary,
+          fontSize: 13,
+        ),
+        items: opts
+            .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+            .toList(),
         onChanged: cb,
-        decoration: _inputDec()),
-    ]);
+        decoration: _inputDec(),
+      ),
+    ],
+  );
 
   InputDecoration _inputDec() => InputDecoration(
-    isDense: true, filled: true, fillColor: context.appSurface3,
+    isDense: true,
+    filled: true,
+    fillColor: context.appSurface3,
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(6),
-      borderSide: BorderSide(color: context.appBorder)),
+      borderSide: BorderSide(color: context.appBorder),
+    ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(6),
-      borderSide: const BorderSide(color: AppDS.accent, width: 1.5)));
+      borderSide: const BorderSide(color: AppDS.accent, width: 1.5),
+    ),
+  );
 }

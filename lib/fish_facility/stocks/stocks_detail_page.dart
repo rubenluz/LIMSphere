@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../tanks/tanks_connection_model.dart';
 import '../lines/fish_lines_connection_model.dart';
 import '../lines/fish_lines_detail_page.dart';
+import '../feeding_options.dart';
 import '../../requests/requests_page.dart';
 import '../../backups/backup_service.dart';
 import '/supabase/supabase_manager.dart';
@@ -153,12 +154,7 @@ const _dropdowns = <String, List<String>>{
   ],
   'fish_stocks_sentinel_status': ['none', 'sentinel', 'tested'],
   'fish_stocks_health_status': ['healthy', 'observation', 'treatment', 'sick'],
-  'fish_stocks_food_type': [
-    'GEMMA 75',
-    'GEMMA 150',
-    'GEMMA 300',
-    'SPAROS 400-600',
-  ],
+  'fish_stocks_food_type': fishFoodTypeOptions,
   'fish_stocks_food_source': ['dry', 'live', 'mixed'],
   'fish_stocks_feeding_schedule': [
     '1x',
@@ -593,6 +589,31 @@ class _TankDetailPageState extends State<TankDetailPage> {
           final v = _ctrl[f.key]?.text.trim() ?? '';
           payload[f.key] = v.isEmpty ? null : v;
         }
+      }
+      final foodType = payload['fish_stocks_food_type']?.toString();
+      if (isFishFoodMixture(foodType)) {
+        final parts = fishFoodMixtureParts(foodType);
+        final first = resolveFishFoodSelection(
+          fishFoodTypeSelection(parts[0]),
+          fishFoodCustomText(parts[0]),
+        );
+        final second = resolveFishFoodSelection(
+          fishFoodTypeSelection(parts[1]),
+          fishFoodCustomText(parts[1]),
+        );
+        if (first == null || second == null) {
+          _snack('Select both foods for the mixture.');
+          return;
+        }
+        payload['fish_stocks_food_type'] = '$first / $second';
+      } else if (fishFoodTypeSelection(foodType) == fishFoodOtherOption &&
+          resolveFishFoodSelection(
+                fishFoodTypeSelection(foodType),
+                fishFoodCustomText(foodType),
+              ) ==
+              null) {
+        _snack('Enter the custom food.');
+        return;
       }
       // Sync derived position columns and line FK
       payload['fish_stocks_rack'] = _selectedRack;
@@ -1669,6 +1690,10 @@ class _TankDetailPageState extends State<TankDetailPage> {
       );
     }
 
+    if (f.key == 'fish_stocks_food_type') {
+      return _buildFoodTypeField(ctrl: ctrl, canEdit: canEdit);
+    }
+
     // Volume dropdown (normalise DB numeric to canonical string)
     if (f.key == 'fish_stocks_volume_l') {
       const opts = ['1.1', '2.4', '3.5', '8.0'];
@@ -2130,6 +2155,158 @@ class _TankDetailPageState extends State<TankDetailPage> {
       ],
     ),
   );
+
+  Widget _buildFoodTypeField({
+    required TextEditingController ctrl,
+    required bool canEdit,
+  }) {
+    final isMixture = isFishFoodMixture(ctrl.text);
+    final parts = fishFoodMixtureParts(ctrl.text);
+    final selected = fishFoodTypeSelection(ctrl.text);
+    final firstSelection = fishFoodTypeSelection(parts[0]);
+    final secondSelection = fishFoodTypeSelection(parts[1]);
+
+    void setMixtureValue(String? first, String? second) {
+      ctrl.text = '${first ?? ''} / ${second ?? ''}';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CheckboxListTile(
+          value: isMixture,
+          onChanged: canEdit
+              ? (v) => setState(() {
+                  if (v == true) {
+                    setMixtureValue(selected, null);
+                  } else {
+                    ctrl.text = selected ?? '';
+                  }
+                })
+              : null,
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          title: Text(
+            'Mixture',
+            style: TextStyle(
+              fontSize: 12,
+              color: context.appTextPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (isMixture)
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: firstSelection,
+                  decoration: _dec('Food 1'),
+                  style: TextStyle(fontSize: 13, color: context.appTextPrimary),
+                  items: fishFoodTypeOptions
+                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                      .toList(),
+                  onChanged: canEdit
+                      ? (v) => setState(() => setMixtureValue(v, parts[1]))
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: secondSelection,
+                  decoration: _dec('Food 2'),
+                  style: TextStyle(fontSize: 13, color: context.appTextPrimary),
+                  items: fishFoodTypeOptions
+                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                      .toList(),
+                  onChanged: canEdit
+                      ? (v) => setState(() => setMixtureValue(parts[0], v))
+                      : null,
+                ),
+              ),
+            ],
+          )
+        else
+          Column(
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: selected,
+                decoration: _dec('Food Type'),
+                style: TextStyle(fontSize: 13, color: context.appTextPrimary),
+                items: [
+                  DropdownMenuItem<String>(
+                    value: null,
+                    child: Text(
+                      '\u2014 not set \u2014',
+                      style: TextStyle(
+                        color: context.appTextMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  ...fishFoodTypeOptions.map(
+                    (v) => DropdownMenuItem(value: v, child: Text(v)),
+                  ),
+                ],
+                onChanged: canEdit
+                    ? (v) => setState(() => ctrl.text = v ?? '')
+                    : null,
+              ),
+              if (selected == fishFoodOtherOption) ...[
+                const SizedBox(height: 8),
+                TextFormField(
+                  initialValue: fishFoodCustomText(ctrl.text),
+                  enabled: canEdit,
+                  style: TextStyle(fontSize: 13, color: context.appTextPrimary),
+                  decoration: _dec('Custom food'),
+                  onChanged: (v) => ctrl.text = v,
+                ),
+              ],
+            ],
+          ),
+        if (isMixture &&
+            (firstSelection == fishFoodOtherOption ||
+                secondSelection == fishFoodOtherOption)) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: firstSelection == fishFoodOtherOption
+                    ? TextFormField(
+                        initialValue: fishFoodCustomText(parts[0]),
+                        enabled: canEdit,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.appTextPrimary,
+                        ),
+                        decoration: _dec('Custom food 1'),
+                        onChanged: (v) => ctrl.text = '$v / ${parts[1] ?? ''}',
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: secondSelection == fishFoodOtherOption
+                    ? TextFormField(
+                        initialValue: fishFoodCustomText(parts[1]),
+                        enabled: canEdit,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.appTextPrimary,
+                        ),
+                        decoration: _dec('Custom food 2'),
+                        onChanged: (v) => ctrl.text = '${parts[0] ?? ''} / $v',
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
 
   Widget _readOnlyMetaChip(String label, String value) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
