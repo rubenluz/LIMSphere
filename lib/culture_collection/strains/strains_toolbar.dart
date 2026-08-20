@@ -18,10 +18,13 @@ class StrainsToolbar extends StatelessWidget {
   final Map<String, bool> sortDirs;
   final List<int> periodicityOptions;
   final int? selectedPeriodicity;
+  final List<String> mediumOptions;
+  final String? selectedMedium;
 
   final VoidCallback onClearSort;
   final void Function(int i, String key) onRemoveSortKey;
   final void Function(int? v) onPeriodicityChanged;
+  final void Function(String? v) onMediumChanged;
   final VoidCallback onClearFilters;
 
   const StrainsToolbar({
@@ -31,29 +34,39 @@ class StrainsToolbar extends StatelessWidget {
     required this.sortDirs,
     required this.periodicityOptions,
     required this.selectedPeriodicity,
+    required this.mediumOptions,
+    required this.selectedMedium,
     required this.onClearSort,
     required this.onRemoveSortKey,
     required this.onPeriodicityChanged,
+    required this.onMediumChanged,
     required this.onClearFilters,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasActive = activeFilters.any((f) => f.value.isNotEmpty) ||
-        selectedPeriodicity != null;
+        selectedPeriodicity != null || selectedMedium != null;
     final hasSort = sortKeys.isNotEmpty;
     final hasCycle = periodicityOptions.isNotEmpty;
+    final hasMedia = mediumOptions.isNotEmpty;
 
     // Hide entirely when nothing to show
-    if (!hasCycle && !hasSort && !hasActive) return const SizedBox.shrink();
+    if (!hasCycle && !hasMedia && !hasSort && !hasActive) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
+      width: double.infinity,
       color: context.appSurface,
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Cycle chips row (aligned left) ───────────────────────────────────
         if (hasCycle)
-          Row(children: [
+          Wrap(
+              alignment: WrapAlignment.start,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
             Text('Cycle:',
                 style: GoogleFonts.spaceGrotesk(
                     fontSize: 11,
@@ -69,8 +82,29 @@ class StrainsToolbar extends StatelessWidget {
                     onTap: () => onPeriodicityChanged(
                         selectedPeriodicity == d ? null : d)))),
           ]),
+        if (hasCycle && hasMedia) const SizedBox(height: 6),
+        if (hasMedia)
+          Wrap(
+              alignment: WrapAlignment.start,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+            Text('Media:',
+                style: GoogleFonts.spaceGrotesk(
+                    fontSize: 11,
+                    color: context.appTextSecondary,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(width: 6),
+            ...mediumOptions.map((medium) => Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: ToolbarChip(
+                    label: medium,
+                    selected: selectedMedium == medium,
+                    compact: true,
+                    onTap: () => onMediumChanged(
+                        selectedMedium == medium ? null : medium)))),
+          ]),
         if (hasSort) ...[
-          if (hasCycle) const SizedBox(height: 6),
+          if (hasCycle || hasMedia) const SizedBox(height: 6),
           SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(children: [
@@ -103,7 +137,7 @@ class StrainsToolbar extends StatelessWidget {
               ])),
         ],
         if (hasActive) ...[
-          if (hasCycle || hasSort) const SizedBox(height: 6),
+          if (hasCycle || hasMedia || hasSort) const SizedBox(height: 6),
           SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(children: [
@@ -132,6 +166,21 @@ class StrainsToolbar extends StatelessWidget {
                         selectedColor: context.appSurface2,
                         side: const BorderSide(color: AppDS.accent),
                         onDeleted: () => onPeriodicityChanged(null),
+                        deleteIconColor: context.appTextSecondary,
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6)),
+                      )),
+                if (selectedMedium != null)
+                  Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InputChip(
+                        label: Text('Media: $selectedMedium',
+                            style: GoogleFonts.spaceGrotesk(fontSize: 11, color: context.appTextPrimary)),
+                        selected: true,
+                        selectedColor: context.appSurface2,
+                        side: const BorderSide(color: AppDS.accent),
+                        onDeleted: () => onMediumChanged(null),
                         deleteIconColor: context.appTextSecondary,
                         visualDensity: VisualDensity.compact,
                         shape: RoundedRectangleBorder(

@@ -23,6 +23,25 @@ void main() {
       expect(result.longitude, closeTo(-27.215139, 0.000001));
     });
 
+    test('parses Azores coordinates with decimal commas and slash', () {
+      final result = parseSampleCoordinates(gps: '37,767146/-25,485625');
+
+      expect(result, isNotNull);
+      expect(result!.latitude, closeTo(37.767146, 0.000001));
+      expect(result.longitude, closeTo(-25.485625, 0.000001));
+    });
+
+    test('parses decimal commas in separate coordinate fields', () {
+      final result = parseSampleCoordinates(
+        latitude: '37,767146',
+        longitude: '-25,485625',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.latitude, closeTo(37.767146, 0.000001));
+      expect(result.longitude, closeTo(-25.485625, 0.000001));
+    });
+
     test('parses legacy degree minute second coordinates', () {
       final result = parseSampleCoordinates(gps: '37°43\'58.6"N 25°17\'36.8"W');
 

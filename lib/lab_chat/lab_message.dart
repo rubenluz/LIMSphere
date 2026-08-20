@@ -51,7 +51,8 @@ class LabMessage {
       body: json['message_body'] as String,
       edited: json['message_edited'] as bool? ?? false,
       editedAt: json['message_edited_at'] != null
-          ? DateTime.parse(json['message_edited_at'] as String) : null,
+          ? DateTime.parse(json['message_edited_at'] as String)
+          : null,
       parentId: json['message_parent_id'] as int?,
       pinned: json['message_pinned'] as bool? ?? false,
       pinnedBy: json['message_pinned_by'] as int?,
@@ -66,14 +67,13 @@ class LabMessage {
     String? contextType,
     int? contextId,
     int? parentId,
-  }) =>
-      {
-        'message_body': body,
-        'message_channel': channel,
-        'message_context_type': ?contextType,
-        'message_context_id': ?contextId,
-        'message_parent_id': ?parentId,
-      };
+  }) => {
+    'message_body': body,
+    'message_channel': channel,
+    'message_context_type': ?contextType,
+    'message_context_id': ?contextId,
+    'message_parent_id': ?parentId,
+  };
 
   LabMessage copyWith({
     String? body,
@@ -82,28 +82,35 @@ class LabMessage {
     bool? pinned,
     bool? deleted,
     List<LabMessage>? replies,
-  }) =>
-      LabMessage(
-        id: id,
-        userAuthUid: userAuthUid,
-        userId: userId,
-        channel: channel,
-        contextType: contextType,
-        contextId: contextId,
-        body: body ?? this.body,
-        edited: edited ?? this.edited,
-        editedAt: editedAt ?? this.editedAt,
-        parentId: parentId,
-        pinned: pinned ?? this.pinned,
-        pinnedBy: pinnedBy,
-        createdAt: createdAt,
-        deleted: deleted ?? this.deleted,
-        userName: userName,
-        replies: replies ?? this.replies,
-      );
+  }) => LabMessage(
+    id: id,
+    userAuthUid: userAuthUid,
+    userId: userId,
+    channel: channel,
+    contextType: contextType,
+    contextId: contextId,
+    body: body ?? this.body,
+    edited: edited ?? this.edited,
+    editedAt: editedAt ?? this.editedAt,
+    parentId: parentId,
+    pinned: pinned ?? this.pinned,
+    pinnedBy: pinnedBy,
+    createdAt: createdAt,
+    deleted: deleted ?? this.deleted,
+    userName: userName,
+    replies: replies ?? this.replies,
+  );
 
   bool get isTopLevel => parentId == null;
-  String get senderKey =>
-      userAuthUid ?? (userId?.toString() ?? 'message_$id');
+  String get senderKey => userAuthUid ?? (userId?.toString() ?? 'message_$id');
   String get displayName => userName ?? 'Unknown User';
+}
+
+bool canEditLabMessage({
+  required LabMessage message,
+  required String? authUid,
+  required String? role,
+}) {
+  final isAdmin = role == 'admin' || role == 'superadmin';
+  return isAdmin || (authUid != null && message.userAuthUid == authUid);
 }

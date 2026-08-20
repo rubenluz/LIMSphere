@@ -4,15 +4,19 @@
 
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '/menu/app_nav.dart';
 import '/theme/theme.dart';
+
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'dashboard_widgets/next_transfer_widget.dart';
 import 'dashboard_widgets/need_new_transfer_widget.dart';
 import 'dashboard_widgets/strains_by_origin_widget.dart';
@@ -31,6 +35,7 @@ import 'dashboard_widgets/breeding_activity_widget.dart';
 import 'dashboard_widgets/open_requests_widget.dart';
 import 'dashboard_widgets/today_reservations_widget.dart';
 import 'dashboard_widgets/pending_users_widget.dart';
+import 'global_search.dart';
 
 const int _kProfileCount = 5;
 
@@ -1049,9 +1054,22 @@ class _DashboardPageState extends State<DashboardPage> {
               color: context.appTextPrimary,
             ),
           ),
-          const Spacer(),
-          if (_isDesktop) _buildUpdateButton(),
+          SizedBox(width: isMobile ? 10 : 24),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: DashboardGlobalSearch(
+                  includeUsers: _isAdmin,
+                  compact: true,
+                ),
+              ),
+            ),
+          ),
           const SizedBox(width: 12),
+          if (_isDesktop) _buildUpdateButton(),
+          if (_isDesktop) const SizedBox(width: 12),
           Tooltip(
             message: 'View on GitHub',
             child: InkWell(

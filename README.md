@@ -1,19 +1,24 @@
 # LIMSphere
 
-LIMSphere is a cross-platform Laboratory Information Management System (LIMS) built with Flutter and Supabase. It brings biological collection records, fish-facility operations, laboratory resources, inventory, labels, and administrative workflows into one application.
+LIMSphere is a cross-platform application for managing a scientific laboratory. It brings a culture collection, zebrafish facility, reagent stock, machines, reservations, labels, and practical laboratory tools into one connected workspace.
 
-The project is currently under active development. It is intended for laboratories that need a practical operational workspace rather than a single-purpose sample database. Desktop layouts support data-heavy management work, while the mobile application includes QR scanning and quick record access.
+The goal is not to build an overcomplicated traceability system. LIMSphere is designed to make everyday laboratory work simple: records from different areas should connect naturally, QR codes should open the correct information across desktop and mobile, and users should be able to make quick updates from a phone.
+
+The interface should remain easy to understand, easy to set up, and consistent across every page. Similar actions and records should use the same layouts and interaction patterns throughout the application.
 
 ## Current scope
 
-- Culture collections: strains, samples, detailed records, imports, exports, and SOPs
-- Fish facilities: stocks, tanks, fish lines, water quality, feeding, and operational history
-- Laboratory resources: rooms and storage locations, reagents, machines, reservations, and a visual lab map
-- Traceability tools: QR scanning, item logs, label design, label printing, and backup/export workflows
-- Collaboration and administration: requests, laboratory chat, users, granular permissions, audit logs, and settings
-- General laboratory tools: concentration and dilution calculators, unit conversion, and well randomization
+- Culture collection: strains, samples, linked detail records, imports, exports, maps, and SOPs
+- Zebrafish facility: stocks, tanks, fish lines, water quality, feeding, and daily facility work
+- Laboratory resources: reagent inventory, rooms and storage locations, machines, and reservations
+- Connected workflows: QR codes, mobile record lookup, quick updates, requests, and laboratory chat
+- Labels and printing: label design, templates, QR labels, and printer support
+- Administration: users, permissions, backups, settings, and database setup
+- Laboratory tools: a completed randomizer and additional practical tools still to be developed
 
-The planned work, priorities, and known gaps are tracked in the [project roadmap](TODO.md).
+The Culture Collection and Fish Facility are mostly implemented. Current work is focused on polishing their workflows and adding useful tools rather than expanding them with unnecessary complexity. Machines and Reservations still need clearer layouts and faster day-to-day workflows. Label printing also needs better compatibility with legacy printers.
+
+The planned improvements and known gaps are tracked in the [project roadmap](TODO.md).
 
 ## Technology
 
@@ -66,7 +71,7 @@ windows/                Windows desktop project
 
 ## Status and roadmap
 
-LIMSphere is not yet presented as a finished production release. The current codebase contains substantial working functionality, while global search, deeper record-level authorization, distribution workflows, and improvements to existing collection-management pages remain planned.
+LIMSphere is under active development and is not yet presented as a finished production release. The main Culture Collection and Fish Facility workflows are in place, while usability improvements, visual consistency, machines, reservations, laboratory tools, mapping, and legacy-printer support remain active priorities.
 
 See [TODO.md](TODO.md) for the detailed roadmap and current implementation status.
 

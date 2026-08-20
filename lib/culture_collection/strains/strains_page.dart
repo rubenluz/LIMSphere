@@ -124,6 +124,8 @@ class _StrainsPageState extends State<StrainsPage> {
   final List<ActiveFilter> _activeFilters = [];
   List<int> _periodicityOptions = [];
   int? _selectedPeriodicity;
+  List<String> _mediumOptions = [];
+  String? _selectedMedium;
 
   bool _hideEmpty = true;
   Set<String> _hiddenCols = {};
@@ -239,6 +241,7 @@ class _StrainsPageState extends State<StrainsPage> {
         _emptyColKeys = {};
       }
       _buildPeriodicityOptions();
+      _buildMediumOptions();
       _applyFilter();
     }
   }
@@ -349,6 +352,7 @@ class _StrainsPageState extends State<StrainsPage> {
           _emptyColKeys = {};
         }
         _buildPeriodicityOptions();
+        _buildMediumOptions();
         _applyFilter();
         setState(() => _loading = false);
       }
@@ -386,6 +390,7 @@ class _StrainsPageState extends State<StrainsPage> {
         _emptyColKeys = {};
       }
       _buildPeriodicityOptions();
+      _buildMediumOptions();
       _applyFilter();
       _syncNextTransferDates(); // background — no await
       setState(() => _loading = false);
@@ -493,6 +498,22 @@ class _StrainsPageState extends State<StrainsPage> {
           ..sort();
   }
 
+  void _buildMediumOptions() {
+    final optionsByLowercase = <String, String>{};
+    for (final row in _rows) {
+      final medium = row['strain_medium']?.toString().trim() ?? '';
+      if (medium.isNotEmpty) {
+        optionsByLowercase.putIfAbsent(medium.toLowerCase(), () => medium);
+      }
+    }
+    _mediumOptions = optionsByLowercase.values.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    if (_selectedMedium != null &&
+        !_mediumOptions.any((m) => m == _selectedMedium)) {
+      _selectedMedium = null;
+    }
+  }
+
   // ── Filter / sort ──────────────────────────────────────────────────────────
   void _applyFilter() {
     var list = List<Map<String, dynamic>>.from(_rows);
@@ -521,6 +542,16 @@ class _StrainsPageState extends State<StrainsPage> {
             (r) =>
                 int.tryParse(r['strain_periodicity']?.toString() ?? '') ==
                 _selectedPeriodicity,
+          )
+          .toList();
+    }
+    if (_selectedMedium != null) {
+      final selected = _selectedMedium!.toLowerCase();
+      list = list
+          .where(
+            (r) =>
+                (r['strain_medium']?.toString().trim().toLowerCase() ?? '') ==
+                selected,
           )
           .toList();
     }
@@ -1296,6 +1327,8 @@ class _StrainsPageState extends State<StrainsPage> {
             sortDirs: _sortDirs,
             periodicityOptions: _periodicityOptions,
             selectedPeriodicity: _selectedPeriodicity,
+            mediumOptions: _mediumOptions,
+            selectedMedium: _selectedMedium,
             onClearSort: _resetSort,
             onRemoveSortKey: (i, key) {
               setState(() {
@@ -1309,10 +1342,15 @@ class _StrainsPageState extends State<StrainsPage> {
               setState(() => _selectedPeriodicity = v);
               _applyFilter();
             },
+            onMediumChanged: (v) {
+              setState(() => _selectedMedium = v);
+              _applyFilter();
+            },
             onClearFilters: () {
               setState(() {
                 _activeFilters.clear();
                 _selectedPeriodicity = null;
+                _selectedMedium = null;
               });
               _applyFilter();
             },

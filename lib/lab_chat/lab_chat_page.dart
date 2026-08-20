@@ -1,6 +1,8 @@
-// lab_chat_page.dart - Multi-channel lab chat with 8 channels grouped by module,
-// real-time Supabase subscription, unread badge tracking, reply threading.
+// lab_chat_page.dart - General lab chat with real-time Supabase updates,
+// unread badge tracking, reply threading, editing, and database mentions.
 // Widget classes extracted to lab_chat_widgets.dart (part).
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,9 +11,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:limsphere/lab_chat/lab_message.dart';
 
+import '/camera/qr_scanner/qr_code_rules.dart';
+import '/camera/qr_scanner/qr_scanner_page.dart';
+import '/supabase/supabase_manager.dart';
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
 import '/menu/app_nav.dart';
+import 'lab_mention.dart';
 
 part 'lab_chat_widgets.dart';
 
@@ -26,36 +32,10 @@ class _Channel {
 
 const _channels = [
   _Channel('general', 'General', Icons.chat_bubble_outline, Color(0xFF00C8F0)),
-  _Channel(
-    'announcements',
-    'Announcements',
-    Icons.campaign_outlined,
-    Color(0xFFFFD60A),
-  ),
-  _Channel('fish', 'Fish', Icons.water, Color(0xFF00D98A)),
-  _Channel('strains', 'Strains', Icons.biotech, Color(0xFF9B72CF)),
-  _Channel('samples', 'Samples', Icons.science_outlined, Color(0xFFFF8C42)),
-  _Channel('reagents', 'Reagents', Icons.colorize_outlined, Color(0xFFFF4D6D)),
-  _Channel(
-    'equipment',
-    'Equipment',
-    Icons.precision_manufacturing_outlined,
-    Color(0xFF7A9CBF),
-  ),
-  _Channel(
-    'reservations',
-    'Reservations',
-    Icons.event_outlined,
-    Color(0xFFEC4899),
-  ),
 ];
 
-// Sidebar grouping: (group header label or null, channel ids)
 const _channelGroups = <(String?, List<String>)>[
-  (null, ['general', 'announcements']),
-  ('Fish Facility', ['fish']),
-  ('Culture Collection', ['strains', 'samples']),
-  ('Resources', ['reagents', 'equipment', 'reservations']),
+  (null, ['general']),
 ];
 
 // ─── Font helpers ─────────────────────────────────────────────────────────────
@@ -171,6 +151,11 @@ class _LabChatPageState extends State<LabChatPage> {
   final _editCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   final _focusNode = FocusNode();
+  Timer? _mentionDebounce;
+  List<LabMention> _mentionResults = const [];
+  bool _mentionLoading = false;
+  int? _mentionStart;
+  int _mentionGeneration = 0;
 
   String _channel = 'general';
   bool _sidebarCollapsed = false;
@@ -199,7 +184,7 @@ class _LabChatPageState extends State<LabChatPage> {
   @override
   void initState() {
     super.initState();
-    _loadSidebarPref();
+    _msgCtrl.addListener(_onComposerChanged);
     _loadLastSeenCounts();
     _resolveCurrentUser();
     _loadAndSubscribe(_channel);
@@ -210,21 +195,6 @@ class _LabChatPageState extends State<LabChatPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) LabChatPage.setActiveChannel(_channel);
     });
-  }
-
-  Future<void> _loadSidebarPref() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(
-        () => _sidebarCollapsed =
-            prefs.getBool('lab_chat_sidebar_collapsed') ?? false,
-      );
-    }
-  }
-
-  Future<void> _saveSidebarPref(bool collapsed) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('lab_chat_sidebar_collapsed', collapsed);
   }
 
   Future<void> _loadLastSeenCounts() async {
@@ -259,6 +229,8 @@ class _LabChatPageState extends State<LabChatPage> {
   void dispose() {
     LabChatPage.setActiveChannel(null);
     _realtimeSub?.unsubscribe();
+    _mentionDebounce?.cancel();
+    _msgCtrl.removeListener(_onComposerChanged);
     _msgCtrl.dispose();
     _editCtrl.dispose();
     _scrollCtrl.dispose();
@@ -276,7 +248,7 @@ class _LabChatPageState extends State<LabChatPage> {
       Map<String, dynamic>? row = await _supabase
           .from('users')
           .select(
-            'user_id, user_name, user_email, user_auth_uid, user_phone, user_institution, user_group',
+            'user_id, user_name, user_email, user_auth_uid, user_role, user_phone, user_institution, user_group',
           )
           .eq('user_auth_uid', authUser.id)
           .maybeSingle();
@@ -286,7 +258,7 @@ class _LabChatPageState extends State<LabChatPage> {
         row = await _supabase
             .from('users')
             .select(
-              'user_id, user_name, user_email, user_auth_uid, user_phone, user_institution, user_group',
+              'user_id, user_name, user_email, user_auth_uid, user_role, user_phone, user_institution, user_group',
             )
             .eq('user_email', authUser.email!)
             .maybeSingle();
@@ -322,7 +294,7 @@ class _LabChatPageState extends State<LabChatPage> {
           await _supabase
                   .from('users')
                   .select(
-                    'user_id, user_name, user_email, user_auth_uid, user_phone, user_institution, user_group',
+                    'user_id, user_name, user_email, user_auth_uid, user_role, user_phone, user_institution, user_group',
                   )
                   .inFilter('user_auth_uid', missing)
               as List<dynamic>;
@@ -511,6 +483,115 @@ class _LabChatPageState extends State<LabChatPage> {
     }
   }
 
+  Future<void> _saveSidebarPref(bool collapsed) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('lab_chat_sidebar_collapsed', collapsed);
+  }
+
+  void _onComposerChanged() {
+    final selection = _msgCtrl.selection;
+    if (!selection.isValid || selection.baseOffset < 0) {
+      _clearMentionSearch();
+      return;
+    }
+    final beforeCursor = _msgCtrl.text.substring(0, selection.baseOffset);
+    final match = RegExp(r'(?:^|\s)@([^\s@\[\]]*)$').firstMatch(beforeCursor);
+    if (match == null) {
+      _clearMentionSearch();
+      return;
+    }
+    final query = LabMentionSearch.normalize(match.group(1) ?? '');
+    _mentionStart = beforeCursor.lastIndexOf('@');
+    _mentionDebounce?.cancel();
+    if (query.isEmpty) {
+      if (_mentionResults.isNotEmpty || _mentionLoading) {
+        setState(() {
+          _mentionResults = const [];
+          _mentionLoading = false;
+        });
+      }
+      return;
+    }
+    final generation = ++_mentionGeneration;
+    setState(() => _mentionLoading = true);
+    _mentionDebounce = Timer(const Duration(milliseconds: 250), () async {
+      final results = await LabMentionSearch(_supabase).search(query);
+      if (!mounted || generation != _mentionGeneration) return;
+      setState(() {
+        _mentionResults = results;
+        _mentionLoading = false;
+      });
+    });
+  }
+
+  void _clearMentionSearch() {
+    _mentionDebounce?.cancel();
+    _mentionGeneration++;
+    _mentionStart = null;
+    if (_mentionResults.isEmpty && !_mentionLoading) return;
+    setState(() {
+      _mentionResults = const [];
+      _mentionLoading = false;
+    });
+  }
+
+  void _insertMention(LabMention mention) {
+    final start = _mentionStart;
+    final selection = _msgCtrl.selection;
+    if (start == null || !selection.isValid) return;
+    final cursor = selection.baseOffset;
+    final updated = _msgCtrl.text.replaceRange(
+      start,
+      cursor,
+      '${mention.token} ',
+    );
+    final nextCursor = start + mention.token.length + 1;
+    _msgCtrl.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: nextCursor),
+    );
+    _clearMentionSearch();
+    _focusNode.requestFocus();
+  }
+
+  Future<void> _openMention(String type, int id) async {
+    try {
+      final routeType = switch (type) {
+        'user' => 'users',
+        'strain' => 'strains',
+        'sample' => 'samples',
+        'fishline' => 'fish_lines',
+        'stock' => 'fish_stocks',
+        'reagent' => 'reagents',
+        _ => type,
+      };
+      final page = await resolveQrRoute(
+        QrPayload(
+          projectCode: SupabaseManager.projectRef ?? 'local',
+          type: routeType,
+          id: id,
+        ),
+      );
+      if (!mounted) return;
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    } catch (e) {
+      _showSnack('Could not open reference: $e', isError: true);
+    }
+  }
+
+  bool get _isAdmin {
+    final role = _currentUser?['user_role']?.toString();
+    return role == 'admin' || role == 'superadmin';
+  }
+
+  bool _canEditMessage(LabMessage message) {
+    return canEditLabMessage(
+      message: message,
+      authUid: _supabase.auth.currentUser?.id,
+      role: _currentUser?['user_role']?.toString(),
+    );
+  }
+
   // ── CRUD actions ──────────────────────────────────────────────────────────
 
   Future<void> _send() async {
@@ -519,9 +600,9 @@ class _LabChatPageState extends State<LabChatPage> {
     if (text.isEmpty) return;
 
     final replyTo = _replyingTo;
+    _msgCtrl.clear();
     setState(() {
       _replyingTo = null;
-      _msgCtrl.clear();
     });
 
     try {
@@ -579,12 +660,15 @@ class _LabChatPageState extends State<LabChatPage> {
   }
 
   Future<void> _saveEdit(LabMessage msg) async {
-    if (!context.requireModuleAction(ModuleAction.edit)) return;
+    if (!_canEditMessage(msg)) {
+      _showSnack('You can only edit your own messages.', isError: true);
+      return;
+    }
     final text = _editCtrl.text.trim();
     setState(() => _editingId = null);
     if (text.isEmpty || text == msg.body) return;
     try {
-      await _supabase
+      var query = _supabase
           .from('messages')
           .update({
             'message_body': text,
@@ -592,6 +676,13 @@ class _LabChatPageState extends State<LabChatPage> {
             'message_edited_at': DateTime.now().toIso8601String(),
           })
           .eq('message_id', msg.id);
+      if (!_isAdmin) {
+        query = query.eq('message_user_uid', _supabase.auth.currentUser!.id);
+      }
+      final updated = await query.select('message_id');
+      if ((updated as List).isEmpty) {
+        throw Exception('The message was not updated. Check your permissions.');
+      }
       // Realtime UPDATE callback refreshes the row
     } catch (e) {
       _showSnack('Edit failed: $e', isError: true);
@@ -689,36 +780,13 @@ class _LabChatPageState extends State<LabChatPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.appBg,
-      body: Row(
+      body: Column(
         children: [
-          // ── LEFT: chat area ──────────────────────────────────────────────
-          Expanded(
-            child: Column(
-              children: [
-                _buildChatHeader(),
-                if (_showPinnedOnly || _search.isNotEmpty) _buildFilterBar(),
-                Expanded(child: _buildMessageList()),
-                if (_replyingTo != null) _buildReplyBanner(),
-                _buildComposer(),
-              ],
-            ),
-          ),
-          // ── DIVIDER ──────────────────────────────────────────────────────
-          Container(width: 1, color: context.appBorder),
-          // ── RIGHT: channel menu ──────────────────────────────────────────
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-            width: _sidebarCollapsed ? 52 : 216,
-            color: context.appSurface,
-            child: Column(
-              children: [
-                _buildSidebarHeader(),
-                Expanded(child: _buildChannelList()),
-                _buildSidebarFooter(),
-              ],
-            ),
-          ),
+          _buildChatHeader(),
+          if (_showPinnedOnly || _search.isNotEmpty) _buildFilterBar(),
+          Expanded(child: _buildMessageList()),
+          if (_replyingTo != null) _buildReplyBanner(),
+          _buildComposer(),
         ],
       ),
     );
@@ -892,21 +960,16 @@ class _LabChatPageState extends State<LabChatPage> {
             prev != null &&
             prev.senderKey == msg.senderKey &&
             msg.createdAt.difference(prev.createdAt).inMinutes < 5;
-        final currentAuthUid = _supabase.auth.currentUser?.id;
-        final currentRole = _currentUser?['user_role'] as String?;
-        final isAdmin = currentRole == 'admin' || currentRole == 'superadmin';
-        final canEditDelete =
-            isAdmin ||
-            (currentAuthUid != null && msg.userAuthUid == currentAuthUid);
         return _MessageBubble(
           key: ValueKey(msg.id),
           message: msg,
           replies: _repliesByParent[msg.id] ?? [],
           compact: compact,
           channelColor: _currentChannel.color,
-          isEditing: _editingId == msg.id,
+          editingMessageId: _editingId,
           editCtrl: _editCtrl,
-          canEditDelete: canEditDelete,
+          canEditMessage: _canEditMessage,
+          onMentionTap: _openMention,
           onReply: (m) {
             setState(() => _replyingTo = m);
             _focusNode.requestFocus();
@@ -986,53 +1049,126 @@ class _LabChatPageState extends State<LabChatPage> {
         color: context.appSurface,
         border: Border(top: BorderSide(color: context.appBorder)),
       ),
-      child: CallbackShortcuts(
-        bindings: {const SingleActivator(LogicalKeyboardKey.enter): _send},
-        child: Focus(
-          child: TextField(
-            controller: _msgCtrl,
-            focusNode: _focusNode,
-            maxLines: null,
-            minLines: 1,
-            style: _body(size: 13),
-            textInputAction: TextInputAction.newline,
-            decoration: InputDecoration(
-              hintText:
-                  'Message #${_currentChannel.label}'
-                  '${_replyingTo != null ? '  (replying)' : ''}'
-                  '  ·  Enter to send',
-              hintStyle: _body(size: 12, color: context.appTextMuted),
-              filled: true,
-              fillColor: context.appSurface2,
-              border: _ob(context, r: 10),
-              enabledBorder: _ob(context, r: 10),
-              focusedBorder: _ob(context, r: 10, color: AppDS.accent, w: 1.5),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 10,
-              ),
-              isDense: true,
-              suffixIcon: Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _cBtn(Icons.tag, 'Attach context', _showContextPicker),
-                    _cBtn(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_mentionLoading || _mentionResults.isNotEmpty)
+            _buildMentionSuggestions(),
+          CallbackShortcuts(
+            bindings: {const SingleActivator(LogicalKeyboardKey.enter): _send},
+            child: Focus(
+              child: TextField(
+                controller: _msgCtrl,
+                focusNode: _focusNode,
+                maxLines: null,
+                minLines: 1,
+                style: _body(size: 13),
+                textInputAction: TextInputAction.newline,
+                decoration: InputDecoration(
+                  hintText:
+                      'Message General${_replyingTo != null ? '  (replying)' : ''}'
+                      '  ·  Type @ plus a name or number  ·  Enter to send',
+                  hintStyle: _body(size: 12, color: context.appTextMuted),
+                  filled: true,
+                  fillColor: context.appSurface2,
+                  border: _ob(context, r: 10),
+                  enabledBorder: _ob(context, r: 10),
+                  focusedBorder: _ob(
+                    context,
+                    r: 10,
+                    color: AppDS.accent,
+                    w: 1.5,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  isDense: true,
+                  suffixIcon: Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: _cBtn(
                       Icons.send_rounded,
                       'Send (Enter)',
                       _send,
                       color: AppDS.accent,
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
+
+  Widget _buildMentionSuggestions() {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 230),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        border: Border.all(color: context.appBorder2),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: _mentionLoading && _mentionResults.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.all(14),
+              child: LinearProgressIndicator(minHeight: 2),
+            )
+          : ListView.builder(
+              shrinkWrap: true,
+              itemCount: _mentionResults.length,
+              itemBuilder: (context, index) {
+                final mention = _mentionResults[index];
+                return ListTile(
+                  dense: true,
+                  leading: Icon(
+                    _mentionIcon(mention.type),
+                    size: 18,
+                    color: AppDS.accent,
+                  ),
+                  title: Text(mention.label, style: _body(size: 12.5)),
+                  subtitle: Text(
+                    [
+                      _mentionTypeLabel(mention.type),
+                      '#${mention.id}',
+                      if (mention.detail != null) mention.detail!,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _body(size: 10.5, color: context.appTextMuted),
+                  ),
+                  onTap: () => _insertMention(mention),
+                );
+              },
+            ),
+    );
+  }
+
+  IconData _mentionIcon(String type) => switch (type) {
+    'users' => Icons.person_outline,
+    'strains' => Icons.biotech_outlined,
+    'samples' => Icons.science_outlined,
+    'fish_stocks' => Icons.water_outlined,
+    'fish_lines' => Icons.pets_outlined,
+    'reagents' => Icons.inventory_2_outlined,
+    'machines' => Icons.precision_manufacturing_outlined,
+    'locations' => Icons.meeting_room_outlined,
+    _ => Icons.alternate_email,
+  };
+
+  String _mentionTypeLabel(String type) => switch (type) {
+    'users' => 'User',
+    'strains' => 'Strain',
+    'samples' => 'Sample',
+    'fish_stocks' => 'Fish stock',
+    'fish_lines' => 'Fish line',
+    'reagents' => 'Reagent',
+    'machines' => 'Machine',
+    'locations' => 'Room',
+    _ => type,
+  };
 
   Widget _cBtn(IconData icon, String tip, VoidCallback onTap, {Color? color}) =>
       Tooltip(
@@ -1052,6 +1188,8 @@ class _LabChatPageState extends State<LabChatPage> {
       );
 
   // ── Right sidebar ─────────────────────────────────────────────────────────
+  // Kept temporarily for backward-compatible state restoration; not rendered.
+  // ignore: unused_element
   Widget _buildSidebarHeader() {
     return Container(
       height: 56,
@@ -1091,6 +1229,7 @@ class _LabChatPageState extends State<LabChatPage> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildChannelList() {
     final items = <Widget>[];
     for (final group in _channelGroups) {
@@ -1233,6 +1372,7 @@ class _LabChatPageState extends State<LabChatPage> {
     return ListView(padding: const EdgeInsets.only(bottom: 8), children: items);
   }
 
+  // ignore: unused_element
   Widget _buildSidebarFooter() {
     if (_sidebarCollapsed) return const SizedBox.shrink();
     return Container(
@@ -1428,6 +1568,8 @@ class _LabChatPageState extends State<LabChatPage> {
     ),
   );
 
+  // Legacy formatter retained so older saved context tags remain readable.
+  // ignore: unused_element
   void _showContextPicker() {
     showDialog(
       context: context,

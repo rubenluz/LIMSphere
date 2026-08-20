@@ -362,7 +362,22 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         for (final f in group.fields) {
           if (!f.readOnly || f.key == 'sample_gps') {
             final v = _ctrl[f.key]?.text.trim() ?? '';
-            update[f.key] = v.isEmpty ? null : v;
+            if (f.key == 'sample_latitude' || f.key == 'sample_longitude') {
+              final parsed = parseSampleCoordinateValue(
+                v,
+                isLatitude: f.key == 'sample_latitude',
+              );
+              if (v.isNotEmpty && parsed == null) {
+                throw FormatException(
+                  f.key == 'sample_latitude'
+                      ? 'Latitude must be between -90 and 90.'
+                      : 'Longitude must be between -180 and 180.',
+                );
+              }
+              update[f.key] = parsed;
+            } else {
+              update[f.key] = v.isEmpty ? null : v;
+            }
           }
         }
       }

@@ -17,19 +17,49 @@ SampleCoordinates? parseSampleCoordinates({
   String? latitude,
   String? longitude,
 }) {
-  final decimalLatitude = double.tryParse(latitude?.trim() ?? '');
-  final decimalLongitude = double.tryParse(longitude?.trim() ?? '');
+  final decimalLatitude = parseSampleCoordinateValue(
+    latitude,
+    isLatitude: true,
+  );
+  final decimalLongitude = parseSampleCoordinateValue(
+    longitude,
+    isLatitude: false,
+  );
   if (_coordinatesInRange(decimalLatitude, decimalLongitude)) {
     return SampleCoordinates(decimalLatitude!, decimalLongitude!);
   }
 
   final rawGps = gps?.trim() ?? '';
+  // Slash/semicolon separators are unambiguous and therefore allow either a
+  // decimal comma or decimal point in each coordinate.
+  final localizedPair = RegExp(
+    r'^\s*([+-]?\d+(?:[.,]\d+)?)\s*[/;]\s*([+-]?\d+(?:[.,]\d+)?)\s*$',
+  ).firstMatch(rawGps);
+  if (localizedPair != null) {
+    final lat = parseSampleCoordinateValue(
+      localizedPair.group(1),
+      isLatitude: true,
+    );
+    final lon = parseSampleCoordinateValue(
+      localizedPair.group(2),
+      isLatitude: false,
+    );
+    if (_coordinatesInRange(lat, lon)) return SampleCoordinates(lat!, lon!);
+  }
+
+  // Preserve the conventional "decimal point, comma separator" format.
   final decimalPair = RegExp(
-    r'^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$',
+    r'^\s*([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*$',
   ).firstMatch(rawGps);
   if (decimalPair != null) {
-    final lat = double.tryParse(decimalPair.group(1)!);
-    final lon = double.tryParse(decimalPair.group(2)!);
+    final lat = parseSampleCoordinateValue(
+      decimalPair.group(1),
+      isLatitude: true,
+    );
+    final lon = parseSampleCoordinateValue(
+      decimalPair.group(2),
+      isLatitude: false,
+    );
     if (_coordinatesInRange(lat, lon)) return SampleCoordinates(lat!, lon!);
   }
 
@@ -53,6 +83,13 @@ SampleCoordinates? parseSampleCoordinates({
     if (_coordinatesInRange(lat, lon)) return SampleCoordinates(lat, lon);
   }
   return null;
+}
+
+double? parseSampleCoordinateValue(String? input, {required bool isLatitude}) {
+  final value = double.tryParse((input ?? '').trim().replaceAll(',', '.'));
+  if (value == null || !value.isFinite) return null;
+  final limit = isLatitude ? 90.0 : 180.0;
+  return value >= -limit && value <= limit ? value : null;
 }
 
 bool _coordinatesInRange(double? latitude, double? longitude) =>

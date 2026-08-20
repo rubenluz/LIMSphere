@@ -396,13 +396,29 @@ class _SamplesPageState extends State<SamplesPage> {
       await _load();
       return;
     }
+    dynamic savedValue = value.isEmpty ? null : value;
+    if (key == 'sample_latitude' || key == 'sample_longitude') {
+      final parsed = parseSampleCoordinateValue(
+        value,
+        isLatitude: key == 'sample_latitude',
+      );
+      if (value.trim().isNotEmpty && parsed == null) {
+        _snack(
+          key == 'sample_latitude'
+              ? 'Latitude must be between -90 and 90.'
+              : 'Longitude must be between -180 and 180.',
+        );
+        return;
+      }
+      savedValue = parsed;
+    }
     try {
       await Supabase.instance.client
           .from('samples')
-          .update({key: value.isEmpty ? null : value})
+          .update({key: savedValue})
           .eq('sample_id', id);
       final idx = _rows.indexWhere((r) => r['sample_id'] == id);
-      if (idx != -1) _rows[idx][key] = value.isEmpty ? null : value;
+      if (idx != -1) _rows[idx][key] = savedValue;
       _applyFilter();
     } catch (e) {
       _snack('Save error: $e');

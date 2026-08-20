@@ -1,77 +1,99 @@
 # TODO
 
-This roadmap keeps LIMSphere focused on improving the workflows and pages that already exist. New standalone pages are not currently planned; related features should be added to the existing domain pages where they are useful.
+This roadmap keeps LIMSphere focused on a simple and connected laboratory workflow. Features should improve daily work without making the application harder to understand, configure, or maintain. Existing pages should be improved before new standalone pages are introduced.
+
+## Product principles
+
+- Keep setup straightforward for a laboratory administrator.
+- Use the same layout, actions, terminology, and interaction patterns across all pages.
+- Prefer clear, fast workflows over complex scientific traceability features.
+- Connect records across modules so users do not need to enter or find the same information repeatedly.
+- Make QR codes useful across desktop and mobile for lookup and quick updates.
+- Add tools only when they solve a real laboratory task.
 
 ## Current priorities
 
-### Permissions and security
+### Culture collection polish
 
-- [x] Enforce action permissions for view, create, edit, delete, approve, export, print, and bulk updates.
-- [ ] Enforce record scope in queries and actions: own, team, institution, or all records.
-- [ ] Apply record-lock and workflow-state restrictions to edit flows.
-- [ ] Apply publication and collection-responsibility rules where relevant.
+- [x] Link samples and strains in both directions.
+- [x] Add map-based GPS selection with synchronized GPS, latitude, and longitude fields.
+- [ ] Add a Samples overview-map button at appbar that plots all sample locations.
+- [ ] Let the overview map filter points by geographic location and by selected samples.
+- [ ] Let the map show or filter strains by inferring their locations from linked samples.
+- [ ] Improve sample and strain filters, saved views, bulk actions, and related-record navigation.
+- [ ] Improve imports, exports, attachments, and validation of collection metadata and coordinates.
+- [ ] Polish the existing Culture Collection tools and workflows instead of adding unnecessary pages.
 
-### Culture collection
+### Fish facility polish
 
-- [ ] Improve strain and sample filtering, saved views, and bulk actions.
-- [ ] Add managed image and file attachments to strain and sample details.
-- [x] Link sample and strain details in both directions and support linked quick requests.
-- [ ] Extend related-record navigation to managed files, sequences, and other downstream records.
-- [ ] Add clear public/private, cryopreservation, and distribution status fields.
-- [x] Add map-based sample GPS selection with synchronized GPS, latitude, and longitude fields.
-- [ ] Improve imports, exports, and broader validation of collection metadata and GPS coordinates.
-- [ ] Complete the requested-strains workflow using the existing schema and Requests page.
+- [ ] Improve stock filters, fish-line links, tank workflows, and movement history.
+- [ ] Improve breeding, mortality, health, pedigree, and cryopreservation workflows.
+- [ ] Add clearer tank occupancy and capacity warnings.
+- [x] Let users configure monitored Water QC maintenance items.
+- [ ] Improve Water QC reports, trends, attachments, and links to affected tanks or stocks.
+- [ ] Review all Fish Facility pages for consistent layout and faster routine data entry.
 
-### Fish facility
+### Machines and reservations
 
-- [ ] Improve stock filters, lineage links, and movement, mortality, and health history.
-- [ ] Improve fish-line pedigree, linked stocks, breeding records, and cryopreservation details.
-- [ ] Add tank occupancy history, capacity warnings, and safer transfer workflows.
-- [x] Let users choose monitored Water QC maintenance items and hide disabled items from the overview.
-- [ ] Improve Water QC reports, attachments, trends, and links to affected tanks or stocks.
+- [ ] Redesign Machine list and detail layouts for clearer maintenance, calibration, files, and usage information.
+- [ ] Simplify creating, editing, and reviewing reservations.
+- [ ] Make machine availability and reservation conflicts immediately visible.
+- [ ] Reduce the number of steps required for common machine and reservation tasks.
+- [ ] Align both areas with the shared layout used by the rest of LIMSphere.
 
-### Resources and inventory
+### Reagents and storage
 
-- [ ] Add reagent reorder thresholds, lot tracking, stock history, and document attachments.
-- [ ] Show low-stock and reorder information within the existing Reagents page and dashboard.
-- [ ] Improve machine maintenance, calibration, usage, reservations, and file history.
-- [x] Add stable room and child-location codes and show them in reagent location selectors.
-- [x] Allow reagents to be stored at room level or at a specific child location.
-- [ ] Improve storage hierarchy, barcode retrieval, occupancy, and chain-of-custody history.
+- [x] Support stable room and child-location codes.
+- [x] Allow reagents to be stored at room level or in a child location.
+- [ ] Improve reagent stock levels, reorder warnings, lots, suppliers, and stock history.
+- [ ] Improve room and storage navigation, occupancy information, and barcode lookup.
+- [ ] Show useful low-stock information on the Reagents page and dashboard.
 
-### Navigation and daily work
+### Laboratory tools
 
-- [ ] Improve the existing dashboard with pending work, low stock, maintenance, approvals, and collection summaries.
-- [ ] Add global search across core records, with results grouped by type.
-- [ ] Add saved filters and recent records to existing list pages where they provide value.
-- [x] Make QR scanning open the relevant existing record and offer safe quick actions.
+- [x] Complete the randomizer.
+- [ ] Define the small set of additional tools that laboratories genuinely need.
+- [ ] Implement each tool with the same simple layout and clear inputs/outputs.
+- [ ] Avoid adding tools that duplicate existing workflows or increase complexity without a clear benefit.
+
+### Labels and legacy printers
+
+- [ ] Investigate and document the current failures with legacy label printers.
+- [ ] Improve printer detection, connection feedback, and actionable error messages.
+- [ ] Add compatible output settings or drivers for supported legacy printers.
+- [ ] Test label dimensions, QR readability, alignment, and print density on real hardware.
+- [ ] Complete useful label presets for core LIMSphere records.
+
+### Connected desktop and mobile workflows
+
+- [x] Give core records canonical LIMSphere QR links.
+- [x] Open verified records from QR scans.
 - [x] Keep mobile workflows focused on scanning, lookup, and quick updates.
+- [ ] Review quick-update actions for samples, strains, fish stocks, reagents, machines, and rooms.
+- [ ] Ensure links between modules always open the correct detail page.
+- [ ] Keep global search fast, clear, and consistent with QR navigation.
 
-### Traceability and administration
+### Consistency and setup
 
-- [x] Give core entities canonical LIMSphere QR links and route scans to verified existing records.
-- [ ] Complete printable-label coverage and presets for every core entity category.
-- [ ] Improve audit history with record filters and clearer old/new value comparisons.
-- [ ] Add required-field and data-quality settings for important metadata.
-- [ ] Improve backup validation and standards-oriented export packages.
-- [x] Add a compact user list and confirmed, safeguarded user deletion.
-- [ ] Finish and polish the tools that already exist.
+- [ ] Create and apply a shared list-page layout across all modules.
+- [ ] Create and apply a shared detail-page layout across all modules.
+- [ ] Standardize filters, dialogs, empty states, loading states, forms, and save feedback.
+- [ ] Simplify first-run database setup and explain failures in plain language.
+- [ ] Review mobile and desktop layouts together for every major workflow.
+- [ ] Keep documentation aligned with the actual implemented state.
 
 ## Completed foundation
 
-- [x] Add JSON-backed granular permissions alongside legacy module permissions.
-- [x] Add admin-only permission editing to user details.
-- [x] Support page access, actions, record scope, publication access, responsibility scope, record-lock bypass, and workflow states in the permission model.
-- [x] Restrict role and permission editing to administrators.
-- [x] Use the shared permission resolver for menu visibility, access checks, and Requests behavior.
+- [x] Add granular user permissions and admin permission editing.
+- [x] Use shared access checks for menu visibility and page actions.
+- [x] Connect the Culture Collection, Fish Facility, resources, users, requests, chat, labels, and QR workflows to the same Supabase-backed application.
+- [x] Add desktop management layouts and mobile QR scanning.
 
-## Later, only if required
+## Later, only if clearly needed
 
-These are possible extensions, not commitments. They should first be implemented inside an existing page or detail view. A new page should only be introduced when the workflow becomes too large or distinct to fit clearly into the current interface.
+These are possible extensions, not commitments. They should only be developed when laboratories have a clear workflow that requires them.
 
-- Taxonomy and sequence management
-- Advanced cross-table reporting
-- Public catalog and external distribution portal
-- Geographic collection explorer
-- Molecular or phenotypic comparison tools
-- External client and compliance-document management
+- Advanced cross-table reports
+- Public collection catalog or distribution portal
+- Sequence, molecular, or phenotypic comparison tools
+- External client integrations
