@@ -5,6 +5,8 @@
 part of 'machines_page.dart';
 
 // ─── Machine Row ──────────────────────────────────────────────────────────────
+// Kept for the table-row layout while the current page uses its card variant.
+// ignore: unused_element
 class _MachineRow extends StatelessWidget {
   final MachineModel machine;
   final VoidCallback onTap;
@@ -31,94 +33,127 @@ class _MachineRow extends StatelessWidget {
             border: Border(bottom: BorderSide(color: context.appBorder)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(children: [
-            // ── Actions ──────────────────────────────────────────────────
-            _RowBtn(icon: Icons.open_in_new, tooltip: 'View detail', onTap: onDetail),
-            _RowBtn(icon: Icons.event_available_outlined, tooltip: 'Quick Reservation', onTap: onReserve),
-            const SizedBox(width: 4),
-            Expanded(
-              flex: 5,
-              child: Row(children: [
-                Flexible(
-                  child: Text(m.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
-                          color: context.appTextPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600)),
-                ),
-                const SizedBox(width: 8),
-                _StatusBadge(status: m.status),
-                if (m.maintenanceOverdue) ...[
-                  const SizedBox(width: 4),
-                  _SmallBadge(label: 'Overdue', color: AppDS.red),
-                ] else if (m.maintenanceDueSoon) ...[
-                  const SizedBox(width: 4),
-                  _SmallBadge(label: 'Due soon', color: AppDS.yellow),
-                ],
-              ]),
-            ),
-            Expanded(
-              flex: 3,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (m.type != null)
-                    Text(m.type!,
+          child: Row(
+            children: [
+              // ── Actions ──────────────────────────────────────────────────
+              _RowBtn(
+                icon: Icons.open_in_new,
+                tooltip: 'View detail',
+                onTap: onDetail,
+              ),
+              _RowBtn(
+                icon: Icons.event_available_outlined,
+                tooltip: 'Quick Reservation',
+                onTap: onReserve,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                flex: 5,
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        m.name,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextPrimary, fontSize: 12)),
-                  if (m.brand != null || m.model != null)
-                    Text(
-                      '${m.brand ?? ''}${m.brand != null && m.model != null ? ' · ' : ''}${m.model ?? ''}',
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
-                          color: context.appTextSecondary, fontSize: 11),
+                          color: context.appTextPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                ],
+                    const SizedBox(width: 8),
+                    _StatusBadge(status: m.status),
+                    if (m.maintenanceOverdue) ...[
+                      const SizedBox(width: 4),
+                      _SmallBadge(label: 'Overdue', color: AppDS.red),
+                    ] else if (m.maintenanceDueSoon) ...[
+                      const SizedBox(width: 4),
+                      _SmallBadge(label: 'Due soon', color: AppDS.yellow),
+                    ],
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              flex: 2,
-              child: m.locationName != null
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(m.locationName!,
+              Expanded(
+                flex: 3,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (m.type != null)
+                      Text(
+                        m.type!,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextPrimary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    if (m.brand != null || m.model != null)
+                      Text(
+                        '${m.brand ?? ''}${m.brand != null && m.model != null ? ' · ' : ''}${m.model ?? ''}',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: m.locationName != null
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            m.locationName!,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.spaceGrotesk(
-                                color: context.appTextPrimary, fontSize: 12)),
-                        if (m.room != null)
-                          Text(m.room!,
+                              color: context.appTextPrimary,
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (m.room != null)
+                            Text(
+                              m.room!,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.spaceGrotesk(
-                                  color: context.appTextSecondary,
-                                  fontSize: 11)),
-                      ],
-                    )
-                  : const SizedBox.shrink(),
-            ),
-            Expanded(
-              flex: 2,
-              child: m.nextMaintenance != null
-                  ? Text(
-                      m.nextMaintenance!.toIso8601String().substring(0, 10),
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.jetBrainsMono(
+                                color: context.appTextSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              Expanded(
+                flex: 2,
+                child: m.nextMaintenance != null
+                    ? Text(
+                        m.nextMaintenance!.toIso8601String().substring(0, 10),
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.jetBrainsMono(
                           color: m.maintenanceOverdue
                               ? AppDS.red
                               : m.maintenanceDueSoon
-                                  ? AppDS.yellow
-                                  : context.appTextSecondary,
-                          fontSize: 11),
-                    )
-                  : Text('—',
-                      style: GoogleFonts.spaceGrotesk(
-                          color: context.appTextMuted, fontSize: 12)),
-            ),
-          ]),
+                              ? AppDS.yellow
+                              : context.appTextSecondary,
+                          fontSize: 11,
+                        ),
+                      )
+                    : Text(
+                        '—',
+                        style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -129,20 +164,23 @@ class _RowBtn extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
-  const _RowBtn(
-      {required this.icon, required this.tooltip, required this.onTap});
+  const _RowBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: tooltip,
-        child: IconButton(
-          icon: Icon(icon, size: 16),
-          color: context.appTextSecondary,
-          visualDensity: VisualDensity.compact,
-          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          onPressed: onTap,
-        ),
-      );
+    message: tooltip,
+    child: IconButton(
+      icon: Icon(icon, size: 16),
+      color: context.appTextSecondary,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      onPressed: onTap,
+    ),
+  );
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -164,8 +202,10 @@ class _StatusBadge extends StatelessWidget {
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(MachineModel.statusLabel(status),
-          style: GoogleFonts.spaceGrotesk(color: color, fontSize: 11)),
+      child: Text(
+        MachineModel.statusLabel(status),
+        style: GoogleFonts.spaceGrotesk(color: color, fontSize: 11),
+      ),
     );
   }
 }
@@ -177,49 +217,53 @@ class _SmallBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(label,
-            style: GoogleFonts.spaceGrotesk(color: color, fontSize: 10)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Text(
+      label,
+      style: GoogleFonts.spaceGrotesk(color: color, fontSize: 10),
+    ),
+  );
 }
-
 
 class _Chip extends StatelessWidget {
   final String label;
   final bool selected;
   final Color color;
   final VoidCallback onTap;
-  const _Chip(
-      {required this.label,
-      required this.selected,
-      required this.color,
-      required this.onTap});
+  const _Chip({
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color:
-                selected ? color.withValues(alpha: 0.18) : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-                color: selected ? color : context.appBorder,
-                width: selected ? 1.5 : 1),
-          ),
-          child: Text(label,
-              style: GoogleFonts.spaceGrotesk(
-                  color: selected ? color : context.appTextSecondary,
-                  fontSize: 12,
-                  fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.normal)),
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: selected ? color.withValues(alpha: 0.18) : Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: selected ? color : context.appBorder,
+          width: selected ? 1.5 : 1,
         ),
-      );
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.spaceGrotesk(
+          color: selected ? color : context.appTextSecondary,
+          fontSize: 12,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+    ),
+  );
 }
 
 // ─── Add/Edit Machine Dialog ────────────────────────────────────────────────────
@@ -273,9 +317,11 @@ class _MachineFormDialogState extends State<_MachineFormDialog> {
     _manualCtrl = TextEditingController(text: e?.manualLink ?? '');
     _notesCtrl = TextEditingController(text: e?.notes ?? '');
     _maintIntervalCtrl = TextEditingController(
-        text: e?.maintenanceIntervalDays?.toString() ?? '');
+      text: e?.maintenanceIntervalDays?.toString() ?? '',
+    );
     _calIntervalCtrl = TextEditingController(
-        text: e?.calibrationIntervalDays?.toString() ?? '');
+      text: e?.calibrationIntervalDays?.toString() ?? '',
+    );
     _status = e?.status ?? 'operational';
     _locationId = e?.locationId;
     _purchaseDate = e?.purchaseDate;
@@ -289,9 +335,19 @@ class _MachineFormDialogState extends State<_MachineFormDialog> {
   @override
   void dispose() {
     for (final c in [
-      _nameCtrl, _typeCtrl, _brandCtrl, _modelCtrl, _serialCtrl,
-      _patrimonyCtrl, _roomCtrl, _responsibleCtrl, _supplierCtrl,
-      _manualCtrl, _notesCtrl, _maintIntervalCtrl, _calIntervalCtrl,
+      _nameCtrl,
+      _typeCtrl,
+      _brandCtrl,
+      _modelCtrl,
+      _serialCtrl,
+      _patrimonyCtrl,
+      _roomCtrl,
+      _responsibleCtrl,
+      _supplierCtrl,
+      _manualCtrl,
+      _notesCtrl,
+      _maintIntervalCtrl,
+      _calIntervalCtrl,
     ]) {
       c.dispose();
     }
@@ -316,25 +372,38 @@ class _MachineFormDialogState extends State<_MachineFormDialog> {
       lastDate: DateTime(2040),
       builder: (ctx, child) => Theme(
         data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-                primary: AppDS.accent, surface: AppDS.surface)),
+          colorScheme: const ColorScheme.dark(
+            primary: AppDS.accent,
+            surface: AppDS.surface,
+          ),
+        ),
         child: child!,
       ),
     );
     if (picked == null) return;
     setState(() {
       switch (field) {
-        case 'purchase': _purchaseDate = picked;
-        case 'warranty': _warrantyUntil = picked;
-        case 'lastMaint': _lastMaintenance = picked;
-        case 'nextMaint': _nextMaintenance = picked;
-        case 'lastCal': _lastCalibration = picked;
-        case 'nextCal': _nextCalibration = picked;
+        case 'purchase':
+          _purchaseDate = picked;
+        case 'warranty':
+          _warrantyUntil = picked;
+        case 'lastMaint':
+          _lastMaintenance = picked;
+        case 'nextMaint':
+          _nextMaintenance = picked;
+        case 'lastCal':
+          _lastCalibration = picked;
+        case 'nextCal':
+          _nextCalibration = picked;
       }
     });
   }
 
   Future<void> _save() async {
+    final action = widget.existing == null
+        ? ModuleAction.create
+        : ModuleAction.edit;
+    if (!context.requireModuleAction(action)) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
@@ -353,29 +422,38 @@ class _MachineFormDialogState extends State<_MachineFormDialog> {
         if (_locationId != null) 'equipment_location_id': _locationId,
         if (_roomCtrl.text.isNotEmpty) 'equipment_room': _roomCtrl.text.trim(),
         if (_purchaseDate != null)
-          'equipment_purchase_date':
-              _purchaseDate!.toIso8601String().substring(0, 10),
+          'equipment_purchase_date': _purchaseDate!.toIso8601String().substring(
+            0,
+            10,
+          ),
         if (_warrantyUntil != null)
-          'equipment_warranty_until':
-              _warrantyUntil!.toIso8601String().substring(0, 10),
+          'equipment_warranty_until': _warrantyUntil!
+              .toIso8601String()
+              .substring(0, 10),
         if (_lastMaintenance != null)
-          'equipment_last_maintenance':
-              _lastMaintenance!.toIso8601String().substring(0, 10),
+          'equipment_last_maintenance': _lastMaintenance!
+              .toIso8601String()
+              .substring(0, 10),
         if (_nextMaintenance != null)
-          'equipment_next_maintenance':
-              _nextMaintenance!.toIso8601String().substring(0, 10),
+          'equipment_next_maintenance': _nextMaintenance!
+              .toIso8601String()
+              .substring(0, 10),
         if (_maintIntervalCtrl.text.isNotEmpty)
-          'equipment_maintenance_interval_days':
-              int.tryParse(_maintIntervalCtrl.text.trim()),
+          'equipment_maintenance_interval_days': int.tryParse(
+            _maintIntervalCtrl.text.trim(),
+          ),
         if (_lastCalibration != null)
-          'equipment_last_calibration':
-              _lastCalibration!.toIso8601String().substring(0, 10),
+          'equipment_last_calibration': _lastCalibration!
+              .toIso8601String()
+              .substring(0, 10),
         if (_nextCalibration != null)
-          'equipment_next_calibration':
-              _nextCalibration!.toIso8601String().substring(0, 10),
+          'equipment_next_calibration': _nextCalibration!
+              .toIso8601String()
+              .substring(0, 10),
         if (_calIntervalCtrl.text.isNotEmpty)
-          'equipment_calibration_interval_days':
-              int.tryParse(_calIntervalCtrl.text.trim()),
+          'equipment_calibration_interval_days': int.tryParse(
+            _calIntervalCtrl.text.trim(),
+          ),
         if (_responsibleCtrl.text.isNotEmpty)
           'equipment_responsible': _responsibleCtrl.text.trim(),
         if (_supplierCtrl.text.isNotEmpty)
@@ -400,8 +478,13 @@ class _MachineFormDialogState extends State<_MachineFormDialog> {
         final newId = row['equipment_id'] as int;
         await Supabase.instance.client
             .from('equipment')
-            .update({'equipment_qrcode': QrRules.build(
-                SupabaseManager.projectRef ?? 'local', 'machines', newId)})
+            .update({
+              'equipment_qrcode': QrRules.build(
+                SupabaseManager.projectRef ?? 'local',
+                'machines',
+                newId,
+              ),
+            })
             .eq('equipment_id', newId);
       }
 
@@ -421,254 +504,385 @@ class _MachineFormDialogState extends State<_MachineFormDialog> {
       backgroundColor: context.appSurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Text(
-          widget.existing != null ? 'Edit Machine' : 'Add Machine',
-          style: GoogleFonts.spaceGrotesk(
-              color: context.appTextPrimary, fontWeight: FontWeight.w600)),
+        widget.existing != null ? 'Edit Machine' : 'Add Machine',
+        style: GoogleFonts.spaceGrotesk(
+          color: context.appTextPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
       content: SizedBox(
         width: 580,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              _f(context, _nameCtrl, 'Name *',
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: _f(context, _typeCtrl, 'Type (e.g. Centrifuge)')),
-                const SizedBox(width: 10),
-                Expanded(child: _dd<String>(context,
-                  label: 'Status',
-                  value: _status,
-                  items: MachineModel.statusOptions
-                      .map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(MachineModel.statusLabel(s),
-                              style: GoogleFonts.spaceGrotesk(
-                                  color: context.appTextPrimary, fontSize: 13))))
-                      .toList(),
-                  onChanged: (v) => setState(() => _status = v ?? 'operational'),
-                )),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: _f(context, _brandCtrl, 'Brand')),
-                const SizedBox(width: 10),
-                Expanded(child: _f(context, _modelCtrl, 'Model')),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: _f(context, _serialCtrl, 'Serial Number')),
-                const SizedBox(width: 10),
-                Expanded(child: _f(context, _patrimonyCtrl, 'Patrimony Number')),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: _dd<int?>(context,
-                  label: 'Location',
-                  value: _locationId,
-                  items: [
-                    DropdownMenuItem<int?>(
-                        value: null,
-                        child: Text('None',
-                            style: GoogleFonts.spaceGrotesk(
-                                color: context.appTextMuted, fontSize: 13))),
-                    ...widget.locations.map((l) => DropdownMenuItem<int?>(
-                          value: (l['location_id'] as num).toInt(),
-                          child: Text(l['location_name'] as String,
-                              style: GoogleFonts.spaceGrotesk(
-                                  color: context.appTextPrimary, fontSize: 13)),
-                        )),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _f(
+                  context,
+                  _nameCtrl,
+                  'Name *',
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _f(context, _typeCtrl, 'Type (e.g. Centrifuge)'),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _dd<String>(
+                        context,
+                        label: 'Status',
+                        value: _status,
+                        items: MachineModel.statusOptions
+                            .map(
+                              (s) => DropdownMenuItem(
+                                value: s,
+                                child: Text(
+                                  MachineModel.statusLabel(s),
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: context.appTextPrimary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _status = v ?? 'operational'),
+                      ),
+                    ),
                   ],
-                  onChanged: (v) => setState(() => _locationId = v),
-                )),
-                const SizedBox(width: 10),
-                Expanded(child: _f(context, _roomCtrl, 'Room')),
-              ]),
-              const SizedBox(height: 10),
-              _sectionLabel(context, 'Maintenance'),
-              const SizedBox(height: 6),
-              Row(children: [
-                Expanded(
-                    child: _dp(context, 'Last Maintenance', _lastMaintenance,
-                        () => _pickDate('lastMaint'))),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: _dp(context, 'Next Maintenance', _nextMaintenance,
-                        () => _pickDate('nextMaint'))),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: _f(context, _maintIntervalCtrl, 'Interval (days)',
-                        keyboardType: TextInputType.number)),
-              ]),
-              const SizedBox(height: 10),
-              _sectionLabel(context, 'Calibration'),
-              const SizedBox(height: 6),
-              Row(children: [
-                Expanded(
-                    child: _dp(context, 'Last Calibration', _lastCalibration,
-                        () => _pickDate('lastCal'))),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: _dp(context, 'Next Calibration', _nextCalibration,
-                        () => _pickDate('nextCal'))),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: _f(context, _calIntervalCtrl, 'Interval (days)',
-                        keyboardType: TextInputType.number)),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(
-                    child: _dp(context, 'Purchase Date', _purchaseDate,
-                        () => _pickDate('purchase'))),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: _dp(context, 'Warranty Until', _warrantyUntil,
-                        () => _pickDate('warranty'))),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: _f(context, _responsibleCtrl, 'Responsible')),
-                const SizedBox(width: 10),
-                Expanded(child: _f(context, _supplierCtrl, 'Supplier')),
-              ]),
-              const SizedBox(height: 10),
-              _f(context, _manualCtrl, 'Manual Link (URL)'),
-              const SizedBox(height: 10),
-              _f(context, _notesCtrl, 'Notes', maxLines: 3),
-            ]),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _f(context, _brandCtrl, 'Brand')),
+                    const SizedBox(width: 10),
+                    Expanded(child: _f(context, _modelCtrl, 'Model')),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _f(context, _serialCtrl, 'Serial Number')),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _f(context, _patrimonyCtrl, 'Patrimony Number'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dd<int?>(
+                        context,
+                        label: 'Location',
+                        value: _locationId,
+                        items: [
+                          DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text(
+                              'None',
+                              style: GoogleFonts.spaceGrotesk(
+                                color: context.appTextMuted,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          ...widget.locations.map(
+                            (l) => DropdownMenuItem<int?>(
+                              value: (l['location_id'] as num).toInt(),
+                              child: Text(
+                                l['location_name'] as String,
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: context.appTextPrimary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _locationId = v),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: _f(context, _roomCtrl, 'Room')),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _sectionLabel(context, 'Maintenance'),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dp(
+                        context,
+                        'Last Maintenance',
+                        _lastMaintenance,
+                        () => _pickDate('lastMaint'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _dp(
+                        context,
+                        'Next Maintenance',
+                        _nextMaintenance,
+                        () => _pickDate('nextMaint'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _f(
+                        context,
+                        _maintIntervalCtrl,
+                        'Interval (days)',
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _sectionLabel(context, 'Calibration'),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dp(
+                        context,
+                        'Last Calibration',
+                        _lastCalibration,
+                        () => _pickDate('lastCal'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _dp(
+                        context,
+                        'Next Calibration',
+                        _nextCalibration,
+                        () => _pickDate('nextCal'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _f(
+                        context,
+                        _calIntervalCtrl,
+                        'Interval (days)',
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _dp(
+                        context,
+                        'Purchase Date',
+                        _purchaseDate,
+                        () => _pickDate('purchase'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _dp(
+                        context,
+                        'Warranty Until',
+                        _warrantyUntil,
+                        () => _pickDate('warranty'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _f(context, _responsibleCtrl, 'Responsible'),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: _f(context, _supplierCtrl, 'Supplier')),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _f(context, _manualCtrl, 'Manual Link (URL)'),
+                const SizedBox(height: 10),
+                _f(context, _notesCtrl, 'Notes', maxLines: 3),
+              ],
+            ),
           ),
         ),
       ),
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.pop(context, false),
-          child: Text('Cancel',
-              style: GoogleFonts.spaceGrotesk(color: context.appTextSecondary)),
+          child: Text(
+            'Cancel',
+            style: GoogleFonts.spaceGrotesk(color: context.appTextSecondary),
+          ),
         ),
         FilledButton(
           onPressed: _saving ? null : _save,
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFF14B8A6),
             foregroundColor: Colors.black,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: _saving
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(widget.existing != null ? 'Save' : 'Create',
-                  style: GoogleFonts.spaceGrotesk()),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(
+                  widget.existing != null ? 'Save' : 'Create',
+                  style: GoogleFonts.spaceGrotesk(),
+                ),
         ),
       ],
     );
   }
 
   Widget _sectionLabel(BuildContext context, String t) => Align(
-        alignment: Alignment.centerLeft,
-        child: Text(t,
-            style: GoogleFonts.spaceGrotesk(
-                color: context.appTextSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6)),
-      );
+    alignment: Alignment.centerLeft,
+    child: Text(
+      t,
+      style: GoogleFonts.spaceGrotesk(
+        color: context.appTextSecondary,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.6,
+      ),
+    ),
+  );
 
-  Widget _f(BuildContext context, TextEditingController ctrl, String label,
-      {int maxLines = 1,
-      TextInputType? keyboardType,
-      String? Function(String?)? validator}) =>
-      TextFormField(
-        controller: ctrl,
-        maxLines: maxLines,
-        keyboardType: keyboardType,
-        validator: validator,
-        style:
-            GoogleFonts.spaceGrotesk(color: context.appTextPrimary, fontSize: 13),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: GoogleFonts.spaceGrotesk(
-              color: context.appTextSecondary, fontSize: 12),
-          filled: true,
-          fillColor: context.appSurface3,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: context.appBorder)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: context.appBorder)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppDS.accent)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        ),
-      );
+  Widget _f(
+    BuildContext context,
+    TextEditingController ctrl,
+    String label, {
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) => TextFormField(
+    controller: ctrl,
+    maxLines: maxLines,
+    keyboardType: keyboardType,
+    validator: validator,
+    style: GoogleFonts.spaceGrotesk(
+      color: context.appTextPrimary,
+      fontSize: 13,
+    ),
+    decoration: InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.spaceGrotesk(
+        color: context.appTextSecondary,
+        fontSize: 12,
+      ),
+      filled: true,
+      fillColor: context.appSurface3,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: context.appBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: context.appBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppDS.accent),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    ),
+  );
 
-  Widget _dd<T>(BuildContext context, {
+  Widget _dd<T>(
+    BuildContext context, {
     required String label,
     required T value,
     required List<DropdownMenuItem<T>> items,
     required void Function(T?) onChanged,
-  }) =>
-      InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: GoogleFonts.spaceGrotesk(
-              color: context.appTextSecondary, fontSize: 12),
-          filled: true,
-          fillColor: context.appSurface3,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: context.appBorder)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: context.appBorder)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+  }) => InputDecorator(
+    decoration: InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.spaceGrotesk(
+        color: context.appTextSecondary,
+        fontSize: 12,
+      ),
+      filled: true,
+      fillColor: context.appSurface3,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: context.appBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: context.appBorder),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    ),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<T>(
+        value: value,
+        isExpanded: true,
+        dropdownColor: context.appSurface,
+        style: GoogleFonts.spaceGrotesk(
+          color: context.appTextPrimary,
+          fontSize: 13,
         ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<T>(
-            value: value,
-            isExpanded: true,
-            dropdownColor: context.appSurface,
-            style: GoogleFonts.spaceGrotesk(
-                color: context.appTextPrimary, fontSize: 13),
-            items: items,
-            onChanged: onChanged,
-          ),
-        ),
-      );
+        items: items,
+        onChanged: onChanged,
+      ),
+    ),
+  );
 
-  Widget _dp(BuildContext context, String label, DateTime? date, VoidCallback onTap) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: context.appSurface3,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: context.appBorder),
+  Widget _dp(
+    BuildContext context,
+    String label,
+    DateTime? date,
+    VoidCallback onTap,
+  ) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: context.appSurface3,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.appBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextSecondary,
+              fontSize: 11,
+            ),
           ),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: GoogleFonts.spaceGrotesk(
-                        color: context.appTextSecondary, fontSize: 11)),
-                const SizedBox(height: 2),
-                Text(
-                    date != null
-                        ? date.toIso8601String().substring(0, 10)
-                        : 'Select date',
-                    style: GoogleFonts.spaceGrotesk(
-                        color:
-                            date != null ? context.appTextPrimary : context.appTextMuted,
-                        fontSize: 13)),
-              ]),
-        ),
-      );
+          const SizedBox(height: 2),
+          Text(
+            date != null
+                ? date.toIso8601String().substring(0, 10)
+                : 'Select date',
+            style: GoogleFonts.spaceGrotesk(
+              color: date != null
+                  ? context.appTextPrimary
+                  : context.appTextMuted,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

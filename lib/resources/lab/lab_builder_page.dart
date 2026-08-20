@@ -26,11 +26,11 @@ import '../locations/location_model.dart';
 
 const double _kDefaultRoomW = 200;
 const double _kDefaultRoomH = 130;
-const double _kDefaultGap   = 24;
-const int    _kDefaultCols  = 4;
-const double _kGridStep     = 20;
-const double _kHandleSize   = 14;
-const double _kMinRoomSize  = 80;
+const double _kDefaultGap = 24;
+const int _kDefaultCols = 4;
+const double _kGridStep = 20;
+const double _kHandleSize = 14;
+const double _kMinRoomSize = 80;
 const double _kMinDecorSize = 16;
 const double _kMinLocationSize = 28;
 const double _kMinCanvasW = 800;
@@ -42,21 +42,21 @@ enum _DecorKind { wall, door, corridor, bathroom }
 
 extension on _DecorKind {
   String get id => switch (this) {
-        _DecorKind.wall => 'wall',
-        _DecorKind.door => 'door',
-        _DecorKind.corridor => 'corridor',
-        _DecorKind.bathroom => 'bathroom',
-      };
+    _DecorKind.wall => 'wall',
+    _DecorKind.door => 'door',
+    _DecorKind.corridor => 'corridor',
+    _DecorKind.bathroom => 'bathroom',
+  };
 }
 
 enum _Size { small, medium, large }
 
 extension on _Size {
   String get label => switch (this) {
-        _Size.small => 'Small',
-        _Size.medium => 'Medium',
-        _Size.large => 'Large',
-      };
+    _Size.small => 'Small',
+    _Size.medium => 'Medium',
+    _Size.large => 'Large',
+  };
 }
 
 // Default placement footprints per kind & size, in canvas units.
@@ -150,7 +150,8 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       if (base == null || loc != base) return true;
     }
     if (_locationBaseline.keys.any(
-        (id) => !_locations.any((loc) => loc.clientId == id))) {
+      (id) => !_locations.any((loc) => loc.clientId == id),
+    )) {
       return true;
     }
     if (_encodeDecors(_decors) != _decorsBaselineJson) return true;
@@ -164,8 +165,10 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       final results = await Future.wait([
         Supabase.instance.client
             .from('storage_locations')
-            .select('location_id, location_name, location_type, '
-                'location_parent_id, location_sort_order, location_layout')
+            .select(
+              'location_id, location_name, location_type, '
+              'location_parent_id, location_sort_order, location_layout',
+            )
             .order('location_sort_order'),
         Supabase.instance.client
             .from('app_meta')
@@ -208,35 +211,46 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       final roomChildCounts = <int, int>{};
       final locationItems = <_CanvasLocation>[];
       final unpersistedLocations = <int>{};
-      final directChildren = allLocations
-          .where((loc) => !loc.isRoom && loc.parentId != null && roomIds.contains(loc.parentId))
-          .toList()
-        ..sort((a, b) {
-          if (a.parentId != b.parentId) {
-            return (a.parentId ?? 0).compareTo(b.parentId ?? 0);
-          }
-          return _bySortThenName(a, b);
-        });
+      final directChildren =
+          allLocations
+              .where(
+                (loc) =>
+                    !loc.isRoom &&
+                    loc.parentId != null &&
+                    roomIds.contains(loc.parentId),
+              )
+              .toList()
+            ..sort((a, b) {
+              if (a.parentId != b.parentId) {
+                return (a.parentId ?? 0).compareTo(b.parentId ?? 0);
+              }
+              return _bySortThenName(a, b);
+            });
       for (final loc in directChildren) {
         final roomGeom = geom[loc.parentId!];
         if (roomGeom == null) continue;
-        final slot = roomChildCounts.update(loc.parentId!, (v) => v + 1,
-            ifAbsent: () => 0);
+        final slot = roomChildCounts.update(
+          loc.parentId!,
+          (v) => v + 1,
+          ifAbsent: () => 0,
+        );
         final raw = locationLayoutsById[loc.id];
         final parsed = _RoomGeom.tryParse(raw);
         if (parsed == null) unpersistedLocations.add(loc.id);
-        locationItems.add(_CanvasLocation(
-          clientId: 'loc_${loc.id}',
-          dbId: loc.id,
-          parentRoomId: loc.parentId!,
-          name: stripLocationCodePrefix(loc.name),
-          type: loc.type,
-          sortOrder: loc.sortOrder,
-          geom: _clampLocationGeom(
-            roomGeom,
-            parsed ?? _locationFallback(roomGeom, slot, loc.type),
+        locationItems.add(
+          _CanvasLocation(
+            clientId: 'loc_${loc.id}',
+            dbId: loc.id,
+            parentRoomId: loc.parentId!,
+            name: stripLocationCodePrefix(loc.name),
+            type: loc.type,
+            sortOrder: loc.sortOrder,
+            geom: _clampLocationGeom(
+              roomGeom,
+              parsed ?? _locationFallback(roomGeom, slot, loc.type),
+            ),
           ),
-        ));
+        );
       }
 
       // Decorations live on the singleton app_meta row.
@@ -252,7 +266,9 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
           try {
             final parsed = jsonDecode(raw);
             if (parsed is Map) settings = Map<String, dynamic>.from(parsed);
-          } catch (_) {/* keep empty */}
+          } catch (_) {
+            /* keep empty */
+          }
         }
         final layout = settings['lab_layout'];
         if (layout is Map) {
@@ -324,9 +340,9 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
   }
 
   Map<String, dynamic> _encodeCanvasSize(Size size) => {
-        'width': size.width,
-        'height': size.height,
-      };
+    'width': size.width,
+    'height': size.height,
+  };
 
   int _bySortThenName(LocationModel a, LocationModel b) {
     final ao = a.sortOrder, bo = b.sortOrder;
@@ -393,18 +409,18 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
   }
 
   Size _defaultLocationSize(String type) => switch (type) {
-        'bench' => const Size(120, 44),
-        'cabinet' => const Size(80, 52),
-        'drawer' => const Size(68, 40),
-        'rack' => const Size(56, 82),
-        'shelf' => const Size(92, 34),
-        'cold_room' => const Size(96, 72),
-        'cryotank' => const Size(58, 58),
-        'freezer' => const Size(72, 68),
-        'fridge' => const Size(68, 68),
-        'box' => const Size(44, 44),
-        _ => const Size(76, 44),
-      };
+    'bench' => const Size(120, 44),
+    'cabinet' => const Size(80, 52),
+    'drawer' => const Size(68, 40),
+    'rack' => const Size(56, 82),
+    'shelf' => const Size(92, 34),
+    'cold_room' => const Size(96, 72),
+    'cryotank' => const Size(58, 58),
+    'freezer' => const Size(72, 68),
+    'fridge' => const Size(68, 68),
+    'box' => const Size(44, 44),
+    _ => const Size(76, 44),
+  };
 
   _RoomGeom _locationFallback(_RoomGeom roomGeom, int slot, String type) {
     final size = _defaultLocationSize(type);
@@ -514,12 +530,7 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     if (g == null) return;
     final s = _scale;
     final next = _clampFreeGeomToCanvas(
-      _RoomGeom(
-        x: g.x + delta.dx / s,
-        y: g.y + delta.dy / s,
-        w: g.w,
-        h: g.h,
-      ),
+      _RoomGeom(x: g.x + delta.dx / s, y: g.y + delta.dy / s, w: g.w, h: g.h),
       minW: _kMinRoomSize,
       minH: _kMinRoomSize,
     );
@@ -531,12 +542,7 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     if (g == null) return;
     final s = _scale;
     final next = _clampFreeGeomToCanvas(
-      _RoomGeom(
-        x: g.x,
-        y: g.y,
-        w: g.w + delta.dx / s,
-        h: g.h + delta.dy / s,
-      ),
+      _RoomGeom(x: g.x, y: g.y, w: g.w + delta.dx / s, h: g.h + delta.dy / s),
       minW: _kMinRoomSize,
       minH: _kMinRoomSize,
     );
@@ -606,17 +612,19 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       final roomGeom = _geom[loc.parentRoomId];
       if (roomGeom == null) return;
       setState(() {
-        _replaceLocation(loc.copyWith(
-          geom: _clampLocationGeom(
-            roomGeom,
-            _RoomGeom(
-              x: _snapValue(loc.geom.x),
-              y: _snapValue(loc.geom.y),
-              w: math.max(_kMinLocationSize, _snapValue(loc.geom.w)),
-              h: math.max(_kMinLocationSize, _snapValue(loc.geom.h)),
+        _replaceLocation(
+          loc.copyWith(
+            geom: _clampLocationGeom(
+              roomGeom,
+              _RoomGeom(
+                x: _snapValue(loc.geom.x),
+                y: _snapValue(loc.geom.y),
+                w: math.max(_kMinLocationSize, _snapValue(loc.geom.w)),
+                h: math.max(_kMinLocationSize, _snapValue(loc.geom.h)),
+              ),
             ),
           ),
-        ));
+        );
       });
       return;
     }
@@ -661,8 +669,12 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     final size = _kDefaultDecorSizes[kind]![_placementSize]!;
     final id = 'd_${DateTime.now().microsecondsSinceEpoch}_${_decorSeq++}';
     // Center the new shape on the click point.
-    final x = _snap ? _snapValue(at.dx - size.width / 2) : at.dx - size.width / 2;
-    final y = _snap ? _snapValue(at.dy - size.height / 2) : at.dy - size.height / 2;
+    final x = _snap
+        ? _snapValue(at.dx - size.width / 2)
+        : at.dx - size.width / 2;
+    final y = _snap
+        ? _snapValue(at.dy - size.height / 2)
+        : at.dy - size.height / 2;
     final geom = _clampFreeGeomToCanvas(
       _RoomGeom(
         x: math.max(0, x),
@@ -702,12 +714,7 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     final s = _scale;
     setState(() {
       final next = _clampFreeGeomToCanvas(
-        _RoomGeom(
-          x: d.x + delta.dx / s,
-          y: d.y + delta.dy / s,
-          w: d.w,
-          h: d.h,
-        ),
+        _RoomGeom(x: d.x + delta.dx / s, y: d.y + delta.dy / s, w: d.w, h: d.h),
         minW: _kMinDecorSize,
         minH: _kMinDecorSize,
       );
@@ -721,12 +728,7 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     final s = _scale;
     setState(() {
       final next = _clampFreeGeomToCanvas(
-        _RoomGeom(
-          x: d.x,
-          y: d.y,
-          w: d.w + delta.dx / s,
-          h: d.h + delta.dy / s,
-        ),
+        _RoomGeom(x: d.x, y: d.y, w: d.w + delta.dx / s, h: d.h + delta.dy / s),
         minW: _kMinDecorSize,
         minH: _kMinDecorSize,
       );
@@ -768,6 +770,7 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
   }
 
   Future<void> _addLocationToRoom(int roomId) async {
+    if (!context.requireModuleAction(ModuleAction.create)) return;
     final room = _rooms.firstWhere((r) => r.id == roomId);
     final result = await showDialog<_NewCanvasLocation>(
       context: context,
@@ -783,10 +786,11 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     );
     final clientId =
         'tmp_${DateTime.now().microsecondsSinceEpoch}_${_locationSeq++}';
-    final sortOrder = (_locationsForRoom(roomId)
-                .map((loc) => loc.sortOrder ?? 0)
-                .fold<int>(0, math.max)) +
-            1;
+    final sortOrder =
+        (_locationsForRoom(roomId)
+            .map((loc) => loc.sortOrder ?? 0)
+            .fold<int>(0, math.max)) +
+        1;
     final next = _CanvasLocation(
       clientId: clientId,
       dbId: null,
@@ -822,8 +826,10 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     try {
       final rows = await Supabase.instance.client
           .from('storage_locations')
-          .select('location_id, location_name, location_type, '
-              'location_parent_id, location_sort_order, location_layout')
+          .select(
+            'location_id, location_name, location_type, '
+            'location_parent_id, location_sort_order, location_layout',
+          )
           .eq('location_id', locationId)
           .limit(1);
       if (!mounted) return;
@@ -842,7 +848,9 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
 
       final row = Map<String, dynamic>.from(rows.first as Map);
       final model = LocationModel.fromMap(row);
-      final matchingCurrent = _locations.where((l) => l.dbId == locationId).toList();
+      final matchingCurrent = _locations
+          .where((l) => l.dbId == locationId)
+          .toList();
       if (matchingCurrent.isEmpty) return;
       final current = matchingCurrent.first;
       final roomGeom = _geom[model.parentId ?? current.parentRoomId];
@@ -874,10 +882,8 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
   }
 
   Future<void> _save() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
+    if (!context.requireModuleAction(ModuleAction.bulkUpdate)) return;
     setState(() => _saving = true);
     final client = Supabase.instance.client;
     // Save (a) rows the user actually moved/resized AND (b) rows that never
@@ -913,12 +919,14 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
         ok++;
       } catch (e) {
         debugPrint('lab_builder: save row $id failed: $e');
-        final room = _rooms.firstWhere((r) => r.id == id,
-            orElse: () => LocationModel.fromMap({
-                  'location_id': id,
-                  'location_name': '?',
-                  'location_type': 'room'
-                }));
+        final room = _rooms.firstWhere(
+          (r) => r.id == id,
+          orElse: () => LocationModel.fromMap({
+            'location_id': id,
+            'location_name': '?',
+            'location_type': 'room',
+          }),
+        );
         failures.add('${room.name}: $e');
       }
     }
@@ -932,19 +940,24 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     final nextSortByRoom = <int, int>{};
     for (final loc in _locations) {
       if (loc.sortOrder != null) {
-        nextSortByRoom[loc.parentRoomId] =
-            math.max(nextSortByRoom[loc.parentRoomId] ?? 0, loc.sortOrder!);
+        nextSortByRoom[loc.parentRoomId] = math.max(
+          nextSortByRoom[loc.parentRoomId] ?? 0,
+          loc.sortOrder!,
+        );
       }
     }
     for (final clientId in dirtyLocationClientIds) {
       final loc = _locationById(clientId);
       if (loc == null || loc.dbId == null) continue;
       try {
-        await client.from('storage_locations').update({
-          'location_name': loc.name.trim(),
-          'location_type': loc.type,
-          'location_layout': loc.geom.toJson(),
-        }).eq('location_id', loc.dbId!);
+        await client
+            .from('storage_locations')
+            .update({
+              'location_name': loc.name.trim(),
+              'location_type': loc.type,
+              'location_layout': loc.geom.toJson(),
+            })
+            .eq('location_id', loc.dbId!);
         savedLocations++;
         savedLocationClientIds.add(clientId);
       } catch (e) {
@@ -973,13 +986,16 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
             .select('location_id')
             .single();
         final newId = (row['location_id'] as num).toInt();
-        await client.from('storage_locations').update({
-          'location_qrcode': QrRules.build(
-            SupabaseManager.projectRef ?? 'local',
-            'locations',
-            newId,
-          ),
-        }).eq('location_id', newId);
+        await client
+            .from('storage_locations')
+            .update({
+              'location_qrcode': QrRules.build(
+                SupabaseManager.projectRef ?? 'local',
+                'locations',
+                newId,
+              ),
+            })
+            .eq('location_id', newId);
         savedLocations++;
         insertedLocationClientIds.add(clientId);
         insertedDbIds[clientId] = newId;
@@ -1028,14 +1044,16 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     if (!mounted) return;
     setState(() {
       _saving = false;
-      _locations = _sortCanvasLocations(_locations.map((loc) {
-        final insertedId = insertedDbIds[loc.clientId];
-        if (insertedId == null) return loc;
-        return loc.copyWith(
-          dbId: insertedId,
-          sortOrder: assignedSortOrders[loc.clientId],
-        );
-      }).toList());
+      _locations = _sortCanvasLocations(
+        _locations.map((loc) {
+          final insertedId = insertedDbIds[loc.clientId];
+          if (insertedId == null) return loc;
+          return loc.copyWith(
+            dbId: insertedId,
+            sortOrder: assignedSortOrders[loc.clientId],
+          );
+        }).toList(),
+      );
       _baseline = {for (final e in _geom.entries) e.key: e.value};
       for (final clientId in savedLocationClientIds) {
         final loc = _locationById(clientId);
@@ -1052,13 +1070,22 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       // Rows we successfully wrote are now persisted; failed ones stay
       // marked so the next Save retries them.
       _unpersistedRoomIds = _unpersistedRoomIds
-          .where((id) => failures.any((f) =>
-              f.contains(_rooms.firstWhere((r) => r.id == id,
-                  orElse: () => LocationModel.fromMap({
+          .where(
+            (id) => failures.any(
+              (f) => f.contains(
+                _rooms
+                    .firstWhere(
+                      (r) => r.id == id,
+                      orElse: () => LocationModel.fromMap({
                         'location_id': id,
                         'location_name': '?',
-                        'location_type': 'room'
-                      })).name)))
+                        'location_type': 'room',
+                      }),
+                    )
+                    .name,
+              ),
+            ),
+          )
           .toSet();
       _unpersistedLocationIds = _unpersistedLocationIds
           .where(failedUnpersistedLocationIds.contains)
@@ -1103,25 +1130,34 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.appSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Discard changes?',
-            style: GoogleFonts.spaceGrotesk(
-                color: ctx.appTextPrimary, fontWeight: FontWeight.w600)),
+        title: Text(
+          'Discard changes?',
+          style: GoogleFonts.spaceGrotesk(
+            color: ctx.appTextPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         content: Text(
           'You have unsaved changes to the lab layout. Discard them?',
           style: GoogleFonts.spaceGrotesk(
-              color: ctx.appTextSecondary, fontSize: 13),
+            color: ctx.appTextSecondary,
+            fontSize: 13,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Keep editing',
-                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
+            child: Text(
+              'Keep editing',
+              style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary),
+            ),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: AppDS.red,
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Discard', style: GoogleFonts.spaceGrotesk()),
@@ -1134,12 +1170,17 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
 
   void _snack(String msg, {bool error = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.spaceGrotesk(color: Colors.white)),
-      backgroundColor: error ? AppDS.red : AppDS.surface,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: GoogleFonts.spaceGrotesk(color: Colors.white),
+        ),
+        backgroundColor: error ? AppDS.red : AppDS.surface,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -1161,9 +1202,13 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
           backgroundColor: context.appSurface2,
           foregroundColor: context.appTextPrimary,
           elevation: 0,
-          title: Text('Lab Builder',
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextPrimary, fontWeight: FontWeight.w600)),
+          title: Text(
+            'Lab Builder',
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           actions: [
             _buildToolPalette(context),
             const SizedBox(width: 6),
@@ -1182,34 +1227,45 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
                 label: Text(
                   _snap ? 'Snap on' : 'Snap off',
                   style: GoogleFonts.spaceGrotesk(
-                      color: _snap ? AppDS.accent : context.appTextSecondary),
+                    color: _snap ? AppDS.accent : context.appTextSecondary,
+                  ),
                 ),
               ),
             ),
             if (_dirty && !_saving)
               IconButton(
                 tooltip: 'Discard changes',
-                icon: Icon(Icons.undo,
-                    size: 18, color: context.appTextSecondary),
+                icon: Icon(
+                  Icons.undo,
+                  size: 18,
+                  color: context.appTextSecondary,
+                ),
                 onPressed: _resetToBaseline,
               ),
             _saving
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppDS.accent)),
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppDS.accent,
+                      ),
+                    ),
                   )
                 : TextButton.icon(
                     onPressed: _dirty ? _save : null,
-                    icon: const Icon(Icons.save_outlined,
-                        size: 16, color: AppDS.accent),
+                    icon: const Icon(
+                      Icons.save_outlined,
+                      size: 16,
+                      color: AppDS.accent,
+                    ),
                     label: Text(
                       _dirty ? 'Save' : 'Saved',
                       style: GoogleFonts.spaceGrotesk(
-                          color: _dirty ? AppDS.accent : context.appTextMuted),
+                        color: _dirty ? AppDS.accent : context.appTextMuted,
+                      ),
                     ),
                   ),
           ],
@@ -1217,8 +1273,8 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _rooms.isEmpty
-                ? _buildEmptyState(context)
-                : _buildBody(context),
+            ? _buildEmptyState(context)
+            : _buildBody(context),
       ),
     );
   }
@@ -1263,14 +1319,25 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       );
     }
 
-	    return Row(mainAxisSize: MainAxisSize.min, children: [
-	      btn(tool: _Tool.select,   icon: Icons.pan_tool_alt_outlined, tooltip: 'Select / move'),
-	      btn(tool: _Tool.wall,     icon: Icons.horizontal_rule,       tooltip: 'Add wall'),
-	      btn(tool: _Tool.door,     icon: Icons.remove,                tooltip: 'Add door'),
-	      btn(tool: _Tool.corridor, icon: Icons.space_dashboard_outlined, tooltip: 'Add corridor'),
-	      btn(tool: _Tool.bathroom, icon: Icons.wc,                    tooltip: 'Add bathroom'),
-	    ]);
-	  }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        btn(
+          tool: _Tool.select,
+          icon: Icons.pan_tool_alt_outlined,
+          tooltip: 'Select / move',
+        ),
+        btn(tool: _Tool.wall, icon: Icons.horizontal_rule, tooltip: 'Add wall'),
+        btn(tool: _Tool.door, icon: Icons.remove, tooltip: 'Add door'),
+        btn(
+          tool: _Tool.corridor,
+          icon: Icons.space_dashboard_outlined,
+          tooltip: 'Add corridor',
+        ),
+        btn(tool: _Tool.bathroom, icon: Icons.wc, tooltip: 'Add bathroom'),
+      ],
+    );
+  }
 
   Widget _buildSizeMenu(BuildContext context) {
     return PopupMenuButton<_Size>(
@@ -1289,8 +1356,9 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
                     ? AppDS.accent
                     : context.appTextPrimary,
                 fontSize: 13,
-                fontWeight:
-                    s == _placementSize ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: s == _placementSize
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
             ),
           ),
@@ -1302,75 +1370,102 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
           border: Border.all(color: context.appBorder),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.aspect_ratio,
-              size: 14, color: context.appTextSecondary),
-          const SizedBox(width: 4),
-          Text(_placementSize.label,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.aspect_ratio, size: 14, color: context.appTextSecondary),
+            const SizedBox(width: 4),
+            Text(
+              _placementSize.label,
               style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextSecondary, fontSize: 12)),
-          const SizedBox(width: 2),
-          Icon(Icons.arrow_drop_down,
-              size: 14, color: context.appTextSecondary),
-        ]),
+                color: context.appTextSecondary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 14,
+              color: context.appTextSecondary,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.meeting_room_outlined,
-            size: 56, color: context.appTextMuted),
-        const SizedBox(height: 12),
-        Text('No rooms to lay out yet.',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.meeting_room_outlined,
+            size: 56,
+            color: context.appTextMuted,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No rooms to lay out yet.',
             style: GoogleFonts.spaceGrotesk(
-                color: context.appTextSecondary, fontSize: 15)),
-        const SizedBox(height: 4),
-        Text(
-          'Add rooms in Rooms & Locations first — they will appear here for placement.',
-          style: GoogleFonts.spaceGrotesk(
-              color: context.appTextMuted, fontSize: 12),
-        ),
-      ]),
+              color: context.appTextSecondary,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Add rooms in Rooms & Locations first — they will appear here for placement.',
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextMuted,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildBody(BuildContext context) {
-    return LayoutBuilder(builder: (ctx, constraints) {
-      final w = constraints.maxWidth;
-      final canvas = _buildCanvas(context);
-      final panel = _buildPanel(context);
-      if (w < 700) {
-        return Column(children: [
-          Expanded(flex: 3, child: canvas),
-          SizedBox(
-            height: 240,
-            child: Container(
-              decoration: BoxDecoration(
-                color: context.appSurface,
-                border: Border(top: BorderSide(color: context.appBorder)),
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final w = constraints.maxWidth;
+        final canvas = _buildCanvas(context);
+        final panel = _buildPanel(context);
+        if (w < 700) {
+          return Column(
+            children: [
+              Expanded(flex: 3, child: canvas),
+              SizedBox(
+                height: 240,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: context.appSurface,
+                    border: Border(top: BorderSide(color: context.appBorder)),
+                  ),
+                  child: panel,
+                ),
               ),
-              child: panel,
+            ],
+          );
+        }
+        final panelW = math.min(320.0, w * 0.4);
+        return Row(
+          children: [
+            Expanded(child: canvas),
+            SizedBox(
+              width: panelW,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: context.appSurface,
+                  border: Border(left: BorderSide(color: context.appBorder)),
+                ),
+                child: panel,
+              ),
             ),
-          ),
-        ]);
-      }
-      final panelW = math.min(320.0, w * 0.4);
-      return Row(children: [
-        Expanded(child: canvas),
-        SizedBox(
-          width: panelW,
-          child: Container(
-            decoration: BoxDecoration(
-              color: context.appSurface,
-              border: Border(left: BorderSide(color: context.appBorder)),
-            ),
-            child: panel,
-          ),
-        ),
-      ]);
-    });
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildCanvas(BuildContext context) {
@@ -1421,17 +1516,31 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
             child: SizedBox(
               width: size.width,
               height: size.height,
-              child: Stack(children: [
-                Positioned.fill(
-                  child: CustomPaint(painter: _GridPainter(context.appBorder)),
-                ),
-                for (final d in _decors.where(_isBackgroundDecor))
-                  _buildDecorShape(context, d),
-                for (final room in _rooms) _buildRoomShape(context, room),
-                for (final loc in _locations) _buildLocationShape(context, loc),
-                for (final d in _decors.where((d) => !_isBackgroundDecor(d)))
-                  _buildDecorShape(context, d),
-              ]),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _GridPainter(context.appBorder),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _CorridorPainter(
+                          _decors.where(_isBackgroundDecor).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  for (final d in _decors.where(_isBackgroundDecor))
+                    _buildDecorShape(context, d),
+                  for (final room in _rooms) _buildRoomShape(context, room),
+                  for (final loc in _locations)
+                    _buildLocationShape(context, loc),
+                  for (final d in _decors.where((d) => !_isBackgroundDecor(d)))
+                    _buildDecorShape(context, d),
+                ],
+              ),
             ),
           ),
         ),
@@ -1445,114 +1554,124 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     final selected = loc.clientId == _selectedLocationId;
     final accent = LocationModel.typeAccent(loc.type);
     final icon = LocationModel.typeIcon(loc.type);
-    final displayName = loc.name.trim().isEmpty ? LocationModel.typeLabel(loc.type) : loc.name;
+    final displayName = loc.name.trim().isEmpty
+        ? LocationModel.typeLabel(loc.type)
+        : loc.name;
 
     return Positioned(
       left: loc.geom.x,
       top: loc.geom.y,
       width: loc.geom.w,
       height: loc.geom.h,
-      child: Stack(clipBehavior: Clip.none, children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _selectLocation(loc.clientId),
-          onDoubleTap:
-              loc.dbId == null ? null : () => _openLocationDetailFromBuilder(loc),
-          onPanStart: (_) {
-            if (!selected) _selectLocation(loc.clientId);
-          },
-          onPanUpdate: (d) => _moveLocation(loc.clientId, d.delta),
-          onPanEnd: (_) => _snapSelected(),
-          child: MouseRegion(
-            cursor: selected ? SystemMouseCursors.move : SystemMouseCursors.click,
-            child: Container(
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: selected ? 0.24 : 0.16),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: selected ? accent : accent.withValues(alpha: 0.75),
-                  width: selected ? 2.2 : 1.2,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _selectLocation(loc.clientId),
+            onDoubleTap: loc.dbId == null
+                ? null
+                : () => _openLocationDetailFromBuilder(loc),
+            onPanStart: (_) {
+              if (!selected) _selectLocation(loc.clientId);
+            },
+            onPanUpdate: (d) => _moveLocation(loc.clientId, d.delta),
+            onPanEnd: (_) => _snapSelected(),
+            child: MouseRegion(
+              cursor: selected
+                  ? SystemMouseCursors.move
+                  : SystemMouseCursors.click,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: selected ? 0.24 : 0.16),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: selected ? accent : accent.withValues(alpha: 0.75),
+                    width: selected ? 2.2 : 1.2,
+                  ),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.30),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
                 ),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: accent.withValues(alpha: 0.30),
-                          blurRadius: 10,
-                          spreadRadius: 1,
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(icon, size: 13, color: accent),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            LocationModel.typeLabel(loc.type),
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.jetBrainsMono(
+                              color: accent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                      ]
-                    : null,
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Icon(icon, size: 13, color: accent),
-                    const SizedBox(width: 6),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Expanded(
                       child: Text(
-                        LocationModel.typeLabel(loc.type),
+                        displayName,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.jetBrainsMono(
-                          color: accent,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                        style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                  ]),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Text(
-                      displayName,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
-                        color: context.appTextPrimary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        if (selected)
-          Positioned(
-            right: -_kHandleSize / 2,
-            bottom: -_kHandleSize / 2,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onPanUpdate: (d) => _resizeLocation(loc.clientId, d.delta),
-              onPanEnd: (_) => _snapSelected(),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.resizeDownRight,
-                child: Container(
-                  width: _kHandleSize,
-                  height: _kHandleSize,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(3),
-                    border: Border.all(color: Colors.white, width: 1.5),
-                  ),
+                  ],
                 ),
               ),
             ),
           ),
-      ]),
+          if (selected)
+            Positioned(
+              right: -_kHandleSize / 2,
+              bottom: -_kHandleSize / 2,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanUpdate: (d) => _resizeLocation(loc.clientId, d.delta),
+                onPanEnd: (_) => _snapSelected(),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeDownRight,
+                  child: Container(
+                    width: _kHandleSize,
+                    height: _kHandleSize,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildDecorShape(BuildContext context, _Decor d) {
     final selected = d.id == _selectedDecorId;
     final accent = switch (d.kind) {
-      _DecorKind.wall => const Color(0xFF64748B),       // slate
-      _DecorKind.door => const Color(0xFFF97316),       // orange
-      _DecorKind.corridor => const Color(0xFFB08968),   // warm taupe
-      _DecorKind.bathroom => const Color(0xFF38BDF8),   // sky (matches lab)
+      _DecorKind.wall => const Color(0xFF64748B), // slate
+      _DecorKind.door => const Color(0xFFF97316), // orange
+      _DecorKind.corridor => const Color(0xFFB08968), // warm taupe
+      _DecorKind.bathroom => const Color(0xFF38BDF8), // sky (matches lab)
     };
     final fillAlpha = switch (d.kind) {
       _DecorKind.wall => selected ? 0.85 : 0.7,
@@ -1572,99 +1691,116 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       top: d.y,
       width: d.w,
       height: d.h,
-      child: Stack(clipBehavior: Clip.none, children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _selectDecor(d.id),
-          onPanStart: (_) {
-            if (!selected) _selectDecor(d.id);
-          },
-          onPanUpdate: (e) => _moveDecor(d.id, e.delta),
-          onPanEnd: (_) => _snapSelected(),
-          child: MouseRegion(
-            cursor: selected
-                ? SystemMouseCursors.move
-                : SystemMouseCursors.click,
-            child: Container(
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: fillAlpha),
-                borderRadius: BorderRadius.circular(switch (d.kind) {
-                  _DecorKind.wall => 2,
-                  _DecorKind.door => 999,
-                  _DecorKind.corridor => 14,
-                  _DecorKind.bathroom => 6,
-                }),
-                border: Border.all(
-                  color: selected ? accent : accent.withValues(alpha: 0.7),
-                  width: selected ? 2 : (d.kind == _DecorKind.corridor ? 1.4 : 1.2),
-                ),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: accent.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          spreadRadius: 1,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _selectDecor(d.id),
+            onPanStart: (_) {
+              if (!selected) _selectDecor(d.id);
+            },
+            onPanUpdate: (e) => _moveDecor(d.id, e.delta),
+            onPanEnd: (_) => _snapSelected(),
+            child: MouseRegion(
+              cursor: selected
+                  ? SystemMouseCursors.move
+                  : SystemMouseCursors.click,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: d.kind == _DecorKind.corridor
+                      ? (selected
+                            ? accent.withValues(alpha: 0.08)
+                            : Colors.transparent)
+                      : accent.withValues(alpha: fillAlpha),
+                  borderRadius: BorderRadius.circular(switch (d.kind) {
+                    _DecorKind.wall => 2,
+                    _DecorKind.door => 999,
+                    _DecorKind.corridor => 0,
+                    _DecorKind.bathroom => 6,
+                  }),
+                  border: d.kind == _DecorKind.corridor && !selected
+                      ? null
+                      : Border.all(
+                          color: selected
+                              ? accent
+                              : accent.withValues(alpha: 0.7),
+                          width: selected ? 2 : 1.2,
                         ),
-                      ]
-                    : null,
-              ),
-              alignment: Alignment.center,
-              child: icon == null
-                  ? (d.kind == _DecorKind.corridor && d.h > 34
-                      ? Text(
-                          d.label ?? 'Corridor',
-                          style: GoogleFonts.spaceGrotesk(
-                            color: accent,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            spreadRadius: 1,
                           ),
-                        )
-                      : null)
-                  : (d.kind == _DecorKind.bathroom
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(icon,
-                                size: math.min(28, d.h * 0.4), color: accent),
-                            if (d.h > 60)
-                              Text(
-                                d.label ?? 'Bathroom',
-                                style: GoogleFonts.spaceGrotesk(
-                                  color: accent,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        ]
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: icon == null
+                    ? (d.kind == _DecorKind.corridor && selected && d.h > 34
+                          ? Text(
+                              d.label ?? 'Corridor',
+                              style: GoogleFonts.spaceGrotesk(
+                                color: accent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                               ),
-                          ],
-                        )
-                      : Icon(icon,
-                          size: math.min(d.w, d.h) * 0.6, color: accent)),
+                            )
+                          : null)
+                    : (d.kind == _DecorKind.bathroom
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  icon,
+                                  size: math.min(28, d.h * 0.4),
+                                  color: accent,
+                                ),
+                                if (d.h > 60)
+                                  Text(
+                                    d.label ?? 'Bathroom',
+                                    style: GoogleFonts.spaceGrotesk(
+                                      color: accent,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
+                            )
+                          : Icon(
+                              icon,
+                              size: math.min(d.w, d.h) * 0.6,
+                              color: accent,
+                            )),
+              ),
             ),
           ),
-        ),
-        if (selected)
-          Positioned(
-            right: -_kHandleSize / 2,
-            bottom: -_kHandleSize / 2,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onPanUpdate: (e) => _resizeDecor(d.id, e.delta),
-              onPanEnd: (_) => _snapSelected(),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.resizeDownRight,
-                child: Container(
-                  width: _kHandleSize,
-                  height: _kHandleSize,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(3),
-                    border: Border.all(color: Colors.white, width: 1.5),
+          if (selected)
+            Positioned(
+              right: -_kHandleSize / 2,
+              bottom: -_kHandleSize / 2,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanUpdate: (e) => _resizeDecor(d.id, e.delta),
+                onPanEnd: (_) => _snapSelected(),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeDownRight,
+                  child: Container(
+                    width: _kHandleSize,
+                    height: _kHandleSize,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -1682,101 +1818,112 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       top: g.y,
       width: g.w,
       height: g.h,
-      child: Stack(clipBehavior: Clip.none, children: [
-        // Body — tap to select, drag to move when already selected.
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _selectRoom(room.id),
-          onPanStart: (_) {
-            if (!selected) _selectRoom(room.id);
-          },
-          onPanUpdate: (d) => _moveRoom(room.id, d.delta),
-          onPanEnd: (_) => _snapSelected(),
-          child: MouseRegion(
-            cursor: selected
-                ? SystemMouseCursors.move
-                : SystemMouseCursors.click,
-            child: Container(
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: selected ? 0.22 : 0.10),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: selected
-                      ? accent
-                      : accent.withValues(alpha: 0.6),
-                  width: selected ? 2.5 : 1.4,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Body — tap to select, drag to move when already selected.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _selectRoom(room.id),
+            onPanStart: (_) {
+              if (!selected) _selectRoom(room.id);
+            },
+            onPanUpdate: (d) => _moveRoom(room.id, d.delta),
+            onPanEnd: (_) => _snapSelected(),
+            child: MouseRegion(
+              cursor: selected
+                  ? SystemMouseCursors.move
+                  : SystemMouseCursors.click,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: selected ? 0.22 : 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: selected ? accent : accent.withValues(alpha: 0.6),
+                    width: selected ? 2.5 : 1.4,
+                  ),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.35),
+                            blurRadius: 12,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
                 ),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: accent.withValues(alpha: 0.35),
-                          blurRadius: 12,
-                          spreadRadius: 1,
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          LocationModel.typeIcon(LocationModel.roomType),
+                          size: 14,
+                          color: accent,
                         ),
-                      ]
-                    : null,
-              ),
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Icon(LocationModel.typeIcon(LocationModel.roomType),
-                        size: 14, color: accent),
-                    const SizedBox(width: 6),
-                    Text(code,
-                        style: GoogleFonts.jetBrainsMono(
+                        const SizedBox(width: 6),
+                        Text(
+                          code,
+                          style: GoogleFonts.jetBrainsMono(
                             color: accent,
                             fontSize: 12,
-                            fontWeight: FontWeight.w700)),
-                  ]),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Text(
-                      desc.isEmpty ? '—' : desc,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
-                        color: context.appTextPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Expanded(
+                      child: Text(
+                        desc.isEmpty ? '—' : desc,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                  Text(
-                    '${g.w.toStringAsFixed(0)} × ${g.h.toStringAsFixed(0)}',
-                    style: GoogleFonts.jetBrainsMono(
-                        color: context.appTextMuted, fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // Resize handle (bottom-right) — only visible when selected.
-        if (selected)
-          Positioned(
-            right: -_kHandleSize / 2,
-            bottom: -_kHandleSize / 2,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onPanUpdate: (d) => _resizeRoom(room.id, d.delta),
-              onPanEnd: (_) => _snapSelected(),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.resizeDownRight,
-                child: Container(
-                  width: _kHandleSize,
-                  height: _kHandleSize,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(3),
-                    border: Border.all(color: Colors.white, width: 1.5),
-                  ),
+                    Text(
+                      '${g.w.toStringAsFixed(0)} × ${g.h.toStringAsFixed(0)}',
+                      style: GoogleFonts.jetBrainsMono(
+                        color: context.appTextMuted,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-      ]),
+          // Resize handle (bottom-right) — only visible when selected.
+          if (selected)
+            Positioned(
+              right: -_kHandleSize / 2,
+              bottom: -_kHandleSize / 2,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanUpdate: (d) => _resizeRoom(room.id, d.delta),
+                onPanEnd: (_) => _snapSelected(),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeDownRight,
+                  child: Container(
+                    width: _kHandleSize,
+                    height: _kHandleSize,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -1802,30 +1949,38 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: kindColor.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(6),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: kindColor.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(kindIcon, color: kindColor, size: 16),
             ),
-            child: Icon(kindIcon, color: kindColor, size: 16),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(kindLabel,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                kindLabel,
                 style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700)),
-          ),
-          IconButton(
-            tooltip: 'Delete',
-            icon: const Icon(Icons.delete_outline,
-                size: 18, color: AppDS.red),
-            onPressed: _deleteSelectedDecor,
-          ),
-        ]),
+                  color: context.appTextPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Delete',
+              icon: const Icon(
+                Icons.delete_outline,
+                size: 18,
+                color: AppDS.red,
+              ),
+              onPressed: _deleteSelectedDecor,
+            ),
+          ],
+        ),
         if (d.kind == _DecorKind.bathroom || d.kind == _DecorKind.corridor) ...[
           const SizedBox(height: 12),
           _LabelField(
@@ -1839,68 +1994,75 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
           ),
         ],
         const SizedBox(height: 16),
-        Text('GEOMETRY',
-            style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8)),
+        Text(
+          'GEOMETRY',
+          style: GoogleFonts.spaceGrotesk(
+            color: context.appTextMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
         const SizedBox(height: 8),
         _GeomField(
-            label: 'X',
-            value: d.x,
-            onChanged: (v) => setState(() {
-                  final next = _clampFreeGeomToCanvas(
-                    _RoomGeom(x: v, y: d.y, w: d.w, h: d.h),
-                    minW: _kMinDecorSize,
-                    minH: _kMinDecorSize,
-                  );
-                  _replaceDecor(
-                    d.copyWith(x: next.x, y: next.y, w: next.w, h: next.h),
-                  );
-                })),
+          label: 'X',
+          value: d.x,
+          onChanged: (v) => setState(() {
+            final next = _clampFreeGeomToCanvas(
+              _RoomGeom(x: v, y: d.y, w: d.w, h: d.h),
+              minW: _kMinDecorSize,
+              minH: _kMinDecorSize,
+            );
+            _replaceDecor(
+              d.copyWith(x: next.x, y: next.y, w: next.w, h: next.h),
+            );
+          }),
+        ),
         const SizedBox(height: 6),
         _GeomField(
-            label: 'Y',
-            value: d.y,
-            onChanged: (v) => setState(() {
-                  final next = _clampFreeGeomToCanvas(
-                    _RoomGeom(x: d.x, y: v, w: d.w, h: d.h),
-                    minW: _kMinDecorSize,
-                    minH: _kMinDecorSize,
-                  );
-                  _replaceDecor(
-                    d.copyWith(x: next.x, y: next.y, w: next.w, h: next.h),
-                  );
-                })),
+          label: 'Y',
+          value: d.y,
+          onChanged: (v) => setState(() {
+            final next = _clampFreeGeomToCanvas(
+              _RoomGeom(x: d.x, y: v, w: d.w, h: d.h),
+              minW: _kMinDecorSize,
+              minH: _kMinDecorSize,
+            );
+            _replaceDecor(
+              d.copyWith(x: next.x, y: next.y, w: next.w, h: next.h),
+            );
+          }),
+        ),
         const SizedBox(height: 6),
         _GeomField(
-            label: 'W',
-            value: d.w,
-            onChanged: (v) => setState(() {
-                  final next = _clampFreeGeomToCanvas(
-                    _RoomGeom(x: d.x, y: d.y, w: v, h: d.h),
-                    minW: _kMinDecorSize,
-                    minH: _kMinDecorSize,
-                  );
-                  _replaceDecor(
-                    d.copyWith(x: next.x, y: next.y, w: next.w, h: next.h),
-                  );
-                })),
+          label: 'W',
+          value: d.w,
+          onChanged: (v) => setState(() {
+            final next = _clampFreeGeomToCanvas(
+              _RoomGeom(x: d.x, y: d.y, w: v, h: d.h),
+              minW: _kMinDecorSize,
+              minH: _kMinDecorSize,
+            );
+            _replaceDecor(
+              d.copyWith(x: next.x, y: next.y, w: next.w, h: next.h),
+            );
+          }),
+        ),
         const SizedBox(height: 6),
         _GeomField(
-            label: 'H',
-            value: d.h,
-            onChanged: (v) => setState(() {
-                  final next = _clampFreeGeomToCanvas(
-                    _RoomGeom(x: d.x, y: d.y, w: d.w, h: v),
-                    minW: _kMinDecorSize,
-                    minH: _kMinDecorSize,
-                  );
-                  _replaceDecor(
-                    d.copyWith(x: next.x, y: next.y, w: next.w, h: next.h),
-                  );
-                })),
+          label: 'H',
+          value: d.h,
+          onChanged: (v) => setState(() {
+            final next = _clampFreeGeomToCanvas(
+              _RoomGeom(x: d.x, y: d.y, w: d.w, h: v),
+              minW: _kMinDecorSize,
+              minH: _kMinDecorSize,
+            );
+            _replaceDecor(
+              d.copyWith(x: next.x, y: next.y, w: next.w, h: next.h),
+            );
+          }),
+        ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _snapSelected,
@@ -1926,42 +2088,49 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(6),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(icon, color: accent, size: 16),
             ),
-            child: Icon(icon, color: accent, size: 16),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              LocationModel.typeLabel(loc.type),
-              style: GoogleFonts.spaceGrotesk(
-                color: context.appTextPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                LocationModel.typeLabel(loc.type),
+                style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
-          if (loc.dbId != null)
-            IconButton(
-              tooltip: 'Open location',
-              icon: Icon(Icons.open_in_new,
-                  size: 16, color: context.appTextSecondary),
-              onPressed: () => _openLocationDetailFromBuilder(loc),
-            ),
-        ]),
+            if (loc.dbId != null)
+              IconButton(
+                tooltip: 'Open location',
+                icon: Icon(
+                  Icons.open_in_new,
+                  size: 16,
+                  color: context.appTextSecondary,
+                ),
+                onPressed: () => _openLocationDetailFromBuilder(loc),
+              ),
+          ],
+        ),
         const SizedBox(height: 12),
         _LabelField(
           key: ValueKey('loc_name_${loc.clientId}'),
           initial: loc.name,
           labelText: 'Name',
-          onChanged: (v) => setState(() => _replaceLocation(
-                loc.copyWith(name: v.trim().isEmpty ? loc.name : v.trim()),
-              )),
+          onChanged: (v) => setState(
+            () => _replaceLocation(
+              loc.copyWith(name: v.trim().isEmpty ? loc.name : v.trim()),
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         Container(
@@ -1971,26 +2140,28 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: context.appBorder),
           ),
-          child: Row(children: [
-            Text(
-              roomCode,
-              style: GoogleFonts.jetBrainsMono(
-                color: AppDS.accent,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                stripLocationCodePrefix(room.name),
-                style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextSecondary,
-                  fontSize: 12,
+          child: Row(
+            children: [
+              Text(
+                roomCode,
+                style: GoogleFonts.jetBrainsMono(
+                  color: AppDS.accent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-          ]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  stripLocationCodePrefix(room.name),
+                  style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         if (loc.dbId == null) ...[
           const SizedBox(height: 10),
@@ -2004,78 +2175,111 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
           ),
         ],
         const SizedBox(height: 16),
-        Text('GEOMETRY',
-            style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8)),
+        Text(
+          'GEOMETRY',
+          style: GoogleFonts.spaceGrotesk(
+            color: context.appTextMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
         const SizedBox(height: 8),
         _GeomField(
-            label: 'X',
-            value: loc.geom.x,
-            onChanged: (v) {
-              final roomGeom = _geom[loc.parentRoomId];
-              if (roomGeom == null) return;
-              setState(() => _replaceLocation(loc.copyWith(
-                    geom: _clampLocationGeom(
-                      roomGeom,
-                      _RoomGeom(x: v, y: loc.geom.y, w: loc.geom.w, h: loc.geom.h),
+          label: 'X',
+          value: loc.geom.x,
+          onChanged: (v) {
+            final roomGeom = _geom[loc.parentRoomId];
+            if (roomGeom == null) return;
+            setState(
+              () => _replaceLocation(
+                loc.copyWith(
+                  geom: _clampLocationGeom(
+                    roomGeom,
+                    _RoomGeom(
+                      x: v,
+                      y: loc.geom.y,
+                      w: loc.geom.w,
+                      h: loc.geom.h,
                     ),
-                  )));
-            }),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 6),
         _GeomField(
-            label: 'Y',
-            value: loc.geom.y,
-            onChanged: (v) {
-              final roomGeom = _geom[loc.parentRoomId];
-              if (roomGeom == null) return;
-              setState(() => _replaceLocation(loc.copyWith(
-                    geom: _clampLocationGeom(
-                      roomGeom,
-                      _RoomGeom(x: loc.geom.x, y: v, w: loc.geom.w, h: loc.geom.h),
+          label: 'Y',
+          value: loc.geom.y,
+          onChanged: (v) {
+            final roomGeom = _geom[loc.parentRoomId];
+            if (roomGeom == null) return;
+            setState(
+              () => _replaceLocation(
+                loc.copyWith(
+                  geom: _clampLocationGeom(
+                    roomGeom,
+                    _RoomGeom(
+                      x: loc.geom.x,
+                      y: v,
+                      w: loc.geom.w,
+                      h: loc.geom.h,
                     ),
-                  )));
-            }),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 6),
         _GeomField(
-            label: 'W',
-            value: loc.geom.w,
-            onChanged: (v) {
-              final roomGeom = _geom[loc.parentRoomId];
-              if (roomGeom == null) return;
-              setState(() => _replaceLocation(loc.copyWith(
-                    geom: _clampLocationGeom(
-                      roomGeom,
-                      _RoomGeom(
-                        x: loc.geom.x,
-                        y: loc.geom.y,
-                        w: math.max(_kMinLocationSize, v),
-                        h: loc.geom.h,
-                      ),
+          label: 'W',
+          value: loc.geom.w,
+          onChanged: (v) {
+            final roomGeom = _geom[loc.parentRoomId];
+            if (roomGeom == null) return;
+            setState(
+              () => _replaceLocation(
+                loc.copyWith(
+                  geom: _clampLocationGeom(
+                    roomGeom,
+                    _RoomGeom(
+                      x: loc.geom.x,
+                      y: loc.geom.y,
+                      w: math.max(_kMinLocationSize, v),
+                      h: loc.geom.h,
                     ),
-                  )));
-            }),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 6),
         _GeomField(
-            label: 'H',
-            value: loc.geom.h,
-            onChanged: (v) {
-              final roomGeom = _geom[loc.parentRoomId];
-              if (roomGeom == null) return;
-              setState(() => _replaceLocation(loc.copyWith(
-                    geom: _clampLocationGeom(
-                      roomGeom,
-                      _RoomGeom(
-                        x: loc.geom.x,
-                        y: loc.geom.y,
-                        w: loc.geom.w,
-                        h: math.max(_kMinLocationSize, v),
-                      ),
+          label: 'H',
+          value: loc.geom.h,
+          onChanged: (v) {
+            final roomGeom = _geom[loc.parentRoomId];
+            if (roomGeom == null) return;
+            setState(
+              () => _replaceLocation(
+                loc.copyWith(
+                  geom: _clampLocationGeom(
+                    roomGeom,
+                    _RoomGeom(
+                      x: loc.geom.x,
+                      y: loc.geom.y,
+                      w: loc.geom.w,
+                      h: math.max(_kMinLocationSize, v),
                     ),
-                  )));
-            }),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _snapSelected,
@@ -2108,52 +2312,67 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
         children: [
-            Icon(Icons.swipe, size: 36, color: context.appTextMuted),
-            const SizedBox(height: 10),
-            Text('Tap a room or shape to edit it',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextSecondary, fontSize: 13)),
-            const SizedBox(height: 8),
-            Text(
-              '· Pick a tool then click the canvas to add a wall, door, or bathroom.\n'
-              '· Drag a shape to move it.\n'
-              '· Drag the corner to resize.\n'
-              '· Snap can be toggled in the AppBar.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextMuted, fontSize: 11, height: 1.5),
+          Icon(Icons.swipe, size: 36, color: context.appTextMuted),
+          const SizedBox(height: 10),
+          Text(
+            'Tap a room or shape to edit it',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextSecondary,
+              fontSize: 13,
             ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '· Pick a tool then click the canvas to add a wall, door, or bathroom.\n'
+            '· Drag a shape to move it.\n'
+            '· Drag the corner to resize.\n'
+            '· Snap can be toggled in the AppBar.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextMuted,
+              fontSize: 11,
+              height: 1.5,
+            ),
+          ),
           const SizedBox(height: 24),
-          Text('BACKGROUND SIZE',
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextMuted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8)),
+          Text(
+            'BACKGROUND SIZE',
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
           const SizedBox(height: 8),
           _GeomField(
-              label: 'W',
-              value: _backgroundSize.width,
-              onChanged: (v) => setState(() {
-                    _backgroundSize = _normalizeCanvasSize(
-                      Size(v, _backgroundSize.height),
-                    );
-                  })),
+            label: 'W',
+            value: _backgroundSize.width,
+            onChanged: (v) => setState(() {
+              _backgroundSize = _normalizeCanvasSize(
+                Size(v, _backgroundSize.height),
+              );
+            }),
+          ),
           const SizedBox(height: 6),
           _GeomField(
-              label: 'H',
-              value: _backgroundSize.height,
-              onChanged: (v) => setState(() {
-                    _backgroundSize = _normalizeCanvasSize(
-                      Size(_backgroundSize.width, v),
-                    );
-                  })),
+            label: 'H',
+            value: _backgroundSize.height,
+            onChanged: (v) => setState(() {
+              _backgroundSize = _normalizeCanvasSize(
+                Size(_backgroundSize.width, v),
+              );
+            }),
+          ),
           const SizedBox(height: 10),
           Text(
             'This sets the editable background area. It will not shrink smaller than the placed layout.',
             style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted, fontSize: 11, height: 1.4),
+              color: context.appTextMuted,
+              fontSize: 11,
+              height: 1.4,
+            ),
           ),
         ],
       );
@@ -2168,28 +2387,36 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppDS.accent.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(code,
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppDS.accent.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                code,
                 style: GoogleFonts.jetBrainsMono(
-                    color: AppDS.accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(desc.isEmpty ? '—' : desc,
+                  color: AppDS.accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                desc.isEmpty ? '—' : desc,
                 style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700)),
-          ),
-        ]),
+                  color: context.appTextPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: _saving ? null : () => _addLocationToRoom(room.id),
@@ -2209,17 +2436,24 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
           ),
         ),
         const SizedBox(height: 14),
-        Text('IN-ROOM LOCATIONS  (${roomLocations.length})',
-            style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8)),
+        Text(
+          'IN-ROOM LOCATIONS  (${roomLocations.length})',
+          style: GoogleFonts.spaceGrotesk(
+            color: context.appTextMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
         const SizedBox(height: 6),
         if (roomLocations.isEmpty)
-          Text('No locations placed in this room yet.',
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextMuted, fontSize: 12))
+          Text(
+            'No locations placed in this room yet.',
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextMuted,
+              fontSize: 12,
+            ),
+          )
         else
           for (final loc in roomLocations)
             Padding(
@@ -2233,124 +2467,159 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
                       ? null
                       : () => _openLocationDetailFromBuilder(loc),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: context.appSurface2,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: context.appBorder),
                     ),
-                    child: Row(children: [
-                      Icon(LocationModel.typeIcon(loc.type),
-                          size: 13, color: LocationModel.typeAccent(loc.type)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          loc.name.trim().isEmpty
-                              ? LocationModel.typeLabel(loc.type)
-                              : loc.name,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.spaceGrotesk(
-                              color: context.appTextPrimary, fontSize: 12),
+                    child: Row(
+                      children: [
+                        Icon(
+                          LocationModel.typeIcon(loc.type),
+                          size: 13,
+                          color: LocationModel.typeAccent(loc.type),
                         ),
-                      ),
-                      Text(
-                        LocationModel.typeLabel(loc.type),
-                        style: GoogleFonts.jetBrainsMono(
-                            color: context.appTextMuted, fontSize: 10),
-                      ),
-                      if (loc.dbId != null) ...[
-                        const SizedBox(width: 6),
-                        Icon(Icons.open_in_new,
-                            size: 14, color: context.appTextMuted),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            loc.name.trim().isEmpty
+                                ? LocationModel.typeLabel(loc.type)
+                                : loc.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.spaceGrotesk(
+                              color: context.appTextPrimary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          LocationModel.typeLabel(loc.type),
+                          style: GoogleFonts.jetBrainsMono(
+                            color: context.appTextMuted,
+                            fontSize: 10,
+                          ),
+                        ),
+                        if (loc.dbId != null) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.open_in_new,
+                            size: 14,
+                            color: context.appTextMuted,
+                          ),
+                        ],
                       ],
-                    ]),
+                    ),
                   ),
                 ),
               ),
             ),
         const SizedBox(height: 16),
-        Text('GEOMETRY',
-            style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8)),
+        Text(
+          'GEOMETRY',
+          style: GoogleFonts.spaceGrotesk(
+            color: context.appTextMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
         const SizedBox(height: 8),
         _GeomField(
-            label: 'X',
-            value: g.x,
-            onChanged: (v) => setState(() => _geom[id] = _clampFreeGeomToCanvas(
-                  _RoomGeom(x: v, y: g.y, w: g.w, h: g.h),
-                  minW: _kMinRoomSize,
-                  minH: _kMinRoomSize,
-                ))),
+          label: 'X',
+          value: g.x,
+          onChanged: (v) => setState(
+            () => _geom[id] = _clampFreeGeomToCanvas(
+              _RoomGeom(x: v, y: g.y, w: g.w, h: g.h),
+              minW: _kMinRoomSize,
+              minH: _kMinRoomSize,
+            ),
+          ),
+        ),
         const SizedBox(height: 6),
         _GeomField(
-            label: 'Y',
-            value: g.y,
-            onChanged: (v) => setState(() => _geom[id] = _clampFreeGeomToCanvas(
-                  _RoomGeom(x: g.x, y: v, w: g.w, h: g.h),
-                  minW: _kMinRoomSize,
-                  minH: _kMinRoomSize,
-                ))),
+          label: 'Y',
+          value: g.y,
+          onChanged: (v) => setState(
+            () => _geom[id] = _clampFreeGeomToCanvas(
+              _RoomGeom(x: g.x, y: v, w: g.w, h: g.h),
+              minW: _kMinRoomSize,
+              minH: _kMinRoomSize,
+            ),
+          ),
+        ),
         const SizedBox(height: 6),
         _GeomField(
-            label: 'W',
-            value: g.w,
-            onChanged: (v) => setState(() => _geom[id] = _clampFreeGeomToCanvas(
-                  _RoomGeom(x: g.x, y: g.y, w: v, h: g.h),
-                  minW: _kMinRoomSize,
-                  minH: _kMinRoomSize,
-                ))),
+          label: 'W',
+          value: g.w,
+          onChanged: (v) => setState(
+            () => _geom[id] = _clampFreeGeomToCanvas(
+              _RoomGeom(x: g.x, y: g.y, w: v, h: g.h),
+              minW: _kMinRoomSize,
+              minH: _kMinRoomSize,
+            ),
+          ),
+        ),
         const SizedBox(height: 6),
         _GeomField(
-            label: 'H',
-            value: g.h,
-            onChanged: (v) => setState(() => _geom[id] = _clampFreeGeomToCanvas(
-                  _RoomGeom(x: g.x, y: g.y, w: g.w, h: v),
-                  minW: _kMinRoomSize,
-                  minH: _kMinRoomSize,
-                ))),
+          label: 'H',
+          value: g.h,
+          onChanged: (v) => setState(
+            () => _geom[id] = _clampFreeGeomToCanvas(
+              _RoomGeom(x: g.x, y: g.y, w: g.w, h: v),
+              minW: _kMinRoomSize,
+              minH: _kMinRoomSize,
+            ),
+          ),
+        ),
         const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _snapSelected,
-              icon: const Icon(Icons.straighten, size: 14),
-              label: const Text('Snap to grid'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: context.appTextSecondary,
-                side: BorderSide(color: context.appBorder),
-                minimumSize: const Size(0, 32),
-                textStyle: GoogleFonts.spaceGrotesk(fontSize: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _snapSelected,
+                icon: const Icon(Icons.straighten, size: 14),
+                label: const Text('Snap to grid'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: context.appTextSecondary,
+                  side: BorderSide(color: context.appBorder),
+                  minimumSize: const Size(0, 32),
+                  textStyle: GoogleFonts.spaceGrotesk(fontSize: 12),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                final base = _baseline[id];
-                if (base != null) setState(() => _geom[id] = base);
-              },
-              icon: const Icon(Icons.undo, size: 14),
-              label: const Text('Reset'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: context.appTextSecondary,
-                side: BorderSide(color: context.appBorder),
-                minimumSize: const Size(0, 32),
-                textStyle: GoogleFonts.spaceGrotesk(fontSize: 12),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  final base = _baseline[id];
+                  if (base != null) setState(() => _geom[id] = base);
+                },
+                icon: const Icon(Icons.undo, size: 14),
+                label: const Text('Reset'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: context.appTextSecondary,
+                  side: BorderSide(color: context.appBorder),
+                  minimumSize: const Size(0, 32),
+                  textStyle: GoogleFonts.spaceGrotesk(fontSize: 12),
+                ),
               ),
             ),
-          ),
-        ]),
+          ],
+        ),
         const SizedBox(height: 16),
         Text(
           'Geometry is stored as JSON on the storage_locations row '
           '(location_layout). The viewer reads the same field, so saved '
           'changes appear in Lab Map immediately.',
           style: GoogleFonts.spaceGrotesk(
-              color: context.appTextMuted, fontSize: 11, height: 1.4),
+            color: context.appTextMuted,
+            fontSize: 11,
+            height: 1.4,
+          ),
         ),
       ],
     );
@@ -2377,26 +2646,31 @@ class _Decor {
     this.label,
   });
 
-  _Decor copyWith({double? x, double? y, double? w, double? h, String? label}) =>
-      _Decor(
-        id: id,
-        kind: kind,
-        x: x ?? this.x,
-        y: y ?? this.y,
-        w: w ?? this.w,
-        h: h ?? this.h,
-        label: label ?? this.label,
-      );
+  _Decor copyWith({
+    double? x,
+    double? y,
+    double? w,
+    double? h,
+    String? label,
+  }) => _Decor(
+    id: id,
+    kind: kind,
+    x: x ?? this.x,
+    y: y ?? this.y,
+    w: w ?? this.w,
+    h: h ?? this.h,
+    label: label ?? this.label,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'kind': kind.id,
-        'x': x,
-        'y': y,
-        'w': w,
-        'h': h,
-        if (label != null) 'label': label,
-      };
+    'id': id,
+    'kind': kind.id,
+    'x': x,
+    'y': y,
+    'w': w,
+    'h': h,
+    if (label != null) 'label': label,
+  };
 
   static _Decor? tryParse(dynamic raw) {
     if (raw is! Map) return null;
@@ -2406,7 +2680,11 @@ class _Decor {
     final y = (raw['y'] as num?)?.toDouble();
     final w = (raw['w'] as num?)?.toDouble();
     final h = (raw['h'] as num?)?.toDouble();
-    if (kind == null || id == null || x == null || y == null || w == null ||
+    if (kind == null ||
+        id == null ||
+        x == null ||
+        y == null ||
+        w == null ||
         h == null) {
       return null;
     }
@@ -2427,12 +2705,12 @@ class _Decor {
 // stand-alone helper.
 class _DecorKindParse {
   static _DecorKind? parse(String? raw) => switch (raw) {
-        'wall' => _DecorKind.wall,
-        'door' => _DecorKind.door,
-        'corridor' => _DecorKind.corridor,
-        'bathroom' => _DecorKind.bathroom,
-        _ => null,
-      };
+    'wall' => _DecorKind.wall,
+    'door' => _DecorKind.door,
+    'corridor' => _DecorKind.corridor,
+    'bathroom' => _DecorKind.bathroom,
+    _ => null,
+  };
 }
 
 class _CanvasLocation {
@@ -2461,16 +2739,15 @@ class _CanvasLocation {
     String? type,
     int? sortOrder,
     _RoomGeom? geom,
-  }) =>
-      _CanvasLocation(
-        clientId: clientId,
-        dbId: dbId ?? this.dbId,
-        parentRoomId: parentRoomId ?? this.parentRoomId,
-        name: name ?? this.name,
-        type: type ?? this.type,
-        sortOrder: sortOrder ?? this.sortOrder,
-        geom: geom ?? this.geom,
-      );
+  }) => _CanvasLocation(
+    clientId: clientId,
+    dbId: dbId ?? this.dbId,
+    parentRoomId: parentRoomId ?? this.parentRoomId,
+    name: name ?? this.name,
+    type: type ?? this.type,
+    sortOrder: sortOrder ?? this.sortOrder,
+    geom: geom ?? this.geom,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -2497,8 +2774,12 @@ class _NewCanvasLocation {
 // ─── Geometry record + JSON ─────────────────────────────────────────────────
 class _RoomGeom {
   final double x, y, w, h;
-  const _RoomGeom(
-      {required this.x, required this.y, required this.w, required this.h});
+  const _RoomGeom({
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
+  });
 
   static _RoomGeom? tryParse(dynamic raw) {
     if (raw == null) return null;
@@ -2531,6 +2812,53 @@ class _RoomGeom {
 }
 
 // ─── Background grid ────────────────────────────────────────────────────────
+class _CorridorPainter extends CustomPainter {
+  final List<_Decor> corridors;
+
+  const _CorridorPainter(this.corridors);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (corridors.isEmpty) return;
+
+    Path? corridorPath;
+    for (final corridor in corridors) {
+      // This slight overlap prevents anti-aliasing seams where snapped
+      // corridor segments meet edge-to-edge.
+      final segment = Path()
+        ..addRect(
+          Rect.fromLTWH(
+            corridor.x,
+            corridor.y,
+            corridor.w,
+            corridor.h,
+          ).inflate(0.35),
+        );
+      corridorPath = corridorPath == null
+          ? segment
+          : Path.combine(PathOperation.union, corridorPath, segment);
+    }
+
+    const accent = Color(0xFFB08968);
+    canvas.drawPath(
+      corridorPath!,
+      Paint()
+        ..style = PaintingStyle.fill
+        ..color = accent.withValues(alpha: 0.16),
+    );
+    canvas.drawPath(
+      corridorPath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = accent.withValues(alpha: 0.7),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CorridorPainter oldDelegate) => true;
+}
+
 class _GridPainter extends CustomPainter {
   final Color color;
   const _GridPainter(this.color);
@@ -2590,31 +2918,39 @@ class _LabelFieldState extends State<_LabelField> {
     return TextField(
       controller: _ctrl,
       style: GoogleFonts.spaceGrotesk(
-          color: context.appTextPrimary, fontSize: 13),
+        color: context.appTextPrimary,
+        fontSize: 13,
+      ),
       onChanged: (v) {
         _debounce?.cancel();
-        _debounce =
-            Timer(const Duration(milliseconds: 250), () => widget.onChanged(v));
+        _debounce = Timer(
+          const Duration(milliseconds: 250),
+          () => widget.onChanged(v),
+        );
       },
       onSubmitted: widget.onChanged,
       decoration: InputDecoration(
         isDense: true,
         labelText: widget.labelText,
         labelStyle: GoogleFonts.spaceGrotesk(
-            color: context.appTextSecondary, fontSize: 11),
+          color: context.appTextSecondary,
+          fontSize: 11,
+        ),
         filled: true,
         fillColor: context.appSurface3,
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: context.appBorder)),
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: context.appBorder)),
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: const BorderSide(color: AppDS.accent)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppDS.accent),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       ),
     );
   }
@@ -2679,42 +3015,56 @@ class _GeomFieldState extends State<_GeomField> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      SizedBox(
-        width: 22,
-        child: Text(widget.label,
+    return Row(
+      children: [
+        SizedBox(
+          width: 22,
+          child: Text(
+            widget.label,
             style: GoogleFonts.jetBrainsMono(
-                color: context.appTextMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w700)),
-      ),
-      Expanded(
-        child: TextField(
-          controller: _ctrl,
-          keyboardType: const TextInputType.numberWithOptions(
-              decimal: true, signed: false),
-          style: GoogleFonts.jetBrainsMono(
-              color: context.appTextPrimary, fontSize: 12),
-          onChanged: _onChanged,
-          decoration: InputDecoration(
-            isDense: true,
-            filled: true,
-            fillColor: context.appSurface3,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: context.appBorder)),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: context.appBorder)),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
-                borderSide: const BorderSide(color: AppDS.accent)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              color: context.appTextMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
-      ),
-    ]);
+        Expanded(
+          child: TextField(
+            controller: _ctrl,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+              signed: false,
+            ),
+            style: GoogleFonts.jetBrainsMono(
+              color: context.appTextPrimary,
+              fontSize: 12,
+            ),
+            onChanged: _onChanged,
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: context.appSurface3,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: context.appBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: context.appBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: const BorderSide(color: AppDS.accent),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 6,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -2723,7 +3073,8 @@ class _AddCanvasLocationDialog extends StatefulWidget {
   const _AddCanvasLocationDialog({required this.room});
 
   @override
-  State<_AddCanvasLocationDialog> createState() => _AddCanvasLocationDialogState();
+  State<_AddCanvasLocationDialog> createState() =>
+      _AddCanvasLocationDialogState();
 }
 
 class _AddCanvasLocationDialogState extends State<_AddCanvasLocationDialog> {

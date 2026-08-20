@@ -4,9 +4,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '/core/data_cache.dart';
+import '../strains/strain_detail_page.dart';
 import '../strains/strains_page.dart';
+import '/requests/requests_page.dart';
 import '/theme/module_permission.dart';
 import '/theme/theme.dart';
+import 'sample_map_picker_page.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design tokens
@@ -28,82 +33,142 @@ const _groups = <({String title, String icon, List<_Field> fields})>[
     title: 'Identifiers',
     icon: 'id',
     fields: [
-      (key: 'sample_code',       label: 'Code',        readOnly: true,  lines: 1),
-      (key: 'sample_rebeca',     label: 'REBECA',      readOnly: false, lines: 1),
-      (key: 'sample_ccpi',       label: 'CCPI',        readOnly: false, lines: 1),
-      (key: 'sample_permit',     label: 'Permit',      readOnly: false, lines: 1),
-      (key: 'sample_other_code', label: 'Other Code',  readOnly: false, lines: 1),
+      (key: 'sample_code', label: 'Code', readOnly: true, lines: 1),
+      (key: 'sample_rebeca', label: 'REBECA', readOnly: false, lines: 1),
+      (key: 'sample_ccpi', label: 'CCPI', readOnly: false, lines: 1),
+      (key: 'sample_permit', label: 'Permit', readOnly: false, lines: 1),
+      (
+        key: 'sample_other_code',
+        label: 'Other Code',
+        readOnly: false,
+        lines: 1,
+      ),
     ],
   ),
   (
     title: 'Collection Event',
     icon: 'collection',
     fields: [
-      (key: 'sample_date',        label: 'Date',        readOnly: false, lines: 1),
-      (key: 'sample_collector',   label: 'Collector',   readOnly: false, lines: 1),
-      (key: 'sample_responsible', label: 'Responsible', readOnly: false, lines: 1),
-      (key: 'sample_project',     label: 'Project',     readOnly: false, lines: 1),
+      (key: 'sample_date', label: 'Date', readOnly: false, lines: 1),
+      (key: 'sample_collector', label: 'Collector', readOnly: false, lines: 1),
+      (
+        key: 'sample_responsible',
+        label: 'Responsible',
+        readOnly: false,
+        lines: 1,
+      ),
+      (key: 'sample_project', label: 'Project', readOnly: false, lines: 1),
     ],
   ),
   (
     title: 'Geography',
     icon: 'geo',
     fields: [
-      (key: 'sample_country',      label: 'Country',      readOnly: false, lines: 1),
-      (key: 'sample_archipelago',  label: 'Archipelago',  readOnly: false, lines: 1),
-      (key: 'sample_island',       label: 'Island',       readOnly: false, lines: 1),
-      (key: 'sample_region',       label: 'Region',       readOnly: false, lines: 1),
-      (key: 'sample_municipality', label: 'Municipality', readOnly: false, lines: 1),
-      (key: 'sample_parish',       label: 'Parish',       readOnly: false, lines: 1),
-      (key: 'sample_local',        label: 'Local',        readOnly: false, lines: 1),
-      (key: 'sample_gps',          label: 'GPS',          readOnly: false, lines: 1),
-      (key: 'sample_latitude',     label: 'Latitude',     readOnly: false, lines: 1),
-      (key: 'sample_longitude',    label: 'Longitude',    readOnly: false, lines: 1),
-      (key: 'sample_altitude_m',   label: 'Altitude (m)', readOnly: false, lines: 1),
+      (key: 'sample_country', label: 'Country', readOnly: false, lines: 1),
+      (
+        key: 'sample_archipelago',
+        label: 'Archipelago',
+        readOnly: false,
+        lines: 1,
+      ),
+      (key: 'sample_island', label: 'Island', readOnly: false, lines: 1),
+      (key: 'sample_region', label: 'Region', readOnly: false, lines: 1),
+      (
+        key: 'sample_municipality',
+        label: 'Municipality',
+        readOnly: false,
+        lines: 1,
+      ),
+      (key: 'sample_parish', label: 'Parish', readOnly: false, lines: 1),
+      (key: 'sample_local', label: 'Local', readOnly: false, lines: 1),
+      (key: 'sample_gps', label: 'GPS', readOnly: true, lines: 1),
+      (key: 'sample_latitude', label: 'Latitude', readOnly: false, lines: 1),
+      (key: 'sample_longitude', label: 'Longitude', readOnly: false, lines: 1),
+      (
+        key: 'sample_altitude_m',
+        label: 'Altitude (m)',
+        readOnly: false,
+        lines: 1,
+      ),
     ],
   ),
   (
     title: 'Habitat',
     icon: 'habitat',
     fields: [
-      (key: 'sample_habitat_type',          label: 'Habitat Type',         readOnly: false, lines: 1),
-      (key: 'sample_habitat_1',             label: 'Habitat 1',            readOnly: false, lines: 1),
-      (key: 'sample_habitat_2',             label: 'Habitat 2',            readOnly: false, lines: 1),
-      (key: 'sample_habitat_3',             label: 'Habitat 3',            readOnly: false, lines: 1),
-      (key: 'sample_substrate',             label: 'Substrate',            readOnly: false, lines: 1),
-      (key: 'sample_method',                label: 'Method',               readOnly: false, lines: 1),
-      (key: 'sample_bloom',                 label: 'Bloom',                readOnly: false, lines: 1),
-      (key: 'sample_associated_organisms',  label: 'Associated Organisms', readOnly: false, lines: 2),
+      (
+        key: 'sample_habitat_type',
+        label: 'Habitat Type',
+        readOnly: false,
+        lines: 1,
+      ),
+      (key: 'sample_habitat_1', label: 'Habitat 1', readOnly: false, lines: 1),
+      (key: 'sample_habitat_2', label: 'Habitat 2', readOnly: false, lines: 1),
+      (key: 'sample_habitat_3', label: 'Habitat 3', readOnly: false, lines: 1),
+      (key: 'sample_substrate', label: 'Substrate', readOnly: false, lines: 1),
+      (key: 'sample_method', label: 'Method', readOnly: false, lines: 1),
+      (key: 'sample_bloom', label: 'Bloom', readOnly: false, lines: 1),
+      (
+        key: 'sample_associated_organisms',
+        label: 'Associated Organisms',
+        readOnly: false,
+        lines: 2,
+      ),
     ],
   ),
   (
     title: 'Physical-Chemical Parameters',
     icon: 'parameters',
     fields: [
-      (key: 'sample_temperature',  label: '°C',              readOnly: false, lines: 1),
-      (key: 'sample_ph',           label: 'pH',              readOnly: false, lines: 1),
-      (key: 'sample_conductivity', label: 'µS/cm',           readOnly: false, lines: 1),
-      (key: 'sample_oxygen',       label: 'O₂ (mg/L)',       readOnly: false, lines: 1),
-      (key: 'sample_salinity',     label: 'Salinity',        readOnly: false, lines: 1),
-      (key: 'sample_radiation',    label: 'Solar Radiation', readOnly: false, lines: 1),
-      (key: 'sample_turbidity',    label: 'Turbidity (NTU)', readOnly: false, lines: 1),
-      (key: 'sample_depth_m',      label: 'Depth (m)',       readOnly: false, lines: 1),
+      (key: 'sample_temperature', label: '°C', readOnly: false, lines: 1),
+      (key: 'sample_ph', label: 'pH', readOnly: false, lines: 1),
+      (key: 'sample_conductivity', label: 'µS/cm', readOnly: false, lines: 1),
+      (key: 'sample_oxygen', label: 'O₂ (mg/L)', readOnly: false, lines: 1),
+      (key: 'sample_salinity', label: 'Salinity', readOnly: false, lines: 1),
+      (
+        key: 'sample_radiation',
+        label: 'Solar Radiation',
+        readOnly: false,
+        lines: 1,
+      ),
+      (
+        key: 'sample_turbidity',
+        label: 'Turbidity (NTU)',
+        readOnly: false,
+        lines: 1,
+      ),
+      (key: 'sample_depth_m', label: 'Depth (m)', readOnly: false, lines: 1),
     ],
   ),
   (
     title: 'Logistics',
     icon: 'logistics',
     fields: [
-      (key: 'sample_photos',           label: 'Photos',        readOnly: false, lines: 1),
-      (key: 'sample_preservation',     label: 'Preservation',  readOnly: false, lines: 1),
-      (key: 'sample_transport_time_h', label: 'Transport (h)', readOnly: false, lines: 1),
+      (key: 'sample_photos', label: 'Photos', readOnly: false, lines: 1),
+      (
+        key: 'sample_preservation',
+        label: 'Preservation',
+        readOnly: false,
+        lines: 1,
+      ),
+      (
+        key: 'sample_transport_time_h',
+        label: 'Transport (h)',
+        readOnly: false,
+        lines: 1,
+      ),
     ],
   ),
   (
     title: 'Observations',
     icon: 'notes',
     fields: [
-      (key: 'sample_observations', label: 'Observations', readOnly: false, lines: 4),
+      (
+        key: 'sample_observations',
+        label: 'Observations',
+        readOnly: false,
+        lines: 4,
+      ),
     ],
   ),
 ];
@@ -113,32 +178,31 @@ const _groups = <({String title, String icon, List<_Field> fields})>[
 // ─────────────────────────────────────────────────────────────────────────────
 IconData _sectionIcon(String icon) {
   return switch (icon) {
-    'id'         => Icons.tag_rounded,
+    'id' => Icons.tag_rounded,
     'collection' => Icons.event_note_rounded,
-    'geo'        => Icons.place_rounded,
-    'habitat'    => Icons.forest_rounded,
+    'geo' => Icons.place_rounded,
+    'habitat' => Icons.forest_rounded,
     'parameters' => Icons.thermostat_rounded,
-    'logistics'  => Icons.local_shipping_outlined,
-    _            => Icons.notes_rounded,
+    'logistics' => Icons.local_shipping_outlined,
+    _ => Icons.notes_rounded,
   };
 }
 
 Color _statusColor(String? s) => switch (s?.toUpperCase()) {
-  'ALIVE'  => const Color(0xFF16A34A),
-  'DEAD'   => const Color(0xFFDC2626),
+  'ALIVE' => const Color(0xFF16A34A),
+  'DEAD' => const Color(0xFFDC2626),
   'INCARE' => const Color(0xFFD97706),
-  _        => const Color(0xFF94A3B8),
+  _ => const Color(0xFF94A3B8),
 };
 
 IconData _statusIcon(String? s) => switch (s?.toUpperCase()) {
-  'ALIVE'  => Icons.check_circle_rounded,
-  'DEAD'   => Icons.cancel_rounded,
+  'ALIVE' => Icons.check_circle_rounded,
+  'DEAD' => Icons.cancel_rounded,
   'INCARE' => Icons.medical_services_rounded,
-  _        => Icons.help_outline_rounded,
+  _ => Icons.help_outline_rounded,
 };
 
-bool _isMobile(BuildContext context) =>
-    MediaQuery.of(context).size.width < 720;
+bool _isMobile(BuildContext context) => MediaQuery.of(context).size.width < 720;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
@@ -156,11 +220,20 @@ class SampleDetailPage extends StatefulWidget {
 class _SampleDetailPageState extends State<SampleDetailPage> {
   final _supabase = Supabase.instance.client;
 
-  Map<String, dynamic> _data    = {};
+  Map<String, dynamic> _data = {};
   List<Map<String, dynamic>> _strains = [];
 
   bool _loading = true;
-  bool _saving  = false;
+  bool _saving = false;
+  String? _loadError;
+
+  int? get _samplePrimaryId {
+    final raw = _data['sample_id'];
+    final id = raw is num ? raw.toInt() : int.tryParse(raw?.toString() ?? '');
+    return id != null && id > 0 ? id : null;
+  }
+
+  bool get _hasLoadedSample => _samplePrimaryId != null;
 
   // Mobile: active section index (last = strains)
   int _mobileSection = 0;
@@ -188,26 +261,78 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   // ── Data ──────────────────────────────────────────────────────────────────
   Future<void> _load() async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
-      final sample = await _supabase
-          .from('samples')
-          .select()
-          .eq('sample_code', widget.sampleId)
-          .single();
+      final rawInput = widget.sampleId;
+      final input = rawInput?.toString().trim() ?? '';
+      if (input.isEmpty || input.toLowerCase() == 'null') {
+        throw const FormatException('The sample has no valid identifier.');
+      }
 
-      final strains = await _supabase
-          .from('strains')
-          .select('strain_id, strain_code, strain_status, strain_genus, strain_species, strain_scientific_name, strain_sample_code')
-          .eq('strain_sample_code', widget.sampleId)
-          .order('strain_code', ascending: true);
+      Map<String, dynamic>? sample;
+      if (rawInput is num) {
+        final row = await _supabase
+            .from('samples')
+            .select()
+            .eq('sample_id', rawInput.toInt())
+            .maybeSingle();
+        if (row != null) sample = Map<String, dynamic>.from(row);
+      } else {
+        final rowByCode = await _supabase
+            .from('samples')
+            .select()
+            .eq('sample_code', input)
+            .maybeSingle();
+        if (rowByCode != null) {
+          sample = Map<String, dynamic>.from(rowByCode);
+        } else {
+          final possibleId = int.tryParse(input);
+          if (possibleId != null) {
+            final rowById = await _supabase
+                .from('samples')
+                .select()
+                .eq('sample_id', possibleId)
+                .maybeSingle();
+            if (rowById != null) sample = Map<String, dynamic>.from(rowById);
+          }
+        }
+      }
+      if (sample == null) {
+        throw StateError('This sample no longer exists in the database.');
+      }
+
+      final sampleCode = sample['sample_code']?.toString().trim();
+      final strains = sampleCode == null || sampleCode.isEmpty
+          ? <Map<String, dynamic>>[]
+          : List<Map<String, dynamic>>.from(
+              await _supabase
+                  .from('strains')
+                  .select(
+                    'strain_id, strain_code, strain_status, strain_genus, strain_species, strain_scientific_name, strain_sample_code',
+                  )
+                  .eq('strain_sample_code', sampleCode)
+                  .order('strain_code', ascending: true),
+            );
 
       if (!mounted) return;
-      _data    = Map<String, dynamic>.from(sample);
-      _strains = List<Map<String, dynamic>>.from(strains);
+      _data = sample;
+      _strains = strains;
       _syncControllers();
     } catch (e) {
-      _snack('Error loading sample: $e');
+      if (mounted) {
+        setState(() {
+          _data = {};
+          _strains = [];
+          _loadError = e is FormatException
+              ? e.message
+              : e is StateError
+              ? e.message
+              : 'Could not load this sample. $e';
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -224,8 +349,10 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
   // ── Save ──────────────────────────────────────────────────────────────────
   Future<void> _save() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
+    final sampleId = _samplePrimaryId;
+    if (sampleId == null) {
+      _snack('This sample has no valid database ID. Reload the sample list.');
       return;
     }
     setState(() => _saving = true);
@@ -233,13 +360,13 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       final update = <String, dynamic>{};
       for (final group in _groups) {
         for (final f in group.fields) {
-          if (!f.readOnly) {
+          if (!f.readOnly || f.key == 'sample_gps') {
             final v = _ctrl[f.key]?.text.trim() ?? '';
             update[f.key] = v.isEmpty ? null : v;
           }
         }
       }
-      await _supabase.from('samples').update(update).eq('sample_code', widget.sampleId);
+      await _supabase.from('samples').update(update).eq('sample_id', sampleId);
       widget.onSaved?.call();
       _snack('Saved successfully.');
     } catch (e) {
@@ -251,42 +378,74 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
   // ── Delete ────────────────────────────────────────────────────────────────
   Future<void> _delete() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
+    final sampleId = _samplePrimaryId;
+    if (sampleId == null) {
+      _snack('This sample is missing or has already been deleted.');
+      widget.onSaved?.call();
       return;
     }
-    final label = _data['sample_code']?.toString() ??
-        '#${_data['sample_other_code']?.toString() ?? widget.sampleId.toString()}';
+    final code = _data['sample_code']?.toString().trim();
+    final otherCode = _data['sample_other_code']?.toString().trim();
+    final label = code?.isNotEmpty == true
+        ? code!
+        : otherCode?.isNotEmpty == true
+        ? otherCode!
+        : 'Sample #$sampleId';
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: context.appSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 40),
-        title: Text('Delete Sample?', textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: context.appTextPrimary)),
+        icon: const Icon(
+          Icons.delete_forever_rounded,
+          color: Color(0xFFDC2626),
+          size: 40,
+        ),
+        title: Text(
+          'Delete Sample?',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: context.appTextPrimary,
+          ),
+        ),
         content: RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
-            style: TextStyle(fontSize: 14, color: context.appTextSecondary, height: 1.5),
+            style: TextStyle(
+              fontSize: 14,
+              color: context.appTextSecondary,
+              height: 1.5,
+            ),
             children: [
               const TextSpan(text: 'You are about to permanently delete\n'),
-              TextSpan(text: label,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: context.appTextPrimary)),
+              TextSpan(
+                text: label,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: context.appTextPrimary,
+                ),
+              ),
               const TextSpan(
-                  text: '.\n\nAll linked strains will be unlinked.\nThis action cannot be undone.'),
+                text: '.\n\nAll linked strains will be unlinked.\nThis action cannot be undone.',
+              ),
             ],
           ),
         ),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           OutlinedButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           const SizedBox(width: 8),
           FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+            ),
             icon: const Icon(Icons.delete_forever_rounded, size: 16),
             label: const Text('Delete'),
             onPressed: () => Navigator.pop(context, true),
@@ -297,7 +456,15 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
     if (confirm != true) return;
     try {
-      await _supabase.from('samples').delete().eq('sample_code', widget.sampleId);
+      final deleted = await _supabase
+          .from('samples')
+          .delete()
+          .eq('sample_id', sampleId)
+          .select('sample_id');
+      if ((deleted as List).isEmpty) {
+        _snack('This sample was already deleted.');
+      }
+      await DataCache.clear('samples');
       widget.onSaved?.call();
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -307,19 +474,57 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
 
   // ── Navigation ────────────────────────────────────────────────────────────
   Future<void> _openStrains() async {
+    final sampleCode = _data['sample_code']?.toString().trim();
+    if (sampleCode == null || sampleCode.isEmpty) {
+      _snack('This sample has no valid sample code.');
+      return;
+    }
     await Navigator.push(
       context,
       modulePageRoute(
         context: context,
-        child: StrainsPage(filterSampleId: widget.sampleId),
+        child: StrainsPage(filterSampleId: sampleCode),
       ),
     );
     _load();
   }
 
+  Future<void> _openStrain(Map<String, dynamic> strain) async {
+    final id = (strain['strain_id'] as num?)?.toInt();
+    if (id == null) return;
+    await Navigator.push(
+      context,
+      modulePageRoute(
+        context: context,
+        child: StrainDetailPage(strainId: id, onSaved: _load),
+      ),
+    );
+    await _load();
+  }
+
+  void _requestSample() {
+    final sampleId = _samplePrimaryId;
+    if (sampleId == null) {
+      _snack('This sample is no longer available.');
+      return;
+    }
+    final code = _data['sample_code']?.toString().trim();
+    final label = code?.isNotEmpty == true ? code! : 'Sample #$sampleId';
+    showQuickRequestDialog(
+      context,
+      type: 'samples',
+      prefillTitle: label,
+      entityType: 'samples',
+      entityId: sampleId.toString(),
+      entityLabel: label,
+    );
+  }
+
   Future<void> _addStrain() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
+    if (!context.requireModuleAction(ModuleAction.create)) return;
+    final sampleCode = _data['sample_code']?.toString().trim();
+    if (sampleCode == null || sampleCode.isEmpty) {
+      _snack('Add a valid sample code before linking a strain.');
       return;
     }
     await Navigator.push(
@@ -327,22 +532,104 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       modulePageRoute(
         context: context,
         child: StrainsPage(
-          filterSampleId: widget.sampleId,
-          autoOpenNewStrainForSample: widget.sampleId,
+          filterSampleId: sampleCode,
+          autoOpenNewStrainForSample: sampleCode,
         ),
       ),
     );
     _load();
   }
 
+  Future<void> _openGpsPicker() async {
+    final coordinates = parseSampleCoordinates(
+      gps: _ctrl['sample_gps']?.text,
+      latitude: _ctrl['sample_latitude']?.text,
+      longitude: _ctrl['sample_longitude']?.text,
+    );
+    final result = await Navigator.push<SampleCoordinates>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SampleMapPickerPage(
+          initialLatitude: coordinates?.latitude,
+          initialLongitude: coordinates?.longitude,
+          allowEditing: context.canEditModule,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    final latitude = result.latitude.toStringAsFixed(6);
+    final longitude = result.longitude.toStringAsFixed(6);
+    setState(() {
+      _ctrl['sample_latitude']?.text = latitude;
+      _ctrl['sample_longitude']?.text = longitude;
+      _ctrl['sample_gps']?.text = '$latitude, $longitude';
+      _data = {
+        ..._data,
+        'sample_latitude': latitude,
+        'sample_longitude': longitude,
+        'sample_gps': '$latitude, $longitude',
+      };
+    });
+  }
+
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
+
+  Widget _buildUnavailableBody() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.inventory_2_outlined,
+            size: 48,
+            color: context.appTextMuted,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Sample unavailable',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: context.appTextPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _loadError ?? 'This sample no longer exists in the database.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: context.appTextSecondary),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => Navigator.maybePop(context),
+                icon: const Icon(Icons.arrow_back, size: 16),
+                label: const Text('Back'),
+              ),
+              FilledButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
 
   // ─────────────────────────────────────────────────────────────────────────
   // BUILD — route to mobile or desktop
@@ -365,52 +652,67 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       appBar: _buildMobileAppBar(code),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Column(children: [
-              // ── Quick info banner ─────────────────────────────────────────
-              _buildMobileInfoBanner(),
+          : _loadError != null
+          ? _buildUnavailableBody()
+          : Column(
+              children: [
+                // ── Quick info banner ─────────────────────────────────────────
+                _buildMobileInfoBanner(),
 
-              // ── Section tab bar ───────────────────────────────────────────
-              _buildMobileSectionBar(),
+                // ── Section tab bar ───────────────────────────────────────────
+                _buildMobileSectionBar(),
 
-              // ── Content ───────────────────────────────────────────────────
-              Expanded(
-                child: isStrainTab
-                    ? _buildMobileStrainsTab()
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(12, 14, 12, 100),
-                        child: _buildMobileSectionFields(
-                            _groups[_mobileSection].fields),
-                      ),
-              ),
-            ]),
+                // ── Content ───────────────────────────────────────────────────
+                Expanded(
+                  child: isStrainTab
+                      ? _buildMobileStrainsTab()
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(12, 14, 12, 100),
+                          child: _buildMobileSectionFields(
+                            _groups[_mobileSection].fields,
+                          ),
+                        ),
+                ),
+              ],
+            ),
 
       // ── FAB: save (hidden on strains tab) ─────────────────────────────────
-      floatingActionButton: isStrainTab
+      floatingActionButton: !_hasLoadedSample
+          ? null
+          : isStrainTab
           ? (canEdit
-              ? FloatingActionButton.extended(
-                  onPressed: _addStrain,
-                  backgroundColor: _DS.accent,
-                  foregroundColor: context.appTextPrimary,
-                  icon: const Icon(Icons.add, size: 20),
-                  label: const Text('Add Strain',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                )
-              : null)
+                ? FloatingActionButton.extended(
+                    onPressed: _addStrain,
+                    backgroundColor: _DS.accent,
+                    foregroundColor: context.appTextPrimary,
+                    icon: const Icon(Icons.add, size: 20),
+                    label: const Text(
+                      'Add Strain',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  )
+                : null)
           : (canEdit
-              ? FloatingActionButton.extended(
-                  onPressed: _saving ? null : _save,
-                  backgroundColor: _DS.accent,
-                  foregroundColor: context.appTextPrimary,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 18, height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.save_rounded, size: 20),
-                  label: Text(_saving ? 'Saving…' : 'Save',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                )
-              : null),
+                ? FloatingActionButton.extended(
+                    onPressed: _saving ? null : _save,
+                    backgroundColor: _DS.accent,
+                    foregroundColor: context.appTextPrimary,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.save_rounded, size: 20),
+                    label: Text(
+                      _saving ? 'Saving…' : 'Save',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  )
+                : null),
     );
   }
 
@@ -431,7 +733,12 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         ],
       ),
       actions: [
-        if (!_loading) ...[
+        if (!_loading && _hasLoadedSample) ...[
+          IconButton(
+            icon: const Icon(Icons.outbox_outlined),
+            tooltip: 'Quick Request',
+            onPressed: _requestSample,
+          ),
           // Strain count badge
           if (_strains.isNotEmpty)
             GestureDetector(
@@ -444,21 +751,34 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                   border: Border.all(color: _DS.accent.withValues(alpha: 0.4)),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.science_rounded, size: 11, color: _DS.accent),
-                  const SizedBox(width: 4),
-                  Text('${_strains.length}',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.science_rounded,
+                      size: 11,
+                      color: _DS.accent,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_strains.length}',
                       style: const TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w600,
-                          color: _DS.accent)),
-                ]),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: _DS.accent,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           // More menu (add strain + delete)
           if (canEdit)
             PopupMenuButton<String>(
               icon: Icon(Icons.more_vert, color: context.appTextSecondary),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               onSelected: (v) {
                 if (v == 'add_strain') _addStrain();
                 if (v == 'delete') _delete();
@@ -468,21 +788,30 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                   value: 'add_strain',
                   child: ListTile(
                     dense: true,
-                    leading: Icon(Icons.science_rounded,
-                        color: _DS.accent, size: 18),
-                    title: Text('Add strain from this sample',
-                        style: TextStyle(fontSize: 13)),
+                    leading: Icon(
+                      Icons.science_rounded,
+                      color: _DS.accent,
+                      size: 18,
+                    ),
+                    title: Text(
+                      'Add strain from this sample',
+                      style: TextStyle(fontSize: 13),
+                    ),
                   ),
                 ),
                 const PopupMenuItem(
                   value: 'delete',
                   child: ListTile(
                     dense: true,
-                    leading: Icon(Icons.delete_outline_rounded,
-                        color: Color(0xFFDC2626), size: 18),
-                    title: Text('Delete sample',
-                        style: TextStyle(
-                            color: Color(0xFFDC2626), fontSize: 13)),
+                    leading: Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFDC2626),
+                      size: 18,
+                    ),
+                    title: Text(
+                      'Delete sample',
+                      style: TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+                    ),
                   ),
                 ),
               ],
@@ -495,48 +824,67 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   // ── Mobile: compact info banner ───────────────────────────────────────────
   Widget _buildMobileInfoBanner() {
     final country = _data['sample_country']?.toString();
-    final island  = _data['sample_island']?.toString();
-    final date    = _data['sample_date']?.toString();
+    final island = _data['sample_island']?.toString();
+    final date = _data['sample_date']?.toString();
 
-    final parts = [country, island, date]
-        .where((v) => v != null && v.isNotEmpty)
-        .join('  ·  ');
+    final parts = [
+      country,
+      island,
+      date,
+    ].where((v) => v != null && v.isNotEmpty).join('  ·  ');
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       color: _DS.accent.withValues(alpha: context.isDark ? 0.08 : 0.06),
-      child: Row(children: [
-        const Icon(Icons.place_rounded, size: 14, color: _DS.accent),
-        const SizedBox(width: 8),
-        Expanded(
-          child: parts.isNotEmpty
-              ? Text(parts,
-                  style: TextStyle(fontSize: 12, color: context.appTextMuted),
-                  overflow: TextOverflow.ellipsis)
-              : Text('No location data',
-                  style: TextStyle(fontSize: 12, color: context.appTextMuted)),
-        ),
-        const SizedBox(width: 8),
-        GestureDetector(
-          onTap: () => setState(() => _mobileSection = _groups.length),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: _DS.accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.science_rounded, size: 12, color: _DS.accent),
-              const SizedBox(width: 4),
-              Text('${_strains.length} strain${_strains.length != 1 ? 's' : ''}',
-                  style: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w600,
-                      color: _DS.accent)),
-            ]),
+      child: Row(
+        children: [
+          const Icon(Icons.place_rounded, size: 14, color: _DS.accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: parts.isNotEmpty
+                ? Text(
+                    parts,
+                    style: TextStyle(fontSize: 12, color: context.appTextMuted),
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : Text(
+                    'No location data',
+                    style: TextStyle(fontSize: 12, color: context.appTextMuted),
+                  ),
           ),
-        ),
-      ]),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => setState(() => _mobileSection = _groups.length),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: _DS.accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.science_rounded,
+                    size: 12,
+                    color: _DS.accent,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${_strains.length} strain${_strains.length != 1 ? 's' : ''}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _DS.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -552,10 +900,10 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         itemCount: _groups.length + 1,
         itemBuilder: (ctx, i) {
           final isStrainTab = i == _groups.length;
-          final isActive    = _mobileSection == i;
+          final isActive = _mobileSection == i;
 
           final label = isStrainTab ? 'Strains' : _groups[i].title;
-          final icon  = isStrainTab
+          final icon = isStrainTab
               ? Icons.science_rounded
               : _sectionIcon(_groups[i].icon);
 
@@ -567,54 +915,60 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: isActive
-                    ? (isStrainTab
-                        ? const Color(0xFF16A34A)
-                        : _DS.accent)
+                    ? (isStrainTab ? const Color(0xFF16A34A) : _DS.accent)
                     : context.appSurface2,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
-                      ? (isStrainTab
-                          ? const Color(0xFF16A34A)
-                          : _DS.accent)
+                      ? (isStrainTab ? const Color(0xFF16A34A) : _DS.accent)
                       : context.appBorder,
                 ),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(icon, size: 13,
-                    color: isActive ? Colors.white : context.appTextMuted),
-                const SizedBox(width: 5),
-                Text(label,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 13,
+                    color: isActive ? Colors.white : context.appTextMuted,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    label,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: isActive
-                          ? Colors.white
-                          : context.appTextSecondary,
-                    )),
-                // Strain count badge on the strains tab
-                if (isStrainTab && _strains.isNotEmpty) ...[
-                  const SizedBox(width: 5),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? Colors.white.withValues(alpha: 0.3)
-                          : const Color(0xFF16A34A).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      color: isActive ? Colors.white : context.appTextSecondary,
                     ),
-                    child: Text('${_strains.length}',
+                  ),
+                  // Strain count badge on the strains tab
+                  if (isStrainTab && _strains.isNotEmpty) ...[
+                    const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? Colors.white.withValues(alpha: 0.3)
+                            : const Color(0xFF16A34A).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${_strains.length}',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           color: isActive
                               ? Colors.white
                               : const Color(0xFF16A34A),
-                        )),
-                  ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ]),
+              ),
             ),
           );
         },
@@ -625,10 +979,14 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   // ── Mobile: section fields (single column) ────────────────────────────────
   Widget _buildMobileSectionFields(List<_Field> fields) {
     return Column(
-      children: fields.map((f) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: _buildField(f),
-      )).toList(),
+      children: fields
+          .map(
+            (f) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildField(f),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -638,19 +996,31 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.science_outlined, size: 56, color: context.appTextMuted),
-            const SizedBox(height: 14),
-            Text('No strains yet',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.science_outlined,
+                size: 56,
+                color: context.appTextMuted,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'No strains yet',
                 style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: context.appTextSecondary)),
-            const SizedBox(height: 4),
-            Text('Tap the button below to add the first strain.',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: context.appTextSecondary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tap the button below to add the first strain.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: context.appTextMuted)),
-          ]),
+                style: TextStyle(fontSize: 13, color: context.appTextMuted),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -660,17 +1030,18 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       itemCount: _strains.length,
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (_, i) {
-        final s       = _strains[i];
-        final code    = s['strain_code']?.toString() ?? '—';
-        final genus   = s['strain_genus']?.toString();
-        final sp      = s['strain_species']?.toString();
+        final s = _strains[i];
+        final code = s['strain_code']?.toString() ?? '—';
+        final genus = s['strain_genus']?.toString();
+        final sp = s['strain_species']?.toString();
         final sciName = s['strain_scientific_name']?.toString();
-        final status  = s['strain_status']?.toString();
-        final taxon   = sciName ??
+        final status = s['strain_status']?.toString();
+        final taxon =
+            sciName ??
             [genus, sp].where((v) => v != null && v.isNotEmpty).join(' ');
 
         return GestureDetector(
-          onTap: _openStrains,
+          onTap: () => _openStrain(s),
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -678,58 +1049,89 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: context.appBorder),
               boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 4, offset: const Offset(0, 1)),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
               ],
             ),
-            child: Row(children: [
-              Container(
-                width: 38, height: 38,
-                decoration: BoxDecoration(
-                  color: _DS.accent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: _DS.accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.science_outlined,
+                    size: 18,
+                    color: _DS.accent,
+                  ),
                 ),
-                child: const Icon(Icons.science_outlined, size: 18, color: _DS.accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(code,
-                      style: TextStyle(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        code,
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
-                          color: context.appTextPrimary)),
-                  if (taxon.isNotEmpty)
-                    Text(taxon,
-                        style: TextStyle(
+                          color: context.appTextPrimary,
+                        ),
+                      ),
+                      if (taxon.isNotEmpty)
+                        Text(
+                          taxon,
+                          style: TextStyle(
                             fontSize: 11,
                             fontStyle: FontStyle.italic,
-                            color: context.appTextMuted),
-                        overflow: TextOverflow.ellipsis),
-                ],
-              )),
-              if (status != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _statusColor(status).withValues(alpha: 0.1),
-                    border: Border.all(
-                        color: _statusColor(status).withValues(alpha: 0.3)),
-                    borderRadius: BorderRadius.circular(12),
+                            color: context.appTextMuted,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(_statusIcon(status),
-                        size: 11, color: _statusColor(status)),
-                    const SizedBox(width: 4),
-                    Text(status,
-                        style: TextStyle(
+                ),
+                if (status != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _statusColor(status).withValues(alpha: 0.1),
+                      border: Border.all(
+                        color: _statusColor(status).withValues(alpha: 0.3),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _statusIcon(status),
+                          size: 11,
+                          color: _statusColor(status),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          status,
+                          style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            color: _statusColor(status))),
-                  ]),
-                ),
-            ]),
+                            color: _statusColor(status),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -741,13 +1143,15 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildDesktop() {
     final code = _data['sample_code']?.toString();
-    final id   = _data['sample_id']?.toString();
+    final id = _data['sample_id']?.toString();
 
     return Scaffold(
       backgroundColor: context.appBg,
       appBar: _buildDesktopAppBar(code, id),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+          ? _buildUnavailableBody()
           : _buildDesktopBody(),
     );
   }
@@ -769,7 +1173,12 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         ],
       ),
       actions: [
-        if (!_loading) ...[
+        if (!_loading && _hasLoadedSample) ...[
+          IconButton(
+            icon: const Icon(Icons.outbox_outlined),
+            tooltip: 'Quick Request',
+            onPressed: _requestSample,
+          ),
           if (_strains.isNotEmpty)
             Container(
               margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
@@ -779,14 +1188,25 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
                 border: Border.all(color: _DS.accent.withValues(alpha: 0.4)),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.science_rounded, size: 13, color: _DS.accent),
-                const SizedBox(width: 5),
-                Text('${_strains.length} strain${_strains.length != 1 ? 's' : ''}',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.science_rounded,
+                    size: 13,
+                    color: _DS.accent,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${_strains.length} strain${_strains.length != 1 ? 's' : ''}',
                     style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600,
-                        color: _DS.accent)),
-              ]),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _DS.accent,
+                    ),
+                  ),
+                ],
+              ),
             ),
           const SizedBox(width: 4),
           ElevatedButton.icon(
@@ -802,23 +1222,35 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFC8181)),
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              color: Color(0xFFFC8181),
+            ),
             tooltip: 'Delete sample',
             onPressed: canEdit ? _delete : context.warnReadOnly,
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: FilledButton.icon(
-              onPressed: _saving ? null : (canEdit ? _save : context.warnReadOnly),
+              onPressed: _saving
+                  ? null
+                  : (canEdit ? _save : context.warnReadOnly),
               style: FilledButton.styleFrom(
                 backgroundColor: _DS.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
               ),
               icon: _saving
                   ? const SizedBox(
-                      width: 14, height: 14,
+                      width: 14,
+                      height: 14,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.save_rounded, size: 16),
               label: const Text('Save', style: TextStyle(fontSize: 13)),
             ),
@@ -837,50 +1269,65 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
           width: 240,
           child: Container(
             color: context.appSurface,
-            child: Column(children: [
-              _buildStatsBar(),
-              Divider(height: 1, color: context.appBorder),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: _groups.length,
-                  itemBuilder: (ctx, i) {
-                    final group = _groups[i];
-                    final isExp = _expanded.contains(i);
-                    return ListTile(
-                      dense: true,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                      leading: Icon(_sectionIcon(group.icon), size: 18,
-                          color: isExp ? _DS.accent : context.appTextSecondary),
-                      title: Text(group.title,
+            child: Column(
+              children: [
+                _buildStatsBar(),
+                Divider(height: 1, color: context.appBorder),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: _groups.length,
+                    itemBuilder: (ctx, i) {
+                      final group = _groups[i];
+                      final isExp = _expanded.contains(i);
+                      return ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 0,
+                        ),
+                        leading: Icon(
+                          _sectionIcon(group.icon),
+                          size: 18,
+                          color: isExp ? _DS.accent : context.appTextSecondary,
+                        ),
+                        title: Text(
+                          group.title,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isExp ? FontWeight.w600 : FontWeight.normal,
-                            color: isExp ? _DS.accent : context.appTextSecondary,
-                          )),
-                      trailing: Icon(
+                            fontWeight: isExp
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: isExp
+                                ? _DS.accent
+                                : context.appTextSecondary,
+                          ),
+                        ),
+                        trailing: Icon(
                           isExp
                               ? Icons.keyboard_arrow_down_rounded
                               : Icons.keyboard_arrow_right_rounded,
                           size: 16,
-                          color: isExp ? _DS.accent : context.appTextSecondary),
-                      selected: isExp,
-                      selectedTileColor: _DS.accent.withValues(alpha: 0.06),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      onTap: () => setState(() {
-                        if (isExp) {
-                          _expanded.remove(i);
-                        } else {
-                          _expanded.add(i);
-                        }
-                      }),
-                    );
-                  },
+                          color: isExp ? _DS.accent : context.appTextSecondary,
+                        ),
+                        selected: isExp,
+                        selectedTileColor: _DS.accent.withValues(alpha: 0.06),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        onTap: () => setState(() {
+                          if (isExp) {
+                            _expanded.remove(i);
+                          } else {
+                            _expanded.add(i);
+                          }
+                        }),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ]),
+              ],
+            ),
           ),
         ),
 
@@ -910,47 +1357,72 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   // ── Desktop: stats bar ────────────────────────────────────────────────────
   Widget _buildStatsBar() {
     final country = _data['sample_country']?.toString();
-    final island  = _data['sample_island']?.toString();
-    final date    = _data['sample_date']?.toString();
+    final island = _data['sample_island']?.toString();
+    final date = _data['sample_date']?.toString();
 
     return Container(
       padding: const EdgeInsets.all(14),
       color: _DS.accent.withValues(alpha: context.isDark ? 0.08 : 0.06),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.colorize_outlined, size: 15, color: _DS.accent),
-          const SizedBox(width: 6),
-          const Text('Sample Info',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                  color: _DS.accent, letterSpacing: 0.5)),
-        ]),
-        const SizedBox(height: 8),
-        if (country != null) _statRow(Icons.flag_rounded, country),
-        if (island  != null) _statRow(Icons.landscape_rounded, island),
-        if (date    != null) _statRow(Icons.calendar_today_rounded, date),
-        const SizedBox(height: 6),
-        _statRow(Icons.science_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.colorize_outlined, size: 15, color: _DS.accent),
+              const SizedBox(width: 6),
+              const Text(
+                'Sample Info',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: _DS.accent,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (country != null) _statRow(Icons.flag_rounded, country),
+          if (island != null) _statRow(Icons.landscape_rounded, island),
+          if (date != null) _statRow(Icons.calendar_today_rounded, date),
+          const SizedBox(height: 6),
+          _statRow(
+            Icons.science_rounded,
             '${_strains.length} strain${_strains.length != 1 ? 's' : ''}',
-            color: _DS.accent),
-      ]),
+            color: _DS.accent,
+          ),
+        ],
+      ),
     );
   }
 
   Widget _statRow(IconData icon, String text, {Color? color}) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Row(children: [
-      Icon(icon, size: 13, color: color ?? context.appTextMuted),
-      const SizedBox(width: 6),
-      Expanded(
-        child: Text(text,
-            style: TextStyle(fontSize: 12, color: color ?? context.appTextSecondary),
-            overflow: TextOverflow.ellipsis),
-      ),
-    ]),
+    child: Row(
+      children: [
+        Icon(icon, size: 13, color: color ?? context.appTextMuted),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: color ?? context.appTextSecondary,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
   );
 
   // ── Desktop: section card ─────────────────────────────────────────────────
-  Widget _buildSection(int index, String title, String iconKey, List<_Field> fields) {
+  Widget _buildSection(
+    int index,
+    String title,
+    String iconKey,
+    List<_Field> fields,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
@@ -959,60 +1431,93 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: context.appBorder),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 6, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: BoxDecoration(
-              color: context.appSurface2,
-              borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12), topRight: Radius.circular(12)),
-              border: Border(bottom: BorderSide(color: context.appBorder)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: BoxDecoration(
+                color: context.appSurface2,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+                border: Border(bottom: BorderSide(color: context.appBorder)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: _DS.accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _sectionIcon(iconKey),
+                      size: 16,
+                      color: _DS.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    title.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: context.appTextMuted,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      if (_expanded.contains(index)) {
+                        _expanded.remove(index);
+                      } else {
+                        _expanded.add(index);
+                      }
+                    }),
+                    child: Icon(
+                      Icons.keyboard_arrow_up_rounded,
+                      size: 20,
+                      color: context.appTextSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                    color: _DS.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8)),
-                child: Icon(_sectionIcon(iconKey), size: 16, color: _DS.accent),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: LayoutBuilder(
+                builder: (ctx, constraints) {
+                  final cols = constraints.maxWidth > 800
+                      ? 3
+                      : constraints.maxWidth > 520
+                      ? 2
+                      : 1;
+                  final fieldW =
+                      (constraints.maxWidth - (cols - 1) * 16) / cols;
+                  return Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: fields
+                        .map(
+                          (f) => SizedBox(width: fieldW, child: _buildField(f)),
+                        )
+                        .toList(),
+                  );
+                },
               ),
-              const SizedBox(width: 10),
-              Text(title.toUpperCase(), style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w700,
-                color: context.appTextMuted, letterSpacing: 0.8)),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => setState(() {
-                  if (_expanded.contains(index)) {
-                    _expanded.remove(index);
-                  } else {
-                    _expanded.add(index);
-                  }
-                }),
-                child: Icon(Icons.keyboard_arrow_up_rounded,
-                    size: 20, color: context.appTextSecondary),
-              ),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: LayoutBuilder(builder: (ctx, constraints) {
-              final cols = constraints.maxWidth > 800 ? 3
-                  : constraints.maxWidth > 520 ? 2 : 1;
-              final fieldW = (constraints.maxWidth - (cols - 1) * 16) / cols;
-              return Wrap(
-                spacing: 16, runSpacing: 16,
-                children: fields
-                    .map((f) => SizedBox(width: fieldW, child: _buildField(f)))
-                    .toList(),
-              );
-            }),
-          ),
-        ]),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1020,8 +1525,9 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   // ── Shared: individual field ──────────────────────────────────────────────
   Widget _buildField(_Field f) {
     final canEdit = context.canEditModule;
-    final ctrl = _ctrl[f.key] ??=
-        TextEditingController(text: _data[f.key]?.toString() ?? '');
+    final ctrl = _ctrl[f.key] ??= TextEditingController(
+      text: _data[f.key]?.toString() ?? '',
+    );
 
     return TextFormField(
       controller: ctrl,
@@ -1033,11 +1539,34 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         labelStyle: TextStyle(fontSize: 12, color: context.appTextMuted),
         isDense: true,
         filled: true,
-        fillColor: (f.readOnly || !canEdit) ? context.appSurface2 : context.appSurface3,
-        border:         OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
-        enabledBorder:  OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
-        focusedBorder:  OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _DS.accent, width: 1.5)),
-        disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.appBorder)),
+        fillColor: (f.readOnly || !canEdit)
+            ? context.appSurface2
+            : context.appSurface3,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _DS.accent, width: 1.5),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
+        suffixIcon: f.key == 'sample_gps'
+            ? IconButton(
+                onPressed: _openGpsPicker,
+                tooltip: context.canEditModule
+                    ? 'Choose position on map'
+                    : 'View position on map',
+                icon: const Icon(Icons.map_outlined, size: 19),
+              )
+            : null,
         contentPadding: f.lines > 1
             ? const EdgeInsets.all(12)
             : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1053,93 +1582,146 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.appBorder),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 6, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          decoration: BoxDecoration(
-            color: context.appSurface2,
-            borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12), topRight: Radius.circular(12)),
-            border: Border(bottom: BorderSide(color: context.appBorder)),
-          ),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                  color: _DS.accent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.science_rounded, size: 16, color: _DS.accent),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: context.appSurface2,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              border: Border(bottom: BorderSide(color: context.appBorder)),
             ),
-            const SizedBox(width: 10),
-            Text('STRAINS FROM THIS SAMPLE'.toUpperCase(), style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w700,
-              color: context.appTextMuted, letterSpacing: 0.8)),
-            if (_strains.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
                     color: _DS.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10)),
-                child: Text('${_strains.length}',
-                    style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.bold,
-                        color: _DS.accent)),
-              ),
-            ],
-            const Spacer(),
-            if (_strains.isNotEmpty)
-              TextButton.icon(
-                onPressed: _openStrains,
-                icon: const Icon(Icons.open_in_new, size: 14),
-                label: const Text('View all', style: TextStyle(fontSize: 12)),
-                style: TextButton.styleFrom(foregroundColor: _DS.accent,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
-              ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              onPressed: _addStrain,
-              icon: const Icon(Icons.add, size: 15),
-              label: const Text('Add Strain', style: TextStyle(fontSize: 12)),
-              style: FilledButton.styleFrom(
-                backgroundColor: _DS.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.science_rounded,
+                    size: 16,
+                    color: _DS.accent,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'STRAINS FROM THIS SAMPLE'.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: context.appTextMuted,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                if (_strains.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _DS.accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${_strains.length}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _DS.accent,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                if (_strains.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: _openStrains,
+                    icon: const Icon(Icons.open_in_new, size: 14),
+                    label: const Text(
+                      'View all',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: _DS.accent,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _addStrain,
+                  icon: const Icon(Icons.add, size: 15),
+                  label: const Text(
+                    'Add Strain',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _DS.accent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ]),
-        ),
-        if (_strains.isEmpty)
-          _buildEmptyStrains()
-        else
-          _buildDesktopStrainsList(),
-      ]),
+          ),
+          if (_strains.isEmpty)
+            _buildEmptyStrains()
+          else
+            _buildDesktopStrainsList(),
+        ],
+      ),
     );
   }
 
   Widget _buildEmptyStrains() => Padding(
     padding: const EdgeInsets.all(32),
     child: Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.science_outlined, size: 48, color: context.appTextMuted),
-        const SizedBox(height: 12),
-        Text('No strains yet',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15,
-                color: context.appTextSecondary)),
-        const SizedBox(height: 4),
-        Text('Add the first strain isolated from this sample.',
-            style: TextStyle(fontSize: 13, color: context.appTextMuted)),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: _addStrain,
-          icon: const Icon(Icons.add),
-          label: const Text('Add First Strain'),
-          style: FilledButton.styleFrom(backgroundColor: _DS.accent),
-        ),
-      ]),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.science_outlined, size: 48, color: context.appTextMuted),
+          const SizedBox(height: 12),
+          Text(
+            'No strains yet',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+              color: context.appTextSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Add the first strain isolated from this sample.',
+            style: TextStyle(fontSize: 13, color: context.appTextMuted),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _addStrain,
+            icon: const Icon(Icons.add),
+            label: const Text('Add First Strain'),
+            style: FilledButton.styleFrom(backgroundColor: _DS.accent),
+          ),
+        ],
+      ),
     ),
   );
 
@@ -1150,51 +1732,87 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
       itemCount: _strains.length,
       separatorBuilder: (_, _) => Divider(height: 1, color: context.appBorder),
       itemBuilder: (_, i) {
-        final s       = _strains[i];
-        final code    = s['strain_code']?.toString() ?? '—';
-        final genus   = s['strain_genus']?.toString();
-        final sp      = s['strain_species']?.toString();
+        final s = _strains[i];
+        final code = s['strain_code']?.toString() ?? '—';
+        final genus = s['strain_genus']?.toString();
+        final sp = s['strain_species']?.toString();
         final sciName = s['strain_scientific_name']?.toString();
-        final status  = s['strain_status']?.toString();
-        final taxon   = sciName ??
+        final status = s['strain_status']?.toString();
+        final taxon =
+            sciName ??
             [genus, sp].where((v) => v != null && v.isNotEmpty).join(' ');
 
         return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          leading: Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-                color: _DS.accent.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.science_outlined, size: 18, color: _DS.accent),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 4,
           ),
-          title: Text(code,
-              style: TextStyle(fontWeight: FontWeight.w600,
-                  fontSize: 13, color: context.appTextPrimary)),
+          leading: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _DS.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.science_outlined,
+              size: 18,
+              color: _DS.accent,
+            ),
+          ),
+          title: Text(
+            code,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: context.appTextPrimary,
+            ),
+          ),
           subtitle: taxon.isNotEmpty
-              ? Text(taxon,
-                  style: TextStyle(fontSize: 12,
-                      fontStyle: FontStyle.italic, color: context.appTextMuted))
+              ? Text(
+                  taxon,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: context.appTextMuted,
+                  ),
+                )
               : null,
           trailing: status != null
               ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: _statusColor(status).withValues(alpha: 0.1),
                     border: Border.all(
-                        color: _statusColor(status).withValues(alpha: 0.3)),
+                      color: _statusColor(status).withValues(alpha: 0.3),
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(_statusIcon(status), size: 11, color: _statusColor(status)),
-                    const SizedBox(width: 4),
-                    Text(status,
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                            color: _statusColor(status))),
-                  ]),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _statusIcon(status),
+                        size: 11,
+                        color: _statusColor(status),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _statusColor(status),
+                        ),
+                      ),
+                    ],
+                  ),
                 )
               : null,
-          onTap: _openStrains,
+          onTap: () => _openStrain(s),
         );
       },
     );

@@ -27,8 +27,8 @@ import 'lab_builder_page.dart';
 // Default tile dimensions when a room has no stored layout.
 const double _kDefaultRoomW = 200;
 const double _kDefaultRoomH = 130;
-const double _kDefaultGap   = 24;
-const int    _kDefaultCols  = 4;
+const double _kDefaultGap = 24;
+const int _kDefaultCols = 4;
 const double _kMinCanvasW = 800;
 const double _kMinCanvasH = 600;
 const double _kViewportFitPadding = 40;
@@ -48,7 +48,6 @@ class _LabPageState extends State<LabPage> {
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _reagents = [];
   List<_Decor> _decors = [];
-  List<_CanvasLocationView> _locations = [];
   // location_id (sub-location OR room) → containing room id.
   Map<int, int> _locToRoom = {};
   Map<int, _RoomGeom> _geom = {};
@@ -57,7 +56,7 @@ class _LabPageState extends State<LabPage> {
   _RoomPanelMode _roomPanelMode = _RoomPanelMode.locations;
   _ReagentSort _reagentSort = _ReagentSort.code;
   bool _reagentSortDescending = false;
-  bool _showLocations = false;
+  bool _showLocationList = false;
   bool _loading = true;
   String _search = '';
   final _searchCtrl = TextEditingController();
@@ -88,13 +87,17 @@ class _LabPageState extends State<LabPage> {
             .order('location_sort_order'),
         Supabase.instance.client
             .from('users')
-            .select('user_id, user_email, user_name, user_phone, '
-                'user_institution, user_group, user_role')
+            .select(
+              'user_id, user_email, user_name, user_phone, '
+              'user_institution, user_group, user_role',
+            )
             .order('user_name'),
         Supabase.instance.client
             .from('reagents')
-            .select('reagent_id, reagent_code, reagent_name, '
-                'reagent_location_id')
+            .select(
+              'reagent_id, reagent_code, reagent_name, '
+              'reagent_location_id',
+            )
             .order('reagent_code'),
         Supabase.instance.client
             .from('app_meta')
@@ -103,10 +106,10 @@ class _LabPageState extends State<LabPage> {
             .limit(1)
             .maybeSingle(),
       ]);
-      final locRows     = results[0] as List<dynamic>;
-      final userRows    = results[1] as List<dynamic>;
+      final locRows = results[0] as List<dynamic>;
+      final userRows = results[1] as List<dynamic>;
       final reagentRows = results[2] as List<dynamic>;
-      final metaRowRaw  = results[3];
+      final metaRowRaw = results[3];
 
       final items = locRows.map<LocationModel>((r) {
         final p = (r as Map)['parent'];
@@ -147,21 +150,6 @@ class _LabPageState extends State<LabPage> {
         geom[room.id] = parsed ?? _gridFallback(i);
       }
 
-      final locationShapes = <_CanvasLocationView>[];
-      for (final room in rooms) {
-        for (final loc in (children[room.id] ?? const <LocationModel>[])) {
-          final parsed = _RoomGeom.tryParse(layoutById[loc.id]);
-          if (parsed == null) continue;
-          locationShapes.add(_CanvasLocationView(
-            id: loc.id,
-            parentRoomId: room.id,
-            name: stripLocationCodePrefix(loc.name),
-            type: loc.type,
-            geom: parsed,
-          ));
-        }
-      }
-
       final decors = <_Decor>[];
       Size? backgroundSize;
       if (metaRowRaw is Map) {
@@ -174,7 +162,9 @@ class _LabPageState extends State<LabPage> {
           try {
             final decoded = jsonDecode(settingsRaw);
             if (decoded is Map) settings = Map<String, dynamic>.from(decoded);
-          } catch (_) {/* keep empty */}
+          } catch (_) {
+            /* keep empty */
+          }
         }
         final layout = settings['lab_layout'];
         if (layout is Map) {
@@ -207,7 +197,6 @@ class _LabPageState extends State<LabPage> {
         _users = List<Map<String, dynamic>>.from(userRows);
         _reagents = List<Map<String, dynamic>>.from(reagentRows);
         _decors = decors;
-        _locations = locationShapes;
         _locToRoom = locToRoom;
         _geom = geom;
         _backgroundSize = backgroundSize;
@@ -222,13 +211,17 @@ class _LabPageState extends State<LabPage> {
       debugPrint('lab_page: load failed: $e');
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Failed to load lab layout: $e',
-            style: GoogleFonts.spaceGrotesk(color: Colors.white)),
-        backgroundColor: AppDS.red,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to load lab layout: $e',
+            style: GoogleFonts.spaceGrotesk(color: Colors.white),
+          ),
+          backgroundColor: AppDS.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
     }
   }
 
@@ -268,7 +261,7 @@ class _LabPageState extends State<LabPage> {
   }
 
   Rect? get _occupiedBounds {
-    if (_geom.isEmpty && _decors.isEmpty && _locations.isEmpty) return null;
+    if (_geom.isEmpty && _decors.isEmpty) return null;
     double minX = double.infinity;
     double minY = double.infinity;
     double maxX = 0;
@@ -283,9 +276,6 @@ class _LabPageState extends State<LabPage> {
 
     for (final g in _geom.values) {
       include(g);
-    }
-    for (final loc in _locations) {
-      include(loc.geom);
     }
     for (final decor in _decors) {
       include(_RoomGeom(x: decor.x, y: decor.y, w: decor.w, h: decor.h));
@@ -334,20 +324,27 @@ class _LabPageState extends State<LabPage> {
   }
 
   void _applyAutoFit(Size viewport, Rect target) {
-    final paddedWidth = math.max(1.0, viewport.width - _kViewportFitPadding * 2);
-    final paddedHeight =
-        math.max(1.0, viewport.height - _kViewportFitPadding * 2);
+    final paddedWidth = math.max(
+      1.0,
+      viewport.width - _kViewportFitPadding * 2,
+    );
+    final paddedHeight = math.max(
+      1.0,
+      viewport.height - _kViewportFitPadding * 2,
+    );
     final scaleX = paddedWidth / math.max(target.width, 1.0);
     final scaleY = paddedHeight / math.max(target.height, 1.0);
-    final scale =
-        math.min(scaleX, scaleY).clamp(_kMinViewerScale, 4.0).toDouble();
+    final scale = math
+        .min(scaleX, scaleY)
+        .clamp(_kMinViewerScale, 4.0)
+        .toDouble();
     final dx =
         ((viewport.width - target.width * scale) / 2 - target.left * scale)
             .toDouble();
     final dy =
         ((viewport.height - target.height * scale) / 2 - target.top * scale)
             .toDouble();
-    final matrix = Matrix4.identity()..scale(scale);
+    final matrix = Matrix4.identity()..scaleByDouble(scale, scale, scale, 1);
     matrix.setTranslationRaw(dx, dy, 0);
     _viewerCtrl.value = matrix;
   }
@@ -362,14 +359,18 @@ class _LabPageState extends State<LabPage> {
   }
 
   List<Map<String, dynamic>> _reagentsInRoom(int roomId) {
-    return _sortReagents(_reagents.where((r) {
-      final locId = r['reagent_location_id'];
-      if (locId is! num) return false;
-      return _locToRoom[locId.toInt()] == roomId;
-    }).toList());
+    return _sortReagents(
+      _reagents.where((r) {
+        final locId = r['reagent_location_id'];
+        if (locId is! num) return false;
+        return _locToRoom[locId.toInt()] == roomId;
+      }).toList(),
+    );
   }
 
-  List<Map<String, dynamic>> _sortReagents(List<Map<String, dynamic>> reagents) {
+  List<Map<String, dynamic>> _sortReagents(
+    List<Map<String, dynamic>> reagents,
+  ) {
     final out = List<Map<String, dynamic>>.from(reagents);
     out.sort((a, b) {
       final codeA = ((a['reagent_code'] as String?) ?? '').trim().toLowerCase();
@@ -461,13 +462,36 @@ class _LabPageState extends State<LabPage> {
 
   String _roomCodeFor(LocationModel room) {
     final idx = _rooms.indexWhere((r) => r.id == room.id);
-    return idx >= 0 ? 'R${idx + 1}' : '';
+    return room.code ?? (idx >= 0 ? 'R${idx + 1}' : '');
+  }
+
+  String _responsibleLabel(String? raw) {
+    final entries = (raw ?? '')
+        .split(';')
+        .map((entry) => entry.trim())
+        .where((entry) => entry.isNotEmpty);
+    return entries
+        .map((entry) {
+          final query = entry.toLowerCase();
+          for (final user in _users) {
+            if ((user['user_email']?.toString().toLowerCase() ?? '') == query) {
+              final name = user['user_name']?.toString().trim();
+              return name == null || name.isEmpty ? entry : name;
+            }
+          }
+          return entry;
+        })
+        .join(', ');
   }
 
   void _openRoomDetail(LocationModel room) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => RoomDetailPage(locationId: room.id)),
+      modulePageRoute(
+        context: context,
+        moduleId: 'locations',
+        child: RoomDetailPage(locationId: room.id),
+      ),
     );
     if (mounted) _load();
   }
@@ -475,7 +499,11 @@ class _LabPageState extends State<LabPage> {
   void _openLocationDetail(LocationModel loc) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => LocationDetailPage(locationId: loc.id)),
+      modulePageRoute(
+        context: context,
+        moduleId: 'locations',
+        child: LocationDetailPage(locationId: loc.id),
+      ),
     );
     if (mounted) _load();
   }
@@ -484,16 +512,18 @@ class _LabPageState extends State<LabPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
-      _buildToolbar(context),
-      Expanded(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _rooms.isEmpty
-                ? _buildEmptyState(context)
-                : _buildBody(context),
-      ),
-    ]);
+    return Column(
+      children: [
+        _buildToolbar(context),
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _rooms.isEmpty
+              ? _buildEmptyState(context)
+              : _buildBody(context),
+        ),
+      ],
+    );
   }
 
   Widget _buildToolbar(BuildContext context) {
@@ -504,173 +534,215 @@ class _LabPageState extends State<LabPage> {
         border: Border(bottom: BorderSide(color: context.appBorder)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(children: [
-        if (MediaQuery.of(context).size.width < 700)
-          IconButton(
-            icon: const Icon(Icons.menu_rounded, size: 20),
-            color: context.appTextSecondary,
-            tooltip: 'Menu',
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        const Icon(Icons.map_outlined, color: AppDS.accent, size: 18),
-        const SizedBox(width: 8),
-        Text('Lab Map',
+      child: Row(
+        children: [
+          if (MediaQuery.of(context).size.width < 700)
+            IconButton(
+              icon: const Icon(Icons.menu_rounded, size: 20),
+              color: context.appTextSecondary,
+              tooltip: 'Menu',
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          const Icon(Icons.map_outlined, color: AppDS.accent, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Lab Map',
             style: GoogleFonts.spaceGrotesk(
-                color: context.appTextPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w600)),
-        const SizedBox(width: 16),
-        Expanded(
-          child: SizedBox(
-            height: 36,
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (v) =>
-                  setState(() => _search = v.trim().toLowerCase()),
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextPrimary, fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'Search rooms…',
-                hintStyle: GoogleFonts.spaceGrotesk(
-                    color: context.appTextMuted, fontSize: 13),
-                prefixIcon:
-                    Icon(Icons.search, color: context.appTextMuted, size: 16),
-                suffixIcon: _search.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: Icon(Icons.clear,
-                            size: 14, color: context.appTextMuted),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          setState(() => _search = '');
-                        },
-                      ),
-                filled: true,
-                fillColor: context.appSurface3,
-                contentPadding: EdgeInsets.zero,
-                border: OutlineInputBorder(
+              color: context.appTextPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) =>
+                    setState(() => _search = v.trim().toLowerCase()),
+                style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextPrimary,
+                  fontSize: 13,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Search rooms, locations, reagents…',
+                  hintStyle: GoogleFonts.spaceGrotesk(
+                    color: context.appTextMuted,
+                    fontSize: 13,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: context.appTextMuted,
+                    size: 16,
+                  ),
+                  suffixIcon: _search.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: Icon(
+                            Icons.clear,
+                            size: 14,
+                            color: context.appTextMuted,
+                          ),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _search = '');
+                          },
+                        ),
+                  filled: true,
+                  fillColor: context.appSurface3,
+                  contentPadding: EdgeInsets.zero,
+                  border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: context.appBorder)),
-                enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: context.appBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: context.appBorder)),
-                focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: context.appBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppDS.accent)),
+                    borderSide: const BorderSide(color: AppDS.accent),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        OutlinedButton.icon(
-          onPressed: () => setState(() => _showLocations = !_showLocations),
-          icon: Icon(
-            _showLocations
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
-            size: 14,
-          ),
-          label: Text(_showLocations ? 'Hide locations' : 'Show locations'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor:
-                _showLocations ? context.appTextSecondary : AppDS.accent,
-            side: BorderSide(
-              color: _showLocations
-                  ? context.appBorder
-                  : AppDS.accent.withValues(alpha: 0.5),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            minimumSize: const Size(0, 36),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
-            textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
-          ),
-        ),
-        const SizedBox(width: 8),
-        if (context.canEditModule)
+          const SizedBox(width: 8),
           OutlinedButton.icon(
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const LabBuilderPage()),
-              );
-              // Builder may have moved/resized rooms — refresh so the map
-              // reflects the new layout.
-              if (mounted) _load();
-            },
-            icon: const Icon(Icons.edit_outlined, size: 14),
-            label: const Text('Open in Builder'),
+            onPressed: () =>
+                setState(() => _showLocationList = !_showLocationList),
+            icon: Icon(
+              _showLocationList
+                  ? Icons.close_rounded
+                  : Icons.format_list_bulleted_rounded,
+              size: 14,
+            ),
+            label: Text(
+              _showLocationList ? 'Close location list' : 'Location list',
+            ),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppDS.accent,
-              side: BorderSide(color: AppDS.accent.withValues(alpha: 0.5)),
+              foregroundColor: _showLocationList
+                  ? context.appTextSecondary
+                  : AppDS.accent,
+              side: BorderSide(
+                color: _showLocationList
+                    ? context.appBorder
+                    : AppDS.accent.withValues(alpha: 0.5),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 12),
               minimumSize: const Size(0, 36),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
               textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
             ),
           ),
-      ]),
+          const SizedBox(width: 8),
+          if (context.canEditModule && context.canBulkUpdateModule)
+            OutlinedButton.icon(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  modulePageRoute(
+                    context: context,
+                    child: const LabBuilderPage(),
+                  ),
+                );
+                // Builder may have moved/resized rooms — refresh so the map
+                // reflects the new layout.
+                if (mounted) _load();
+              },
+              icon: const Icon(Icons.edit_outlined, size: 14),
+              label: const Text('Open in Builder'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppDS.accent,
+                side: BorderSide(color: AppDS.accent.withValues(alpha: 0.5)),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(0, 36),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.map_outlined, size: 56, color: context.appTextMuted),
-        const SizedBox(height: 12),
-        Text('No rooms to display.',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.map_outlined, size: 56, color: context.appTextMuted),
+          const SizedBox(height: 12),
+          Text(
+            'No rooms to display.',
             style: GoogleFonts.spaceGrotesk(
-                color: context.appTextSecondary, fontSize: 15)),
-        const SizedBox(height: 4),
-        Text(
-          'Add rooms in Rooms & Locations first — they will appear here.',
-          style: GoogleFonts.spaceGrotesk(
-              color: context.appTextMuted, fontSize: 12),
-        ),
-      ]),
+              color: context.appTextSecondary,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Add rooms in Rooms & Locations first — they will appear here.',
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextMuted,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildBody(BuildContext context) {
-    return LayoutBuilder(builder: (ctx, constraints) {
-      final w = constraints.maxWidth;
-      final canvas = _buildCanvas(context);
-      final panel = _buildPanel(context);
-      // Below 700 px of *content* width, stack vertically — phones and
-      // narrow split-screen.
-      if (w < 700) {
-        return Column(children: [
-          Expanded(flex: 3, child: canvas),
-          SizedBox(
-            height: 280,
-            child: Container(
-              decoration: BoxDecoration(
-                color: context.appSurface,
-                border: Border(top: BorderSide(color: context.appBorder)),
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final w = constraints.maxWidth;
+        final canvas = _buildCanvas(context);
+        final panel = _buildPanel(context);
+        // Below 700 px of *content* width, stack vertically — phones and
+        // narrow split-screen.
+        if (w < 700) {
+          return Column(
+            children: [
+              Expanded(flex: 3, child: canvas),
+              SizedBox(
+                height: 280,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: context.appSurface,
+                    border: Border(top: BorderSide(color: context.appBorder)),
+                  ),
+                  child: panel,
+                ),
               ),
-              child: panel,
+            ],
+          );
+        }
+        // Map gets at least half the width; panel prefers 340 px but is
+        // capped so the canvas never drops below 50 % of the row.
+        final panelW = math.min(340.0, w * 0.5);
+        return Row(
+          children: [
+            Expanded(child: canvas),
+            SizedBox(
+              width: panelW,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: context.appSurface,
+                  border: Border(left: BorderSide(color: context.appBorder)),
+                ),
+                child: panel,
+              ),
             ),
-          ),
-        ]);
-      }
-      // Map gets at least half the width; panel prefers 340 px but is
-      // capped so the canvas never drops below 50 % of the row.
-      final panelW = math.min(340.0, w * 0.5);
-      return Row(children: [
-        Expanded(child: canvas),
-        SizedBox(
-          width: panelW,
-          child: Container(
-            decoration: BoxDecoration(
-              color: context.appSurface,
-              border: Border(left: BorderSide(color: context.appBorder)),
-            ),
-            child: panel,
-          ),
-        ),
-      ]);
-    });
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildCanvas(BuildContext context) {
@@ -689,19 +761,30 @@ class _LabPageState extends State<LabPage> {
             child: SizedBox(
               width: size.width,
               height: size.height,
-              child: Stack(children: [
-                // Background grid
-                Positioned.fill(
-                  child: CustomPaint(painter: _GridPainter(context.appBorder)),
-                ),
-                for (final decor in _decors.where(_isBackgroundDecor))
-                  _buildDecorShape(context, decor),
-                for (final room in _rooms) _buildRoomShape(context, room),
-                if (_showLocations)
-                  for (final loc in _locations) _buildLocationShape(context, loc),
-                for (final decor in _decors.where((d) => !_isBackgroundDecor(d)))
-                  _buildDecorShape(context, decor),
-              ]),
+              child: Stack(
+                children: [
+                  // Background grid
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _GridPainter(context.appBorder),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _CorridorPainter(
+                          _decors.where(_isBackgroundDecor).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  for (final room in _rooms) _buildRoomShape(context, room),
+                  for (final decor in _decors.where(
+                    (d) => !_isBackgroundDecor(d),
+                  ))
+                    _buildDecorShape(context, decor),
+                ],
+              ),
             ),
           ),
         );
@@ -710,77 +793,6 @@ class _LabPageState extends State<LabPage> {
   }
 
   bool _isBackgroundDecor(_Decor decor) => decor.kind == _DecorKind.corridor;
-
-  Widget _buildLocationShape(BuildContext context, _CanvasLocationView loc) {
-    final accent = LocationModel.typeAccent(loc.type);
-    final icon = LocationModel.typeIcon(loc.type);
-    final displayName =
-        loc.name.trim().isEmpty ? LocationModel.typeLabel(loc.type) : loc.name;
-    final location = _locById[loc.id];
-    final dimmed =
-        _search.isNotEmpty && !_searchRoomHits.contains(loc.parentRoomId);
-    return Positioned(
-      left: loc.geom.x,
-      top: loc.geom.y,
-      width: loc.geom.w,
-      height: loc.geom.h,
-      child: Opacity(
-        opacity: dimmed ? 0.35 : 1,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => setState(() => _selectedRoomId = loc.parentRoomId),
-            onDoubleTap: location == null ? null : () => _openLocationDetail(location),
-            child: Container(
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: accent.withValues(alpha: 0.75),
-                  width: 1.2,
-                ),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Icon(icon, size: 13, color: accent),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        LocationModel.typeLabel(loc.type),
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.jetBrainsMono(
-                          color: accent,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ]),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    child: Text(
-                      displayName,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
-                        color: context.appTextPrimary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildDecorShape(BuildContext context, _Decor decor) {
     final accent = switch (decor.kind) {
@@ -825,37 +837,40 @@ class _LabPageState extends State<LabPage> {
           alignment: Alignment.center,
           child: icon == null
               ? (decor.kind == _DecorKind.corridor && decor.h > 34
-                  ? Text(
-                      decor.label ?? 'Corridor',
-                      style: GoogleFonts.spaceGrotesk(
-                        color: accent,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    )
-                  : null)
+                    ? Text(
+                        decor.label ?? 'Corridor',
+                        style: GoogleFonts.spaceGrotesk(
+                          color: accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    : null)
               : (decor.kind == _DecorKind.bathroom
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(icon,
-                            size: math.min(28, decor.h * 0.4), color: accent),
-                        if (decor.h > 60)
-                          Text(
-                            decor.label ?? 'Bathroom',
-                            style: GoogleFonts.spaceGrotesk(
-                              color: accent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            icon,
+                            size: math.min(28, decor.h * 0.4),
+                            color: accent,
                           ),
-                      ],
-                    )
-                  : Icon(
-                      icon,
-                      size: math.min(decor.w, decor.h) * 0.6,
-                      color: accent,
-                    )),
+                          if (decor.h > 60)
+                            Text(
+                              decor.label ?? 'Bathroom',
+                              style: GoogleFonts.spaceGrotesk(
+                                color: accent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      )
+                    : Icon(
+                        icon,
+                        size: math.min(decor.w, decor.h) * 0.6,
+                        color: accent,
+                      )),
         ),
       ),
     );
@@ -869,6 +884,7 @@ class _LabPageState extends State<LabPage> {
     final accent = LocationModel.typeAccent(LocationModel.roomType);
     final code = _roomCodeFor(room);
     final desc = stripLocationCodePrefix(room.name);
+    final responsible = _responsibleLabel(room.responsible);
     final dimmed = _search.isNotEmpty && !matched;
     final reagentCount = _reagentsInRoom(room.id).length;
 
@@ -890,9 +906,7 @@ class _LabPageState extends State<LabPage> {
                 color: accent.withValues(alpha: selected ? 0.22 : 0.10),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: selected
-                      ? accent
-                      : accent.withValues(alpha: 0.6),
+                  color: selected ? accent : accent.withValues(alpha: 0.6),
                   width: selected ? 2.5 : 1.4,
                 ),
                 boxShadow: selected
@@ -909,54 +923,98 @@ class _LabPageState extends State<LabPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    Icon(
-                      LocationModel.typeIcon(LocationModel.roomType),
-                      size: 14,
-                      color: accent,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      code,
-                      style: GoogleFonts.jetBrainsMono(
+                  Row(
+                    children: [
+                      Icon(
+                        LocationModel.typeIcon(LocationModel.roomType),
+                        size: 14,
                         color: accent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
                       ),
-                    ),
-                  ]),
+                      const SizedBox(width: 6),
+                      Text(
+                        code,
+                        style: GoogleFonts.jetBrainsMono(
+                          color: accent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Expanded(
-                    child: Text(
-                      desc.isEmpty ? '—' : desc,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
-                        color: context.appTextPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          desc.isEmpty ? '—' : desc,
+                          maxLines: responsible.isEmpty ? 2 : 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (responsible.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline_rounded,
+                                size: 11,
+                                color: context.appTextMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  responsible,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: context.appTextSecondary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  Row(children: [
-                    Icon(Icons.location_on_outlined,
-                        size: 11, color: context.appTextMuted),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${(_childMap[room.id] ?? const []).length}',
-                      style: GoogleFonts.jetBrainsMono(
-                          color: context.appTextMuted, fontSize: 10),
-                    ),
-                    const SizedBox(width: 10),
-                    Icon(Icons.science_outlined,
-                        size: 11, color: context.appTextMuted),
-                    const SizedBox(width: 2),
-                    Text(
-                      '$reagentCount',
-                      style: GoogleFonts.jetBrainsMono(
-                          color: context.appTextMuted, fontSize: 10),
-                    ),
-                  ]),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 11,
+                        color: context.appTextMuted,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${(_childMap[room.id] ?? const []).length}',
+                        style: GoogleFonts.jetBrainsMono(
+                          color: context.appTextMuted,
+                          fontSize: 10,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(
+                        Icons.science_outlined,
+                        size: 11,
+                        color: context.appTextMuted,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '$reagentCount',
+                        style: GoogleFonts.jetBrainsMono(
+                          color: context.appTextMuted,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -966,7 +1024,212 @@ class _LabPageState extends State<LabPage> {
     );
   }
 
+  Widget _buildAllLocationsList(BuildContext context) {
+    final visibleRooms = _search.isEmpty
+        ? _rooms
+        : _rooms.where((room) => _searchRoomHits.contains(room.id)).toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.format_list_bulleted_rounded,
+              size: 18,
+              color: AppDS.accent,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Rooms & locations',
+                style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Close list',
+              icon: Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: context.appTextSecondary,
+              ),
+              onPressed: () => setState(() => _showLocationList = false),
+            ),
+          ],
+        ),
+        Text(
+          '${visibleRooms.length} room${visibleRooms.length == 1 ? '' : 's'} · '
+          '${visibleRooms.fold<int>(0, (sum, room) => sum + (_childMap[room.id]?.length ?? 0))} locations',
+          style: GoogleFonts.spaceGrotesk(
+            color: context.appTextMuted,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (visibleRooms.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              'No rooms or locations match this search.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.spaceGrotesk(
+                color: context.appTextMuted,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        for (final room in visibleRooms) ...[
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => setState(() {
+                _selectedRoomId = room.id;
+                _showLocationList = false;
+              }),
+              child: Container(
+                margin: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: room.id == _selectedRoomId
+                      ? AppDS.accent.withValues(alpha: 0.12)
+                      : context.appSurface2,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: room.id == _selectedRoomId
+                        ? AppDS.accent.withValues(alpha: 0.55)
+                        : context.appBorder,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.meeting_room_outlined,
+                      size: 16,
+                      color: AppDS.accent,
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 42,
+                      child: Text(
+                        _roomCodeFor(room),
+                        style: GoogleFonts.jetBrainsMono(
+                          color: AppDS.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        stripLocationCodePrefix(room.name),
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${(_childMap[room.id] ?? const []).length}',
+                      style: GoogleFonts.jetBrainsMono(
+                        color: context.appTextMuted,
+                        fontSize: 10,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: context.appTextMuted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          for (
+            var index = 0;
+            index < (_childMap[room.id] ?? const []).length;
+            index++
+          )
+            Builder(
+              builder: (context) {
+                final location = _childMap[room.id]![index];
+                final code =
+                    location.code ??
+                    'L${_rooms.indexOf(room) + 1}.${index + 1}';
+                final accent = LocationModel.typeAccent(location.type);
+                return Padding(
+                  padding: const EdgeInsets.only(left: 18, top: 3),
+                  child: ListTile(
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    tileColor: context.appSurface,
+                    leading: Icon(
+                      LocationModel.typeIcon(location.type),
+                      size: 15,
+                      color: accent,
+                    ),
+                    title: Row(
+                      children: [
+                        SizedBox(
+                          width: 52,
+                          child: Text(
+                            code,
+                            style: GoogleFonts.jetBrainsMono(
+                              color: context.appTextMuted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            stripLocationCodePrefix(location.name),
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.spaceGrotesk(
+                              color: context.appTextPrimary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    subtitle: Text(
+                      LocationModel.typeLabel(location.type),
+                      style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextMuted,
+                        fontSize: 10,
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.open_in_new_rounded,
+                      size: 14,
+                      color: context.appTextMuted,
+                    ),
+                    onTap: () => _openLocationDetail(location),
+                  ),
+                );
+              },
+            ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildPanel(BuildContext context) {
+    if (_showLocationList) return _buildAllLocationsList(context);
     final room = _selectedRoom;
     final reagentHits = _matchingReagents;
     if (room == null) {
@@ -976,27 +1239,39 @@ class _LabPageState extends State<LabPage> {
       if (_search.isNotEmpty && reagentHits.isNotEmpty) {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          children: [
-            _buildReagentHits(context, reagentHits),
-          ],
+          children: [_buildReagentHits(context, reagentHits)],
         );
       }
       return Padding(
         padding: const EdgeInsets.all(20),
         child: Center(
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.touch_app_outlined,
-                size: 36, color: context.appTextMuted),
-            const SizedBox(height: 10),
-            Text('Tap a room on the map',
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.touch_app_outlined,
+                size: 36,
+                color: context.appTextMuted,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Tap a room on the map',
                 style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextSecondary, fontSize: 13)),
-            const SizedBox(height: 2),
-            Text('Double-tap to open its detail page.',
+                  color: context.appTextSecondary,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Double-tap to open its detail page.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextMuted, fontSize: 11)),
-          ]),
+                  color: context.appTextMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -1009,37 +1284,47 @@ class _LabPageState extends State<LabPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(code,
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                code,
                 style: GoogleFonts.jetBrainsMono(
-                    color: accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              desc.isEmpty ? '—' : desc,
-              style: GoogleFonts.spaceGrotesk(
+                  color: accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                desc.isEmpty ? '—' : desc,
+                style: GoogleFonts.spaceGrotesk(
                   color: context.appTextPrimary,
                   fontSize: 16,
-                  fontWeight: FontWeight.w700),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Open room',
-            icon: Icon(Icons.open_in_new,
-                size: 16, color: context.appTextSecondary),
-            onPressed: () => _openRoomDetail(room),
-          ),
-        ]),
-        if (room.responsible != null && room.responsible!.trim().isNotEmpty) ...[
+            IconButton(
+              tooltip: 'Open room',
+              icon: Icon(
+                Icons.open_in_new,
+                size: 16,
+                color: context.appTextSecondary,
+              ),
+              onPressed: () => _openRoomDetail(room),
+            ),
+          ],
+        ),
+        if (room.responsible != null &&
+            room.responsible!.trim().isNotEmpty) ...[
           const SizedBox(height: 8),
           DetailResponsibleChips(raw: room.responsible, users: _users),
         ],
@@ -1052,24 +1337,34 @@ class _LabPageState extends State<LabPage> {
         ],
         const SizedBox(height: 14),
         Text(
-            _roomPanelMode == _RoomPanelMode.locations
-                ? 'SUB-LOCATIONS  (${kids.length})'
-                : 'REAGENTS IN ROOM  (${roomReagents.length})',
-            style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8)),
+          _roomPanelMode == _RoomPanelMode.locations
+              ? 'SUB-LOCATIONS  (${kids.length})'
+              : 'REAGENTS IN ROOM  (${roomReagents.length})',
+          style: GoogleFonts.spaceGrotesk(
+            color: context.appTextMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
         const SizedBox(height: 6),
         if (_roomPanelMode == _RoomPanelMode.locations && kids.isEmpty)
-          Text('No sub-locations in this room yet.',
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextMuted, fontSize: 12))
+          Text(
+            'No sub-locations in this room yet.',
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextMuted,
+              fontSize: 12,
+            ),
+          )
         else if (_roomPanelMode == _RoomPanelMode.reagents &&
             roomReagents.isEmpty)
-          Text('No reagents are assigned to this room yet.',
-              style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextMuted, fontSize: 12))
+          Text(
+            'No reagents are assigned to this room yet.',
+            style: GoogleFonts.spaceGrotesk(
+              color: context.appTextMuted,
+              fontSize: 12,
+            ),
+          )
         else if (_roomPanelMode == _RoomPanelMode.locations)
           ..._buildGroupedChildren(context, room, kids)
         else
@@ -1188,8 +1483,11 @@ class _LabPageState extends State<LabPage> {
     );
   }
 
-  List<Widget> _buildRoomReagentTiles(BuildContext context, LocationModel room,
-      List<Map<String, dynamic>> reagents) {
+  List<Widget> _buildRoomReagentTiles(
+    BuildContext context,
+    LocationModel room,
+    List<Map<String, dynamic>> reagents,
+  ) {
     return [
       for (final r in reagents)
         Padding(
@@ -1204,17 +1502,17 @@ class _LabPageState extends State<LabPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.water_drop_outlined,
-                    size: 13, color: AppDS.orange),
+                Icon(Icons.water_drop_outlined, size: 13, color: AppDS.orange),
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 60,
                   child: Text(
                     (r['reagent_code'] as String?) ?? '-',
                     style: GoogleFonts.jetBrainsMono(
-                        color: context.appTextMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600),
+                      color: context.appTextMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 Expanded(
@@ -1226,14 +1524,18 @@ class _LabPageState extends State<LabPage> {
                         (r['reagent_name'] as String?) ?? '-',
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextPrimary, fontSize: 12),
+                          color: context.appTextPrimary,
+                          fontSize: 12,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         _reagentLocationLabel(r, room.id),
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextMuted, fontSize: 10),
+                          color: context.appTextMuted,
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
@@ -1246,8 +1548,10 @@ class _LabPageState extends State<LabPage> {
   }
 
   Widget _buildReagentHits(
-      BuildContext context, List<Map<String, dynamic>> hits,
-      {bool scoped = false}) {
+    BuildContext context,
+    List<Map<String, dynamic>> hits, {
+    bool scoped = false,
+  }) {
     if (hits.isEmpty) {
       return scoped
           ? const SizedBox.shrink()
@@ -1256,7 +1560,9 @@ class _LabPageState extends State<LabPage> {
               child: Text(
                 'No reagents match "${_searchCtrl.text}".',
                 style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextMuted, fontSize: 12),
+                  color: context.appTextMuted,
+                  fontSize: 12,
+                ),
               ),
             );
     }
@@ -1268,10 +1574,11 @@ class _LabPageState extends State<LabPage> {
               ? 'MATCHING REAGENTS HERE  (${hits.length})'
               : 'REAGENTS FOUND  (${hits.length})',
           style: GoogleFonts.spaceGrotesk(
-              color: context.appTextMuted,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8),
+            color: context.appTextMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
         ),
         const SizedBox(height: 6),
         for (final r in hits.take(20))
@@ -1293,39 +1600,49 @@ class _LabPageState extends State<LabPage> {
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 8),
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: context.appSurface2,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: context.appBorder),
                   ),
-                  child: Row(children: [
-                    Icon(Icons.water_drop_outlined,
-                        size: 13, color: AppDS.orange),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 60,
-                      child: Text(
-                        (r['reagent_code'] as String?) ?? '—',
-                        style: GoogleFonts.jetBrainsMono(
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.water_drop_outlined,
+                        size: 13,
+                        color: AppDS.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 60,
+                        child: Text(
+                          (r['reagent_code'] as String?) ?? '—',
+                          style: GoogleFonts.jetBrainsMono(
                             color: context.appTextMuted,
                             fontSize: 11,
-                            fontWeight: FontWeight.w600),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        (r['reagent_name'] as String?) ?? '—',
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextPrimary, fontSize: 12),
+                      Expanded(
+                        child: Text(
+                          (r['reagent_name'] as String?) ?? '—',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextPrimary,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
-                    ),
-                    if (!scoped) ...[
-                      const SizedBox(width: 6),
-                      _roomBadge(context, r),
+                      if (!scoped) ...[
+                        const SizedBox(width: 6),
+                        _roomBadge(context, r),
+                      ],
                     ],
-                  ]),
+                  ),
                 ),
               ),
             ),
@@ -1336,7 +1653,9 @@ class _LabPageState extends State<LabPage> {
             child: Text(
               '+${hits.length - 20} more — refine your search to narrow down.',
               style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextMuted, fontSize: 11),
+                color: context.appTextMuted,
+                fontSize: 11,
+              ),
             ),
           ),
       ],
@@ -1349,12 +1668,17 @@ class _LabPageState extends State<LabPage> {
         : null;
     final roomId = locId == null ? null : _locToRoom[locId];
     if (roomId == null) {
-      return Text('—',
-          style: GoogleFonts.jetBrainsMono(
-              color: context.appTextMuted, fontSize: 10));
+      return Text(
+        '—',
+        style: GoogleFonts.jetBrainsMono(
+          color: context.appTextMuted,
+          fontSize: 10,
+        ),
+      );
     }
     final idx = _rooms.indexWhere((r) => r.id == roomId);
     if (idx < 0) return const SizedBox.shrink();
+    final room = _rooms[idx];
     final accent = LocationModel.typeAccent(LocationModel.roomType);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1363,15 +1687,21 @@ class _LabPageState extends State<LabPage> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        'R${idx + 1}',
+        room.code ?? 'R${idx + 1}',
         style: GoogleFonts.jetBrainsMono(
-            color: accent, fontSize: 10, fontWeight: FontWeight.w700),
+          color: accent,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
 
   List<Widget> _buildGroupedChildren(
-      BuildContext context, LocationModel room, List<LocationModel> kids) {
+    BuildContext context,
+    LocationModel room,
+    List<LocationModel> kids,
+  ) {
     final roomIdx = _rooms.indexWhere((r) => r.id == room.id);
     final byType = <String, List<LocationModel>>{};
     for (final c in kids) {
@@ -1379,9 +1709,16 @@ class _LabPageState extends State<LabPage> {
     }
     final groups = <(String, List<String>)>[
       ...LocationModel.locationSubtypeGroups,
-      ('Other', [for (final t in byType.keys)
-        if (!LocationModel.locationSubtypeGroups
-            .any((g) => g.$2.contains(t))) t]),
+      (
+        'Other',
+        [
+          for (final t in byType.keys)
+            if (!LocationModel.locationSubtypeGroups.any(
+              (g) => g.$2.contains(t),
+            ))
+              t,
+        ],
+      ),
     ];
 
     final out = <Widget>[];
@@ -1391,26 +1728,30 @@ class _LabPageState extends State<LabPage> {
         inGroup.addAll(byType[t] ?? const []);
       }
       if (inGroup.isEmpty) continue;
-      out.add(Padding(
-        padding: const EdgeInsets.only(top: 10, bottom: 4),
-        child: Text(group.$1.toUpperCase(),
+      out.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 10, bottom: 4),
+          child: Text(
+            group.$1.toUpperCase(),
             style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8)),
-      ));
+              color: context.appTextMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+      );
       for (final c in inGroup) {
         final idx = (_childMap[room.id] ?? const []).indexOf(c);
-        final code = idx < 0 ? '' : 'L${roomIdx + 1}.${idx + 1}';
+        final code = c.code ?? (idx < 0 ? '' : 'L${roomIdx + 1}.${idx + 1}');
         out.add(_buildChildTile(context, c, code));
       }
     }
     return out;
   }
 
-  Widget _buildChildTile(
-      BuildContext context, LocationModel loc, String code) {
+  Widget _buildChildTile(BuildContext context, LocationModel loc, String code) {
     final accent = LocationModel.typeAccent(loc.type);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -1426,51 +1767,67 @@ class _LabPageState extends State<LabPage> {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: context.appBorder),
             ),
-            child: Row(children: [
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(4),
+            child: Row(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Icon(
+                    LocationModel.typeIcon(loc.type),
+                    color: accent,
+                    size: 13,
+                  ),
                 ),
-                child: Icon(LocationModel.typeIcon(loc.type),
-                    color: accent, size: 13),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 52,
-                child: Text(code,
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 52,
+                  child: Text(
+                    code,
                     style: GoogleFonts.jetBrainsMono(
-                        color: context.appTextMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600)),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      stripLocationCodePrefix(loc.name).isEmpty
-                          ? LocationModel.typeLabel(loc.type)
-                          : stripLocationCodePrefix(loc.name),
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        stripLocationCodePrefix(loc.name).isEmpty
+                            ? LocationModel.typeLabel(loc.type)
+                            : stripLocationCodePrefix(loc.name),
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.spaceGrotesk(
                           color: context.appTextPrimary,
                           fontSize: 12,
-                          fontWeight: FontWeight.w500),
-                    ),
-                    if (loc.temperature != null)
-                      Text(loc.temperature!,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (loc.temperature != null)
+                        Text(
+                          loc.temperature!,
                           style: GoogleFonts.spaceGrotesk(
-                              color: context.appTextMuted, fontSize: 10)),
-                  ],
+                            color: context.appTextMuted,
+                            fontSize: 10,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              Icon(Icons.chevron_right,
-                  size: 14, color: context.appTextMuted),
-            ]),
+                Icon(
+                  Icons.chevron_right,
+                  size: 14,
+                  color: context.appTextMuted,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1509,7 +1866,11 @@ class _Decor {
     final y = (raw['y'] as num?)?.toDouble();
     final w = (raw['w'] as num?)?.toDouble();
     final h = (raw['h'] as num?)?.toDouble();
-    if (id == null || kind == null || x == null || y == null || w == null ||
+    if (id == null ||
+        kind == null ||
+        x == null ||
+        y == null ||
+        w == null ||
         h == null) {
       return null;
     }
@@ -1527,33 +1888,22 @@ class _Decor {
 
 class _DecorKindParser {
   static _DecorKind? parse(String? raw) => switch (raw) {
-        'wall' => _DecorKind.wall,
-        'door' => _DecorKind.door,
-        'corridor' => _DecorKind.corridor,
-        'bathroom' => _DecorKind.bathroom,
-        _ => null,
-      };
-}
-
-class _CanvasLocationView {
-  final int id;
-  final int parentRoomId;
-  final String name;
-  final String type;
-  final _RoomGeom geom;
-
-  const _CanvasLocationView({
-    required this.id,
-    required this.parentRoomId,
-    required this.name,
-    required this.type,
-    required this.geom,
-  });
+    'wall' => _DecorKind.wall,
+    'door' => _DecorKind.door,
+    'corridor' => _DecorKind.corridor,
+    'bathroom' => _DecorKind.bathroom,
+    _ => null,
+  };
 }
 
 class _RoomGeom {
   final double x, y, w, h;
-  const _RoomGeom({required this.x, required this.y, required this.w, required this.h});
+  const _RoomGeom({
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
+  });
 
   static _RoomGeom? tryParse(dynamic raw) {
     if (raw == null) return null;
@@ -1573,6 +1923,53 @@ class _RoomGeom {
 }
 
 // ─── Background grid painter ────────────────────────────────────────────────
+class _CorridorPainter extends CustomPainter {
+  final List<_Decor> corridors;
+
+  const _CorridorPainter(this.corridors);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (corridors.isEmpty) return;
+
+    Path? corridorPath;
+    for (final corridor in corridors) {
+      // This slight overlap prevents anti-aliasing seams where snapped
+      // corridor segments meet edge-to-edge.
+      final segment = Path()
+        ..addRect(
+          Rect.fromLTWH(
+            corridor.x,
+            corridor.y,
+            corridor.w,
+            corridor.h,
+          ).inflate(0.35),
+        );
+      corridorPath = corridorPath == null
+          ? segment
+          : Path.combine(PathOperation.union, corridorPath, segment);
+    }
+
+    const accent = Color(0xFFB08968);
+    canvas.drawPath(
+      corridorPath!,
+      Paint()
+        ..style = PaintingStyle.fill
+        ..color = accent.withValues(alpha: 0.16),
+    );
+    canvas.drawPath(
+      corridorPath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = accent.withValues(alpha: 0.7),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CorridorPainter oldDelegate) => true;
+}
+
 class _GridPainter extends CustomPainter {
   final Color color;
   const _GridPainter(this.color);

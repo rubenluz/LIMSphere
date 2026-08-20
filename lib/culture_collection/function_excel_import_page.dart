@@ -10,7 +10,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../backups/backup_service.dart';
+import '../theme/module_permission.dart';
 
 part 'excel_import_widgets.dart';
 
@@ -21,23 +23,55 @@ part 'excel_import_widgets.dart';
 
 const _sampleDbFields = [
   '— ignore —',
-  'sample_code', 'sample_rebeca', 'sample_ccpi', 'sample_permit',
-  'sample_other_code', 'sample_date', 'sample_collector', 'sample_responsible',
-  'sample_country', 'sample_archipelago', 'sample_island', 'sample_region',
-  'sample_municipality', 'sample_parish', 'sample_local',
-  'sample_gps', 'sample_latitude', 'sample_longitude', 'sample_altitude_m',
-  'sample_habitat_type', 'sample_habitat_1', 'sample_habitat_2', 'sample_habitat_3',
-  'sample_substrate', 'sample_method',
-  'sample_temperature', 'sample_ph', 'sample_conductivity', 'sample_oxygen',
-  'sample_salinity', 'sample_radiation', 'sample_turbidity', 'sample_depth_m',
-  'sample_bloom', 'sample_associated_organisms',
-  'sample_photos', 'sample_preservation', 'sample_transport_time_h',
-  'sample_project', 'sample_observations',
+  'sample_code',
+  'sample_rebeca',
+  'sample_ccpi',
+  'sample_permit',
+  'sample_other_code',
+  'sample_date',
+  'sample_collector',
+  'sample_responsible',
+  'sample_country',
+  'sample_archipelago',
+  'sample_island',
+  'sample_region',
+  'sample_municipality',
+  'sample_parish',
+  'sample_local',
+  'sample_gps',
+  'sample_latitude',
+  'sample_longitude',
+  'sample_altitude_m',
+  'sample_habitat_type',
+  'sample_habitat_1',
+  'sample_habitat_2',
+  'sample_habitat_3',
+  'sample_substrate',
+  'sample_method',
+  'sample_temperature',
+  'sample_ph',
+  'sample_conductivity',
+  'sample_oxygen',
+  'sample_salinity',
+  'sample_radiation',
+  'sample_turbidity',
+  'sample_depth_m',
+  'sample_bloom',
+  'sample_associated_organisms',
+  'sample_photos',
+  'sample_preservation',
+  'sample_transport_time_h',
+  'sample_project',
+  'sample_observations',
 ];
 
 const _strainDbFields = [
   '— ignore —',
-  'strain_code', 'strain_sample_code', 'strain_origin', 'strain_status', 'strain_toxins',
+  'strain_code',
+  'strain_sample_code',
+  'strain_origin',
+  'strain_status',
+  'strain_toxins',
   'strain_situation', 'strain_last_checked', 'strain_public',
   'strain_private_collection', 'strain_type_strain', 'strain_biosafety_level',
   'strain_access_conditions', 'strain_other_codes',
@@ -46,7 +80,9 @@ const _strainDbFields = [
   'strain_class', 'strain_order', 'strain_family',
   'strain_genus', 'strain_species', 'strain_subspecies', 'strain_variety',
   'strain_scientific_name', 'strain_authority', 'strain_other_names',
-  'strain_taxonomist', 'strain_identification_method', 'strain_identification_date',
+  'strain_taxonomist',
+  'strain_identification_method',
+  'strain_identification_date',
   // Morphology
   'strain_morphology', 'strain_cell_shape', 'strain_cell_size_um',
   'strain_motility', 'strain_pigments', 'strain_colonial_morphology',
@@ -69,7 +105,10 @@ const _strainDbFields = [
   // Molecular — prokaryotes
   'strain_seq_16s_bp', 'strain_its', 'strain_its_bands', 'strain_cloned_gel',
   'strain_genbank_16s_its', 'strain_genbank_status',
-  'strain_genome_pct', 'strain_genome_cont', 'strain_genome_16s', 'strain_gca_accession',
+  'strain_genome_pct',
+  'strain_genome_cont',
+  'strain_genome_16s',
+  'strain_gca_accession',
   // Molecular — eukaryotes
   'strain_seq_18s_bp', 'strain_genbank_18s',
   'strain_its2_bp', 'strain_genbank_its2',
@@ -80,17 +119,30 @@ const _strainDbFields = [
   'strain_bioactivity', 'strain_metabolites', 'strain_industrial_use',
   'strain_growth_rate', 'strain_publications', 'strain_external_links',
   'strain_notes', 'strain_qrcode',
-// Sample-linked mirror fields (read-only)
-'sample_code','sample_rebeca', 'sample_ccpi', 'sample_permit',
-'sample_other_code', 'sample_date', 'sample_collector', 'sample_responsible',
-'sample_country', 'sample_archipelago', 'sample_island', 'sample_region',
-'sample_municipality','sample_parish', 'sample_local', 'sample_gps', 'sample_latitude',
-'sample_longitude', 'sample_altitude_m', 'sample_habitat_type', 'sample_habitat_1',
-'sample_habitat_2', 'sample_habitat_3', 'sample_substrate', 'sample_method',
-'sample_temperature', 'sample_ph', 'sample_conductivity', 'sample_oxygen',
-'sample_salinity', 'sample_radiation', 'sample_turbidity', 'sample_depth_m',
-'sample_bloom', 'sample_associated_organisms', 'sample_photos', 'sample_preservation',
-'sample_transport_time_h', 'sample_project', 'sample_observations', 'sample_created_at',
+  // Sample-linked mirror fields (read-only)
+  'sample_code', 'sample_rebeca', 'sample_ccpi', 'sample_permit',
+  'sample_other_code', 'sample_date', 'sample_collector', 'sample_responsible',
+  'sample_country', 'sample_archipelago', 'sample_island', 'sample_region',
+  'sample_municipality',
+  'sample_parish',
+  'sample_local',
+  'sample_gps',
+  'sample_latitude',
+  'sample_longitude',
+  'sample_altitude_m',
+  'sample_habitat_type',
+  'sample_habitat_1',
+  'sample_habitat_2', 'sample_habitat_3', 'sample_substrate', 'sample_method',
+  'sample_temperature', 'sample_ph', 'sample_conductivity', 'sample_oxygen',
+  'sample_salinity', 'sample_radiation', 'sample_turbidity', 'sample_depth_m',
+  'sample_bloom',
+  'sample_associated_organisms',
+  'sample_photos',
+  'sample_preservation',
+  'sample_transport_time_h',
+  'sample_project',
+  'sample_observations',
+  'sample_created_at',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,47 +150,85 @@ const _strainDbFields = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 const Map<String, String> _sampleAutoMap = {
-  'Sample Number': 'sample_code', 'no': 'sample_code', 'n': 'sample_code',
-  '#': 'sample_code', 'number': 'sample_code', 'sample_code': 'sample_code',
-  'rebeca': 'sample_rebeca', 'ccpi': 'sample_ccpi',
-  'permit': 'sample_permit', 'collection permit': 'sample_permit',
-  'data': 'sample_date', 'date': 'sample_date', 'collection date': 'sample_date',
+  'Sample Number': 'sample_code',
+  'no': 'sample_code',
+  'n': 'sample_code',
+  '#': 'sample_code',
+  'number': 'sample_code',
+  'sample_code': 'sample_code',
+  'rebeca': 'sample_rebeca',
+  'ccpi': 'sample_ccpi',
+  'permit': 'sample_permit',
+  'collection permit': 'sample_permit',
+  'data': 'sample_date',
+  'date': 'sample_date',
+  'collection date': 'sample_date',
   'collector': 'sample_collector',
-  'country': 'sample_country', 'país': 'sample_country', 'pais': 'sample_country',
-  'archipelago': 'sample_archipelago', 'arquipélago': 'sample_archipelago',
-  'ilha': 'sample_island', 'island': 'sample_island',
+  'country': 'sample_country',
+  'país': 'sample_country',
+  'pais': 'sample_country',
+  'archipelago': 'sample_archipelago',
+  'arquipélago': 'sample_archipelago',
+  'ilha': 'sample_island',
+  'island': 'sample_island',
   'region': 'sample_region',
-  'concelho': 'sample_municipality', 'municipality': 'sample_municipality',
-  'parish': 'sample_parish', 'freguesia': 'sample_parish',
+  'concelho': 'sample_municipality',
+  'municipality': 'sample_municipality',
+  'parish': 'sample_parish',
+  'freguesia': 'sample_parish',
   'local': 'sample_local',
   'gps': 'sample_gps',
-  'latitude': 'sample_latitude', 'lat': 'sample_latitude',
-  'longitude': 'sample_longitude', 'lon': 'sample_longitude', 'lng': 'sample_longitude',
-  'altitude': 'sample_altitude_m', 'altitude (m)': 'sample_altitude_m',
-  'habitat_type': 'sample_habitat_type', 'habitat type': 'sample_habitat_type',
-  'habitat_1': 'sample_habitat_1', 'habitat 1': 'sample_habitat_1',
-  'habitat_2': 'sample_habitat_2', 'habitat 2': 'sample_habitat_2',
-  'habitat_3': 'sample_habitat_3', 'habitat 3': 'sample_habitat_3',
+  'latitude': 'sample_latitude',
+  'lat': 'sample_latitude',
+  'longitude': 'sample_longitude',
+  'lon': 'sample_longitude',
+  'lng': 'sample_longitude',
+  'altitude': 'sample_altitude_m',
+  'altitude (m)': 'sample_altitude_m',
+  'habitat_type': 'sample_habitat_type',
+  'habitat type': 'sample_habitat_type',
+  'habitat_1': 'sample_habitat_1',
+  'habitat 1': 'sample_habitat_1',
+  'habitat_2': 'sample_habitat_2',
+  'habitat 2': 'sample_habitat_2',
+  'habitat_3': 'sample_habitat_3',
+  'habitat 3': 'sample_habitat_3',
   'substrate': 'sample_substrate',
-  'método': 'sample_method', 'metodo': 'sample_method', 'method': 'sample_method',
-  'fotos': 'sample_photos', 'photos': 'sample_photos',
-  '°c': 'sample_temperature', 'ºc': 'sample_temperature',
-  'temp': 'sample_temperature', 'temperature': 'sample_temperature',
+  'método': 'sample_method',
+  'metodo': 'sample_method',
+  'method': 'sample_method',
+  'fotos': 'sample_photos',
+  'photos': 'sample_photos',
+  '°c': 'sample_temperature',
+  'ºc': 'sample_temperature',
+  'temp': 'sample_temperature',
+  'temperature': 'sample_temperature',
   'ph': 'sample_ph',
-  'condutividade (µs/cm)': 'sample_conductivity', 'conductivity': 'sample_conductivity',
-  'us/cm': 'sample_conductivity', 'µs/cm': 'sample_conductivity',
-  'o2 (mg/l)': 'sample_oxygen', 'oxygen': 'sample_oxygen', 'o2': 'sample_oxygen',
-  'salinidade': 'sample_salinity', 'salinity': 'sample_salinity',
-  'radiação': 'sample_radiation', 'radiation': 'sample_radiation',
+  'condutividade (µs/cm)': 'sample_conductivity',
+  'conductivity': 'sample_conductivity',
+  'us/cm': 'sample_conductivity',
+  'µs/cm': 'sample_conductivity',
+  'o2 (mg/l)': 'sample_oxygen',
+  'oxygen': 'sample_oxygen',
+  'o2': 'sample_oxygen',
+  'salinidade': 'sample_salinity',
+  'salinity': 'sample_salinity',
+  'radiação': 'sample_radiation',
+  'radiation': 'sample_radiation',
   'solar radiation': 'sample_radiation',
-  'turbidity': 'sample_turbidity', 'turbidez': 'sample_turbidity',
-  'depth': 'sample_depth_m', 'depth (m)': 'sample_depth_m',
+  'turbidity': 'sample_turbidity',
+  'turbidez': 'sample_turbidity',
+  'depth': 'sample_depth_m',
+  'depth (m)': 'sample_depth_m',
   'bloom': 'sample_bloom',
   'preservation': 'sample_preservation',
-  'project': 'sample_project', 'projeto': 'sample_project',
-  'responsável': 'sample_responsible', 'responsible': 'sample_responsible',
+  'project': 'sample_project',
+  'projeto': 'sample_project',
+  'responsável': 'sample_responsible',
+  'responsible': 'sample_responsible',
   'sampling responsible': 'sample_responsible',
-  'observações': 'sample_observations', 'observations': 'sample_observations',
+  'observações': 'sample_observations',
+  'observations': 'sample_observations',
 };
 
 const Map<String, String> _strainAutoMap = {
@@ -151,7 +241,8 @@ const Map<String, String> _strainAutoMap = {
   'public': 'strain_public',
   'private collection': 'strain_private_collection',
   'typestrain': 'strain_type_strain', 'type strain': 'strain_type_strain',
-  'biosafety': 'strain_biosafety_level', 'biosafety level': 'strain_biosafety_level',
+  'biosafety': 'strain_biosafety_level',
+  'biosafety level': 'strain_biosafety_level',
   // Taxonomy
   'empire': 'strain_empire',
   'kingdom': 'strain_kingdom',
@@ -163,9 +254,11 @@ const Map<String, String> _strainAutoMap = {
   'specie': 'strain_species', 'species': 'strain_species',
   'subspecies': 'strain_subspecies',
   'variety': 'strain_variety',
-  'scientific name': 'strain_scientific_name', 'scientific_name': 'strain_scientific_name',
+  'scientific name': 'strain_scientific_name',
+  'scientific_name': 'strain_scientific_name',
   'authority': 'strain_authority',
-  'old identification': 'strain_other_names', 'old_identification': 'strain_other_names',
+  'old identification': 'strain_other_names',
+  'old_identification': 'strain_other_names',
   'other names': 'strain_other_names',
   'photo': 'strain_photo',
   'publicphoto': 'strain_public_photo', 'public photo': 'strain_public_photo',
@@ -182,7 +275,8 @@ const Map<String, String> _strainAutoMap = {
   'next transfer': 'strain_next_transfer',
   'medium': 'strain_medium', 'room': 'strain_room',
   'light cycle': 'strain_light_cycle',
-  'temperature c': 'strain_temperature_c', 'incubation temp': 'strain_temperature_c',
+  'temperature c': 'strain_temperature_c',
+  'incubation temp': 'strain_temperature_c',
   // Isolation
   'isolation responsible': 'strain_isolation_responsible',
   'isolation date': 'strain_isolation_date',
@@ -191,14 +285,16 @@ const Map<String, String> _strainAutoMap = {
   // Molecular — prokaryotes
   '16s (bp)': 'strain_seq_16s_bp', '16s': 'strain_seq_16s_bp',
   'its': 'strain_its',
-  'its bands (amplified/ sequenced)': 'strain_its_bands', 'its bands': 'strain_its_bands',
+  'its bands (amplified/ sequenced)': 'strain_its_bands',
+  'its bands': 'strain_its_bands',
   'cloned / gelextraction': 'strain_cloned_gel', 'cloned': 'strain_cloned_gel',
   'genbank (16s+its)': 'strain_genbank_16s_its',
   'genbank status': 'strain_genbank_status',
   'genome (%)': 'strain_genome_pct',
   'genome (cont.)': 'strain_genome_cont', 'genome cont': 'strain_genome_cont',
   'genome (16s)': 'strain_genome_16s',
-  'gca_acession': 'strain_gca_accession', 'gca accession': 'strain_gca_accession',
+  'gca_acession': 'strain_gca_accession',
+  'gca accession': 'strain_gca_accession',
   // Molecular — eukaryotes
   '18s (bp)': 'strain_seq_18s_bp', '18s': 'strain_seq_18s_bp',
   'genbank (18s)': 'strain_genbank_18s',
@@ -217,7 +313,7 @@ const Map<String, String> _strainAutoMap = {
   'qrcode': 'strain_qrcode',
   // Sample-linked columns embedded in strains sheet (mirror fields, prefixed s_)
   'sample number': 'strain_sample_code', 'sample': 'strain_sample_code',
-  'sample_code': 'strain_sample_code', 'nº': 'strain_sample_code'
+  'sample_code': 'strain_sample_code', 'nº': 'strain_sample_code',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -242,7 +338,9 @@ List<String> _detectHeaders(List<List<dynamic>> rows) {
 }
 
 List<Map<String, String>> _parseWithMapping(
-    List<List<dynamic>> rows, Map<int, String> colMap) {
+  List<List<dynamic>> rows,
+  Map<int, String> colMap,
+) {
   if (rows.length < 2) return [];
   final result = <Map<String, String>>[];
   for (int r = 1; r < rows.length; r++) {
@@ -332,14 +430,13 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv'],
-      withData: true,
     );
-    if (result == null || result.files.isEmpty) return;
-    final bytes = result.files.first.bytes;
-    if (bytes == null) return;
+    if (result.isEmpty) return;
+    final file = result.first;
+    final bytes = await file.readAsBytes();
     setState(() {
       _sampleCsvRows = _parseCsvBytes(bytes);
-      _fileName = result.files.first.name;
+      _fileName = file.name;
     });
     if (_importMode != 'both') _buildMappings();
   }
@@ -348,14 +445,13 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv'],
-      withData: true,
     );
-    if (result == null || result.files.isEmpty) return;
-    final bytes = result.files.first.bytes;
-    if (bytes == null) return;
+    if (result.isEmpty) return;
+    final file = result.first;
+    final bytes = await file.readAsBytes();
     setState(() {
       _strainCsvRows = _parseCsvBytes(bytes);
-      _strainFileName = result.files.first.name;
+      _strainFileName = file.name;
     });
     if (_importMode != 'both') _buildMappings();
   }
@@ -438,6 +534,8 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
 
   // ── Step 3 → 4: import ─────────────────────────────────────────────────────
   Future<void> _runImport() async {
+    if (!context.requireModuleAction(ModuleAction.create)) return;
+    if (!context.requireModuleAction(ModuleAction.bulkUpdate)) return;
     setState(() => _step = 4);
     final sb = StringBuffer();
     final db = Supabase.instance.client;
@@ -446,104 +544,119 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     var changedStrains = false;
 
     try {
-  // ── Get next available sample number ────────────────────────────────
-  int nextNumber = 1;
-  final maxRes = await db
-      .from('samples')
-      .select('sample_code')
-      .order('sample_code', ascending: false)
-      .limit(1);
-  if ((maxRes as List).isNotEmpty && maxRes[0]['sample_code'] != null) {
-    nextNumber = (maxRes[0]['sample_code'] as num).toInt() + 1;
-  }
-
-  // ── Build sample_code → sample_id map from existing samples ───────
-  final existingSamples = await db.from('samples').select('sample_code');
-  final numberToId = <String, dynamic>{};
-  for (final s in (existingSamples as List)) {
-    final code = s['sample_code']?.toString();
-    if (code != null && code.isNotEmpty) {
-      numberToId[code] = s['sample_code'];
-    }
-  }
-
-  // ── Import samples ─────────────────────────────────────────────────
-  if (importSamples) {
-    for (final sample in _parsedSamples) {
-      final linkVal = sample[_sampleLinkField]?.toString();
-
-      if (linkVal == null || linkVal.isEmpty) {
-        final row = _sampleRowFromMap(sample, nextNumber);
-        final res = await db
-            .from('samples')
-            .insert(row)
-            .select('sample_code')
-            .single();
-        sb.writeln('✓ Sample #${res['sample_code']} imported (no sample_code).');
-        nextNumber++;
-        continue;
-      }
-
-      if (numberToId.containsKey(linkVal)) {
-        sb.writeln('⚠ Sample #$linkVal already exists — skipped.');
-        continue;
-      }
-
-      final row = _sampleRowFromMap(sample, nextNumber);
-      final res = await db
+      // ── Get next available sample number ────────────────────────────────
+      int nextNumber = 1;
+      final maxRes = await db
           .from('samples')
-          .insert(row)
           .select('sample_code')
-          .single();
-
-      numberToId[linkVal] = res['sample_code'];
-      sb.writeln('✓ Sample #${res['sample_code']} (SAMPLE=$linkVal) imported.');
-      nextNumber++;
-    }
-  }
-
-  // ── Import strains ─────────────────────────────────────────────────
-  if (importStrains) {
-    for (final strain in _parsedStrains) {
-      final code = strain['strain_code']?.toString() ?? '(no code)';
-      dynamic sampleId;
-
-      final linkVal = strain[_strainLinkField]?.toString();
-
-      if (linkVal == null || linkVal.isEmpty) {
-        await db.from('strains').upsert(
-            _strainRowFromMap(strain, null),
-            onConflict: 'strain_code');
-        changedStrains = true;
-        sb.writeln('✓ Strain $code imported (no sample link).');
-        continue;
+          .order('sample_code', ascending: false)
+          .limit(1);
+      if ((maxRes as List).isNotEmpty && maxRes[0]['sample_code'] != null) {
+        nextNumber = (maxRes[0]['sample_code'] as num).toInt() + 1;
       }
 
-      sampleId = numberToId[linkVal];
-      if (sampleId != null) {
-        await db.from('strains').upsert(
-            _strainRowFromMap(strain, sampleId),
-            onConflict: 'strain_code');
-        changedStrains = true;
-        sb.writeln('✓ Strain $code → Sample $sampleId imported.');
-      } else {
-        sb.writeln('⚠ Sample "$linkVal" not found — strain inserted without sample link.');
-        await db.from('strains').upsert(
-            _strainRowFromMap(strain, null),
-            onConflict: 'strain_code');
-        changedStrains = true;
+      // ── Build sample_code → sample_id map from existing samples ───────
+      final existingSamples = await db.from('samples').select('sample_code');
+      final numberToId = <String, dynamic>{};
+      for (final s in (existingSamples as List)) {
+        final code = s['sample_code']?.toString();
+        if (code != null && code.isNotEmpty) {
+          numberToId[code] = s['sample_code'];
+        }
       }
+
+      // ── Import samples ─────────────────────────────────────────────────
+      if (importSamples) {
+        for (final sample in _parsedSamples) {
+          final linkVal = sample[_sampleLinkField]?.toString();
+
+          if (linkVal == null || linkVal.isEmpty) {
+            final row = _sampleRowFromMap(sample, nextNumber);
+            final res = await db
+                .from('samples')
+                .insert(row)
+                .select('sample_code')
+                .single();
+            sb.writeln(
+              '✓ Sample #${res['sample_code']} imported (no sample_code).',
+            );
+            nextNumber++;
+            continue;
+          }
+
+          if (numberToId.containsKey(linkVal)) {
+            sb.writeln('⚠ Sample #$linkVal already exists — skipped.');
+            continue;
+          }
+
+          final row = _sampleRowFromMap(sample, nextNumber);
+          final res = await db
+              .from('samples')
+              .insert(row)
+              .select('sample_code')
+              .single();
+
+          numberToId[linkVal] = res['sample_code'];
+          sb.writeln(
+            '✓ Sample #${res['sample_code']} (SAMPLE=$linkVal) imported.',
+          );
+          nextNumber++;
+        }
+      }
+
+      // ── Import strains ─────────────────────────────────────────────────
+      if (importStrains) {
+        for (final strain in _parsedStrains) {
+          final code = strain['strain_code']?.toString() ?? '(no code)';
+          dynamic sampleId;
+
+          final linkVal = strain[_strainLinkField]?.toString();
+
+          if (linkVal == null || linkVal.isEmpty) {
+            await db
+                .from('strains')
+                .upsert(
+                  _strainRowFromMap(strain, null),
+                  onConflict: 'strain_code',
+                );
+            changedStrains = true;
+            sb.writeln('✓ Strain $code imported (no sample link).');
+            continue;
+          }
+
+          sampleId = numberToId[linkVal];
+          if (sampleId != null) {
+            await db
+                .from('strains')
+                .upsert(
+                  _strainRowFromMap(strain, sampleId),
+                  onConflict: 'strain_code',
+                );
+            changedStrains = true;
+            sb.writeln('✓ Strain $code → Sample $sampleId imported.');
+          } else {
+            sb.writeln(
+              '⚠ Sample "$linkVal" not found — strain inserted without sample link.',
+            );
+            await db
+                .from('strains')
+                .upsert(
+                  _strainRowFromMap(strain, null),
+                  onConflict: 'strain_code',
+                );
+            changedStrains = true;
+          }
+        }
+      }
+
+      if (changedStrains) {
+        unawaited(BackupService.instance.notifyCrudChange('strains'));
+      }
+
+      sb.writeln('\n✅ Import complete.');
+    } catch (e) {
+      sb.writeln('\n❌ Error in import: $e');
     }
-  }
-
-  if (changedStrains) {
-    unawaited(BackupService.instance.notifyCrudChange('strains'));
-  }
-
-  sb.writeln('\n✅ Import complete.');
-} catch (e) {
-  sb.writeln('\n❌ Error in import: $e');
-}
 
     setState(() {
       _importLog = sb.toString();
@@ -553,7 +666,19 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
 
   // ── Value sanitisers ────────────────────────────────────────────────────────
   static const _emptyPlaceholders = {
-    '-', '—', '–', 'n/a', 'na', 'none', 'null', '.', '/', '?', 'nd', 'n.d.', 'nd.'
+    '-',
+    '—',
+    '–',
+    'n/a',
+    'na',
+    'none',
+    'null',
+    '.',
+    '/',
+    '?',
+    'nd',
+    'n.d.',
+    'nd.',
   };
 
   String? _clean(String? raw) {
@@ -631,9 +756,11 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
   }
 
   Map<String, dynamic> _strainRowFromMap(
-      Map<String, String> m, dynamic sampleId) {
+    Map<String, String> m,
+    dynamic sampleId,
+  ) {
     return {
-      'strain_sample_code': _clean( m['strain_sample_code']),
+      'strain_sample_code': _clean(m['strain_sample_code']),
       'strain_code': _clean(m['strain_code']),
       'strain_origin': _clean(m['strain_origin']),
       'strain_status': _clean(m['strain_status']),
@@ -687,7 +814,9 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
       'strain_medium': _clean(m['strain_medium']),
       'strain_medium_salinity': _clean(m['strain_medium_salinity']),
       'strain_light_cycle': _clean(m['strain_light_cycle']),
-      'strain_light_intensity_umol': _cleanDouble(m['strain_light_intensity_umol']),
+      'strain_light_intensity_umol': _cleanDouble(
+        m['strain_light_intensity_umol'],
+      ),
       'strain_temperature_c': _cleanDouble(m['strain_temperature_c']),
       'strain_co2_pct': _cleanDouble(m['strain_co2_pct']),
       'strain_aeration': _clean(m['strain_aeration']),
@@ -766,112 +895,128 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
 
   // ── Step 0: pick file(s) + choose import mode ───────────────────────────────
   Widget _buildStep0() => Center(
-        key: const ValueKey(0),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.table_chart_outlined, size: 72, color: Colors.grey.shade400),
-              const SizedBox(height: 20),
-              const Text('Import from CSV',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('Select what to import, then choose your .csv file(s).',
-                  style: TextStyle(color: Colors.grey.shade600), textAlign: TextAlign.center),
-              const SizedBox(height: 28),
+    key: const ValueKey(0),
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 480),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.table_chart_outlined,
+              size: 72,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Import from CSV',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Select what to import, then choose your .csv file(s).',
+              style: TextStyle(color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
 
-              // ── Import mode selector ──────────────────────────────────────
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('What to import',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            // ── Import mode selector ──────────────────────────────────────
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'What to import',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
-              const SizedBox(height: 10),
-              _ImportModeCard(
-                mode: 'samples',
-                label: 'Samples only',
-                description: 'Import collection sample data — location, habitat, physical-chemical parameters.',
+            ),
+            const SizedBox(height: 10),
+            _ImportModeCard(
+              mode: 'samples',
+              label: 'Samples only',
+              description: 'Import collection sample data — location, habitat, physical-chemical parameters.',
+              icon: Icons.colorize_outlined,
+              selected: _importMode == 'samples',
+              onTap: () => setState(() {
+                _importMode = 'samples';
+                _sampleCsvRows = null;
+                _strainCsvRows = null;
+                _fileName = '';
+                _strainFileName = '';
+              }),
+            ),
+            const SizedBox(height: 8),
+            _ImportModeCard(
+              mode: 'strains',
+              label: 'Strains only',
+              description: 'Import strain culture data — taxonomy, maintenance, molecular.',
+              icon: Icons.science_outlined,
+              selected: _importMode == 'strains',
+              onTap: () => setState(() {
+                _importMode = 'strains';
+                _sampleCsvRows = null;
+                _strainCsvRows = null;
+                _fileName = '';
+                _strainFileName = '';
+              }),
+            ),
+            const SizedBox(height: 8),
+            _ImportModeCard(
+              mode: 'both',
+              label: 'Samples + Strains',
+              description: 'Import two CSV files and link them automatically.',
+              icon: Icons.table_chart_outlined,
+              selected: _importMode == 'both',
+              onTap: () => setState(() {
+                _importMode = 'both';
+                _sampleCsvRows = null;
+                _strainCsvRows = null;
+                _fileName = '';
+                _strainFileName = '';
+              }),
+            ),
+
+            const SizedBox(height: 28),
+
+            if (_importMode != 'strains') ...[
+              _FilePicker(
+                label: _importMode == 'both'
+                    ? 'Samples CSV'
+                    : 'Browse CSV File',
+                fileName: _fileName,
                 icon: Icons.colorize_outlined,
-                selected: _importMode == 'samples',
-                onTap: () => setState(() {
-                  _importMode = 'samples';
-                  _sampleCsvRows = null;
-                  _strainCsvRows = null;
-                  _fileName = '';
-                  _strainFileName = '';
-                }),
+                onPick: _pickSampleFile,
               ),
               const SizedBox(height: 8),
-              _ImportModeCard(
-                mode: 'strains',
-                label: 'Strains only',
-                description: 'Import strain culture data — taxonomy, maintenance, molecular.',
+            ],
+            if (_importMode == 'both') ...[
+              _FilePicker(
+                label: 'Strains CSV',
+                fileName: _strainFileName,
                 icon: Icons.science_outlined,
-                selected: _importMode == 'strains',
-                onTap: () => setState(() {
-                  _importMode = 'strains';
-                  _sampleCsvRows = null;
-                  _strainCsvRows = null;
-                  _fileName = '';
-                  _strainFileName = '';
-                }),
+                onPick: _pickStrainFile,
               ),
-              const SizedBox(height: 8),
-              _ImportModeCard(
-                mode: 'both',
-                label: 'Samples + Strains',
-                description: 'Import two CSV files and link them automatically.',
-                icon: Icons.table_chart_outlined,
-                selected: _importMode == 'both',
-                onTap: () => setState(() {
-                  _importMode = 'both';
-                  _sampleCsvRows = null;
-                  _strainCsvRows = null;
-                  _fileName = '';
-                  _strainFileName = '';
-                }),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: (_sampleCsvRows != null && _strainCsvRows != null)
+                    ? _buildMappings
+                    : null,
+                icon: const Icon(Icons.table_rows_outlined),
+                label: const Text('Next — Map Columns'),
               ),
-
-              const SizedBox(height: 28),
-
-              if (_importMode != 'strains') ...[
-                _FilePicker(
-                  label: _importMode == 'both' ? 'Samples CSV' : 'Browse CSV File',
-                  fileName: _fileName,
-                  icon: Icons.colorize_outlined,
-                  onPick: _pickSampleFile,
-                ),
-                const SizedBox(height: 8),
-              ],
-              if (_importMode == 'both') ...[
-                _FilePicker(
-                  label: 'Strains CSV',
-                  fileName: _strainFileName,
-                  icon: Icons.science_outlined,
-                  onPick: _pickStrainFile,
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: (_sampleCsvRows != null && _strainCsvRows != null)
-                      ? _buildMappings
-                      : null,
-                  icon: const Icon(Icons.table_rows_outlined),
-                  label: const Text('Next — Map Columns'),
-                ),
-              ],
-              if (_importMode == 'strains') ...[
-                _FilePicker(
-                  label: 'Browse CSV File',
-                  fileName: _fileName.isEmpty ? _strainFileName : _fileName,
-                  icon: Icons.science_outlined,
-                  onPick: _pickStrainFile,
-                ),
-              ],
-            ]),
-          ),
+            ],
+            if (_importMode == 'strains') ...[
+              _FilePicker(
+                label: 'Browse CSV File',
+                fileName: _fileName.isEmpty ? _strainFileName : _fileName,
+                icon: Icons.science_outlined,
+                onPick: _pickStrainFile,
+              ),
+            ],
+          ],
         ),
-      );
+      ),
+    ),
+  );
 
   // ── Step 2: column mapping ──────────────────────────────────────────────────
   Widget _buildStep2() {
@@ -900,37 +1045,53 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
           ),
         Expanded(
           child: _mappingTab == 0 && hasSamples
-              ? _buildMappingTable(_sampleHeaders, _sampleColMap,
-                  _sampleDbFields, isSample: true)
+              ? _buildMappingTable(
+                  _sampleHeaders,
+                  _sampleColMap,
+                  _sampleDbFields,
+                  isSample: true,
+                )
               : hasStrains
-                  ? _buildMappingTable(_strainHeaders, _strainColMap,
-                      _strainDbFields, isSample: false)
-                  : const Center(child: Text('No columns detected.')),
+              ? _buildMappingTable(
+                  _strainHeaders,
+                  _strainColMap,
+                  _strainDbFields,
+                  isSample: false,
+                )
+              : const Center(child: Text('No columns detected.')),
         ),
       ],
     );
   }
 
-  Widget _buildMappingTable(List<String> headers, Map<int, String> colMap,
-      List<String> dbFields, {required bool isSample}) {
-    final unmapped =
-        colMap.values.where((v) => v == '— ignore —').length;
+  Widget _buildMappingTable(
+    List<String> headers,
+    Map<int, String> colMap,
+    List<String> dbFields, {
+    required bool isSample,
+  }) {
+    final unmapped = colMap.values.where((v) => v == '— ignore —').length;
     return Column(
       children: [
         if (unmapped > 0)
           Container(
             width: double.infinity,
             color: Colors.amber.shade100,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(children: [
-              const Icon(Icons.warning_amber_rounded,
-                  color: Colors.amber, size: 18),
-              const SizedBox(width: 8),
-              Text(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.amber,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
                   '$unmapped column(s) not auto-recognised — assign them or leave as ignore.',
-                  style: const TextStyle(fontSize: 13)),
-            ]),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ],
+            ),
           ),
         Expanded(
           child: ListView.separated(
@@ -945,88 +1106,110 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
               return Container(
                 color: isIgnored ? Colors.amber.shade50 : null,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 6),
-                child: Row(children: [
-                  Container(
-                    width: 32,
-                    height: 28,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 28,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
                         color: Theme.of(context)
                             .colorScheme
                             .surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(6)),
-                    child: Text(_colLetter(i),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _colLetter(i),
                         style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 3,
-                    child: Column(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 3,
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                              header.isEmpty ? '(empty)' : header,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                  color:
-                                      header.isEmpty ? Colors.grey : null)),
-                          Text('Column ${_colLetter(i)}',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade500)),
-                        ]),
-                  ),
-                  const Icon(Icons.arrow_forward,
-                      size: 16, color: Colors.grey),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 4,
-                    child: DropdownButtonFormField<String>(
-                      initialValue:
-                          dbFields.contains(mapped) ? mapped : '— ignore —',
-                      isExpanded: true,
-                      isDense: true,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 8),
-                        filled: isIgnored,
-                        fillColor:
-                            isIgnored ? Colors.amber.shade50 : null,
+                            header.isEmpty ? '(empty)' : header,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: header.isEmpty ? Colors.grey : null,
+                            ),
+                          ),
+                          Text(
+                            'Column ${_colLetter(i)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
                       ),
-                      items: dbFields
-                          .map((f) => DropdownMenuItem(
-                                value: f,
-                                child: Text(f,
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: f == '— ignore —'
-                                            ? Colors.grey
-                                            : null)),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() {
-                        if (isSample) {
-                          _sampleColMap[i] = v ?? '— ignore —';
-                        } else {
-                          _strainColMap[i] = v ?? '— ignore —';
-                        }
-                      }),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
+                    const Icon(
+                      Icons.arrow_forward,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 4,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: dbFields.contains(mapped)
+                            ? mapped
+                            : '— ignore —',
+                        isExpanded: true,
+                        isDense: true,
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          filled: isIgnored,
+                          fillColor: isIgnored ? Colors.amber.shade50 : null,
+                        ),
+                        items: dbFields
+                            .map(
+                              (f) => DropdownMenuItem(
+                                value: f,
+                                child: Text(
+                                  f,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: f == '— ignore —'
+                                        ? Colors.grey
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) => setState(() {
+                          if (isSample) {
+                            _sampleColMap[i] = v ?? '— ignore —';
+                          } else {
+                            _strainColMap[i] = v ?? '— ignore —';
+                          }
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
                       isIgnored ? Icons.block : Icons.check_circle,
                       size: 18,
-                      color: isIgnored
-                          ? Colors.amber.shade700
-                          : Colors.green),
-                ]),
+                      color: isIgnored ? Colors.amber.shade700 : Colors.green,
+                    ),
+                  ],
+                ),
               );
             },
           ),
@@ -1044,8 +1227,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         ? (_parsedStrains.expand((r) => r.keys).toSet().toList()..sort())
         : <String>[];
 
-    final bothSheets =
-        _parsedSamples.isNotEmpty && _parsedStrains.isNotEmpty;
+    final bothSheets = _parsedSamples.isNotEmpty && _parsedStrains.isNotEmpty;
 
     final sampleVals = _parsedSamples
         .map((r) => r[_sampleLinkField] ?? '')
@@ -1074,274 +1256,307 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 680),
                 child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Card(
-                        color:
-                            Theme.of(context).colorScheme.primaryContainer,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Card(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(children: [
-                                  Icon(Icons.link,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary),
-                                  const SizedBox(width: 8),
-                                  Text('Sample ↔ Strain Link Field',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onPrimaryContainer)),
-                                ]),
-                                const SizedBox(height: 8),
+                                Icon(
+                                  Icons.link,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Select which field in each file shares the same value to link strains to their sample.\n'
-                                  'Typically this is the Sample Code — mapped to "sample_code" in the samples file '
-                                  'and "strain_sample_code" in the strains file.',
+                                  'Sample ↔ Strain Link Field',
                                   style: TextStyle(
-                                      fontSize: 13,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer),
-                                ),
-                              ]),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (!bothSheets)
-                        const Card(
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Text(
-                                'Only one file selected — no linking needed.'),
-                          ),
-                        )
-                      else ...[
-                        Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          Row(children: [
-                                            Icon(
-                                                Icons.colorize_outlined,
-                                                size: 18,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary),
-                                            const SizedBox(width: 6),
-                                            const Text('Samples file',
-                                                style: TextStyle(
-                                                    fontWeight:
-                                                        FontWeight.bold)),
-                                          ]),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                              'Which field is the sample identifier?',
-                                              style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors
-                                                      .grey.shade600)),
-                                          const SizedBox(height: 12),
-                                          DropdownButtonFormField<String>(
-                                            initialValue: sampleFields
-                                                    .contains(
-                                                        _sampleLinkField)
-                                                ? _sampleLinkField
-                                                : null,
-                                            isExpanded: true,
-                                            decoration:
-                                                const InputDecoration(
-                                              labelText: 'Identifier field',
-                                              border: OutlineInputBorder(),
-                                            ),
-                                            items: sampleFields
-                                                .map((f) => DropdownMenuItem(
-                                                      value: f,
-                                                      child: Text(f,
-                                                          style: const TextStyle(
-                                                              fontSize:
-                                                                  13)),
-                                                    ))
-                                                .toList(),
-                                            onChanged: (v) {
-                                              if (v == null) return;
-                                              setState(() =>
-                                                  _sampleLinkField = v);
-                                              _refreshLinkPreviews();
-                                            },
-                                          ),
-                                          if (_sampleLinkSampleValues
-                                              .isNotEmpty) ...[
-                                            const SizedBox(height: 10),
-                                            Text('Sample values:',
-                                                style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Colors
-                                                        .grey.shade500)),
-                                            const SizedBox(height: 4),
-                                            Wrap(
-                                              spacing: 4,
-                                              runSpacing: 4,
-                                              children:
-                                                  _sampleLinkSampleValues
-                                                      .map((v) => Chip(
-                                                            label: Text(v,
-                                                                style: const TextStyle(
-                                                                    fontSize:
-                                                                        11)),
-                                                            visualDensity:
-                                                                VisualDensity
-                                                                    .compact,
-                                                            padding:
-                                                                EdgeInsets
-                                                                    .zero,
-                                                          ))
-                                                      .toList(),
-                                            ),
-                                          ],
-                                        ]),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 40),
-                                child: Icon(Icons.compare_arrows,
-                                    size: 32,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
                                     color: Theme.of(context)
                                         .colorScheme
-                                        .primary),
-                              ),
-                              Expanded(
-                                child: Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          Row(children: [
-                                            Icon(Icons.science_outlined,
-                                                size: 18,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary),
-                                            const SizedBox(width: 6),
-                                            const Text('Strains file',
-                                                style: TextStyle(
-                                                    fontWeight:
-                                                        FontWeight.bold)),
-                                          ]),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                              'Which field contains the matching sample value?',
-                                              style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors
-                                                      .grey.shade600)),
-                                          const SizedBox(height: 12),
-                                          DropdownButtonFormField<String>(
-                                            initialValue: strainFields
-                                                    .contains(
-                                                        _strainLinkField)
-                                                ? _strainLinkField
-                                                : null,
-                                            isExpanded: true,
-                                            decoration:
-                                                const InputDecoration(
-                                              labelText: 'Link field',
-                                              border: OutlineInputBorder(),
-                                            ),
-                                            items: strainFields
-                                                .map((f) => DropdownMenuItem(
-                                                      value: f,
-                                                      child: Text(f,
-                                                          style: const TextStyle(
-                                                              fontSize:
-                                                                  13)),
-                                                    ))
-                                                .toList(),
-                                            onChanged: (v) {
-                                              if (v == null) return;
-                                              setState(() =>
-                                                  _strainLinkField = v);
-                                              _refreshLinkPreviews();
-                                            },
-                                          ),
-                                          if (_strainLinkSampleValues
-                                              .isNotEmpty) ...[
-                                            const SizedBox(height: 10),
-                                            Text('Sample values:',
-                                                style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Colors
-                                                        .grey.shade500)),
-                                            const SizedBox(height: 4),
-                                            Wrap(
-                                              spacing: 4,
-                                              runSpacing: 4,
-                                              children:
-                                                  _strainLinkSampleValues
-                                                      .map((v) => Chip(
-                                                            label: Text(v,
-                                                                style: const TextStyle(
-                                                                    fontSize:
-                                                                        11)),
-                                                            visualDensity:
-                                                                VisualDensity
-                                                                    .compact,
-                                                            padding:
-                                                                EdgeInsets
-                                                                    .zero,
-                                                          ))
-                                                      .toList(),
-                                            ),
-                                          ],
-                                        ]),
+                                        .onPrimaryContainer,
                                   ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Select which field in each file shares the same value to link strains to their sample.\n'
+                              'Typically this is the Sample Code — mapped to "sample_code" in the samples file '
+                              'and "strain_sample_code" in the strains file.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                               ),
-                            ]),
-                        const SizedBox(height: 20),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: hasGoodMatch
-                                ? Colors.green.shade50
-                                : Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: hasGoodMatch
-                                    ? Colors.green.shade300
-                                    : Colors.red.shade300),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (!bothSheets)
+                      const Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text(
+                            'Only one file selected — no linking needed.',
                           ),
-                          child: Row(children: [
+                        ),
+                      )
+                    else ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.colorize_outlined,
+                                          size: 18,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        const Text(
+                                          'Samples file',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Which field is the sample identifier?',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    DropdownButtonFormField<String>(
+                                      initialValue:
+                                          sampleFields.contains(
+                                            _sampleLinkField,
+                                          )
+                                          ? _sampleLinkField
+                                          : null,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Identifier field',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      items: sampleFields
+                                          .map(
+                                            (f) => DropdownMenuItem(
+                                              value: f,
+                                              child: Text(
+                                                f,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (v) {
+                                        if (v == null) return;
+                                        setState(() => _sampleLinkField = v);
+                                        _refreshLinkPreviews();
+                                      },
+                                    ),
+                                    if (_sampleLinkSampleValues.isNotEmpty) ...[
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Sample values:',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 4,
+                                        runSpacing: 4,
+                                        children: _sampleLinkSampleValues
+                                            .map(
+                                              (v) => Chip(
+                                                label: Text(
+                                                  v,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                padding: EdgeInsets.zero,
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 40,
+                            ),
+                            child: Icon(
+                              Icons.compare_arrows,
+                              size: 32,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          Expanded(
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.science_outlined,
+                                          size: 18,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        const Text(
+                                          'Strains file',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Which field contains the matching sample value?',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    DropdownButtonFormField<String>(
+                                      initialValue:
+                                          strainFields.contains(
+                                            _strainLinkField,
+                                          )
+                                          ? _strainLinkField
+                                          : null,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Link field',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      items: strainFields
+                                          .map(
+                                            (f) => DropdownMenuItem(
+                                              value: f,
+                                              child: Text(
+                                                f,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (v) {
+                                        if (v == null) return;
+                                        setState(() => _strainLinkField = v);
+                                        _refreshLinkPreviews();
+                                      },
+                                    ),
+                                    if (_strainLinkSampleValues.isNotEmpty) ...[
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Sample values:',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 4,
+                                        runSpacing: 4,
+                                        children: _strainLinkSampleValues
+                                            .map(
+                                              (v) => Chip(
+                                                label: Text(
+                                                  v,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                padding: EdgeInsets.zero,
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: hasGoodMatch
+                              ? Colors.green.shade50
+                              : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: hasGoodMatch
+                                ? Colors.green.shade300
+                                : Colors.red.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
                             Icon(
-                                hasGoodMatch
-                                    ? Icons.check_circle
-                                    : Icons.warning_rounded,
-                                color: hasGoodMatch
-                                    ? Colors.green
-                                    : Colors.red),
+                              hasGoodMatch
+                                  ? Icons.check_circle
+                                  : Icons.warning_rounded,
+                              color: hasGoodMatch ? Colors.green : Colors.red,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 hasGoodMatch
                                     ? '$matches strain(s) matched to a sample using the selected fields. '
-                                        'Unmatched strains will auto-create a new sample if they carry sample data, or be left unlinked.'
+                                          'Unmatched strains will auto-create a new sample if they carry sample data, or be left unlinked.'
                                     : 'No matches found between the two fields. Check that values share the same format (e.g. both "12", not one "12" and one "Sample 12").',
                                 style: TextStyle(
                                   fontSize: 13,
@@ -1351,10 +1566,12 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                                 ),
                               ),
                             ),
-                          ]),
+                          ],
                         ),
-                      ],
-                    ]),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1393,8 +1610,8 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
           child: _previewTab == 0 && hasSamples
               ? _buildPreviewGrid(_parsedSamples)
               : hasStrains
-                  ? _buildPreviewGrid(_parsedStrains)
-                  : const Center(child: Text('No data.')),
+              ? _buildPreviewGrid(_parsedStrains)
+              : const Center(child: Text('No data.')),
         ),
       ],
     );
@@ -1426,9 +1643,10 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                   color: Theme.of(context).colorScheme.primaryContainer,
                   height: 38,
                   child: Row(
-                      children: cols
-                          .map((c) => _pCell(c, isHeader: true))
-                          .toList()),
+                    children: cols
+                        .map((c) => _pCell(c, isHeader: true))
+                        .toList(),
+                  ),
                 ),
               ),
             ),
@@ -1452,13 +1670,14 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                       color: i.isEven
                           ? Theme.of(context).colorScheme.surface
                           : Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withValues(alpha: 0.3),
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.3),
                       child: Row(
-                          children: cols
-                              .map((c) => _pCell(rows[i][c] ?? ''))
-                              .toList()),
+                        children: cols
+                            .map((c) => _pCell(rows[i][c] ?? ''))
+                            .toList(),
+                      ),
                     ),
                   ),
                 ),
@@ -1471,32 +1690,38 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
   }
 
   Widget _pCell(String text, {bool isHeader = false}) => Container(
-        width: 150,
-        height: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-            border: Border(right: BorderSide(color: Colors.grey.shade200))),
-        alignment: Alignment.centerLeft,
-        child: Text(text,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    isHeader ? FontWeight.bold : FontWeight.normal,
-                color: isHeader
-                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                    : null),
-            overflow: TextOverflow.ellipsis),
-      );
+    width: 150,
+    height: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    decoration: BoxDecoration(
+      border: Border(right: BorderSide(color: Colors.grey.shade200)),
+    ),
+    alignment: Alignment.centerLeft,
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+        color: isHeader
+            ? Theme.of(context).colorScheme.onPrimaryContainer
+            : null,
+      ),
+      overflow: TextOverflow.ellipsis,
+    ),
+  );
 
   // ── Step 5: importing ───────────────────────────────────────────────────────
   Widget _buildStep5() => const Center(
-        key: ValueKey(5),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 20),
-          Text('Importing…', style: TextStyle(fontSize: 16)),
-        ]),
-      );
+    key: ValueKey(5),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircularProgressIndicator(),
+        SizedBox(height: 20),
+        Text('Importing…', style: TextStyle(fontSize: 16)),
+      ],
+    ),
+  );
 
   // ── Step 6: result log ──────────────────────────────────────────────────────
   Widget _buildStep6() {
@@ -1504,38 +1729,54 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     return Padding(
       key: const ValueKey(6),
       padding: const EdgeInsets.all(24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Icon(success ? Icons.check_circle : Icons.error,
-              color: success ? Colors.green : Colors.red, size: 32),
-          const SizedBox(width: 12),
-          Text(success ? 'Import Complete' : 'Finished with Errors',
-              style:
-                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        ]),
-        const SizedBox(height: 16),
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                success ? Icons.check_circle : Icons.error,
+                color: success ? Colors.green : Colors.red,
+                size: 32,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                success ? 'Import Complete' : 'Finished with Errors',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
                 color: Colors.grey.shade900,
-                borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              child: Text(_importLog,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: SingleChildScrollView(
+                child: Text(
+                  _importLog,
                   style: const TextStyle(
-                      fontFamily: 'monospace',
-                      color: Colors.greenAccent,
-                      fontSize: 13)),
+                    fontFamily: 'monospace',
+                    color: Colors.greenAccent,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: () => Navigator.pop(context, true),
-          icon: const Icon(Icons.check),
-          label: const Text('Done — Back to Data'),
-        ),
-      ]),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.check),
+            label: const Text('Done — Back to Data'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1550,17 +1791,21 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     return Container(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(children: [
-        Expanded(child: Text(info, style: const TextStyle(fontSize: 13))),
-        OutlinedButton(
+      child: Row(
+        children: [
+          Expanded(child: Text(info, style: const TextStyle(fontSize: 13))),
+          OutlinedButton(
             onPressed: () => setState(() => _step = backStep),
-            child: const Text('Back')),
-        const SizedBox(width: 8),
-        FilledButton.icon(
+            child: const Text('Back'),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
             onPressed: onNext,
             icon: Icon(nextIcon),
-            label: Text(nextLabel)),
-      ]),
+            label: Text(nextLabel),
+          ),
+        ],
+      ),
     );
   }
 }

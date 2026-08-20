@@ -3,17 +3,24 @@
 // Has its own Scaffold + AppBar (exception to the no-scaffold page rule).
 
 import 'dart:async';
+
 import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
+
 import '/theme/module_permission.dart';
+
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'strain_detail_page.dart';
 import '../function_excel_import_page.dart';
+
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
+
 import 'dart:io';
+
 import '/core/data_cache.dart';
 import 'strains_columns.dart';
 import 'strains_design_tokens.dart';
@@ -785,10 +792,7 @@ class _StrainsPageState extends State<StrainsPage> {
   ) async {
     switch (action) {
       case 'need_transfer':
-        if (!context.canEditModule) {
-          context.warnReadOnly();
-          return;
-        }
+        if (!context.requireModuleAction(ModuleAction.edit)) return;
         await _toggleNeedNewTransfer(row);
         break;
       case 'request':
@@ -796,9 +800,13 @@ class _StrainsPageState extends State<StrainsPage> {
           context,
           type: 'strains',
           prefillTitle: row['strain_code']?.toString() ?? '',
+          entityType: 'strains',
+          entityId: row['strain_id'],
+          entityLabel: row['strain_code']?.toString(),
         );
         break;
       case 'print':
+        if (!context.requireModuleAction(ModuleAction.print)) return;
         await showQuickPrintDialog(
           context,
           category: 'Strains',
@@ -815,10 +823,7 @@ class _StrainsPageState extends State<StrainsPage> {
         );
         break;
       case 'delete':
-        if (!context.canEditModule) {
-          context.warnReadOnly();
-          return;
-        }
+        if (!context.requireModuleAction(ModuleAction.delete)) return;
         await _deleteStrain(row);
         break;
     }
@@ -859,6 +864,7 @@ class _StrainsPageState extends State<StrainsPage> {
   }
 
   Future<void> _deleteStrain(Map<String, dynamic> row) async {
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
     final code = row['strain_code']?.toString() ?? row['strain_id'].toString();
     final confirm = await showDialog<bool>(
       context: context,
@@ -1027,6 +1033,7 @@ class _StrainsPageState extends State<StrainsPage> {
   }
 
   Future<void> _exportSelectedCsv() async {
+    if (!context.requireModuleAction(ModuleAction.export)) return;
     final rows = _selectedRows;
     final cols = _exportCols;
     if (rows.isEmpty) {
@@ -1056,6 +1063,7 @@ class _StrainsPageState extends State<StrainsPage> {
   }
 
   Future<void> _exportMirriCsv() async {
+    if (!context.requireModuleAction(ModuleAction.export)) return;
     final rows = _filtered;
     if (rows.isEmpty) {
       _snack('No strains to export');
@@ -1073,10 +1081,7 @@ class _StrainsPageState extends State<StrainsPage> {
   }
 
   Future<void> _showAddStrainDialog({dynamic preselectedSampleId}) async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.create)) return;
     List<Map<String, dynamic>> samples = [];
     try {
       samples = List<Map<String, dynamic>>.from(
@@ -1145,9 +1150,9 @@ class _StrainsPageState extends State<StrainsPage> {
                     isDense: true,
                   ),
                   items: samples.map((s) {
-                    final lbl = [
-                      s['sample_code']?.toString(),
-                    ].where((v) => v != null && v.isNotEmpty).join(' — ');
+                    final lbl = [s['sample_code']?.toString()]
+                        .where((v) => v != null && v.isNotEmpty)
+                        .join(' — ');
                     return DropdownMenuItem(
                       value: s['sample_code'],
                       child: Text(lbl, overflow: TextOverflow.ellipsis),
@@ -1209,15 +1214,15 @@ class _StrainsPageState extends State<StrainsPage> {
         'strain_code=${res['strain_code']}',
       );
       unawaited(BackupService.instance.notifyCrudChange('strains'));
-        if (mounted) {
-          Navigator.push(
-            context,
-            modulePageRoute(
-              context: context,
-              child: StrainDetailPage(strainId: res['strain_id'], onSaved: _load),
-            ),
-          ).then((_) => _load());
-        }
+      if (mounted) {
+        Navigator.push(
+          context,
+          modulePageRoute(
+            context: context,
+            child: StrainDetailPage(strainId: res['strain_id'], onSaved: _load),
+          ),
+        ).then((_) => _load());
+      }
     } catch (e, st) {
       debugPrint(st.toString());
       _snack('Error creating strain: $e');
@@ -1268,10 +1273,15 @@ class _StrainsPageState extends State<StrainsPage> {
               onToggleColManager: () =>
                   setState(() => _showColManager = !_showColManager),
               onImport: () async {
+                if (!context.requireModuleAction(ModuleAction.create)) return;
+                if (!context.requireModuleAction(ModuleAction.bulkUpdate)) {
+                  return;
+                }
                 final ok = await Navigator.push<bool>(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const ExcelImportPage(mode: 'strains'),
+                  modulePageRoute(
+                    context: context,
+                    child: const ExcelImportPage(mode: 'strains'),
                   ),
                 );
                 if (ok == true) _load();

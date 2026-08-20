@@ -3,15 +3,21 @@
 // Widget and dialog classes in reagents_widgets.dart (part).
 
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+
 import '/theme/module_permission.dart';
 import '/theme/grid_widgets.dart';
+
 import 'package:google_fonts/google_fonts.dart';
+
 import 'dart:io';
+
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+
 import '/core/data_cache.dart';
 import '/supabase/supabase_manager.dart';
 import '/theme/theme.dart';
@@ -71,7 +77,7 @@ const _tableW =
 
 // Tab-navigable columns — matches visual column order left-to-right.
 // 'stockStatus', 'category', 'subcategory', 'storageTemp',
-// 'physicalState', 'contamination' and 'location' are dropdowns;
+// 'physicalState', 'contamination', 'room' and 'location' are dropdowns;
 // the rest are text fields.
 const _tabCols = [
   'code',
@@ -80,6 +86,7 @@ const _tabCols = [
   'subcategory',
   'tags',
   'name',
+  'room',
   'location',
   'storageTemp',
   'physicalState',
@@ -180,9 +187,8 @@ class _ReagentsPageState extends State<ReagentsPage> {
       debugPrint('Reagents load error: $e');
       if (cached == null && mounted) {
         setState(() => _loading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to load: $e')));
       }
     }
     final locations = await _loadLocations();
@@ -202,7 +208,8 @@ class _ReagentsPageState extends State<ReagentsPage> {
   String? _roomDisplayForLocationId(int? locationId) {
     final loc = _locationMetaById(locationId);
     if (loc == null) return null;
-    if ((loc['location_type'] as String?) == 'room') {
+    if ((loc['location_type'] as String?) == null ||
+        (loc['location_type'] as String?) == 'room') {
       return (loc['_display'] as String?) ?? (loc['location_name'] as String?);
     }
     final parentId = (loc['location_parent_id'] as num?)?.toInt();
@@ -214,6 +221,10 @@ class _ReagentsPageState extends State<ReagentsPage> {
   String? _locationDisplayForLocationId(int? locationId) {
     final loc = _locationMetaById(locationId);
     if (loc == null) return null;
+    if ((loc['location_type'] as String?) == null ||
+        (loc['location_type'] as String?) == 'room') {
+      return '/';
+    }
     return (loc['_display'] as String?) ?? (loc['location_name'] as String?);
   }
 
@@ -388,10 +399,8 @@ class _ReagentsPageState extends State<ReagentsPage> {
   }
 
   Future<void> _showAddEditDialog([ReagentModel? existing]) async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    final action = existing == null ? ModuleAction.create : ModuleAction.edit;
+    if (!context.requireModuleAction(action)) return;
     final locations = await _loadLocations();
     if (!mounted) return;
     final result = await showDialog<bool>(
@@ -411,7 +420,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
           .from('storage_locations')
           .select(
             'location_id, location_name, location_type, '
-            'location_parent_id, location_sort_order',
+            'location_code, location_parent_id, location_sort_order',
           )
           .order('location_name');
       return _orderLocationsHierarchically(
@@ -441,13 +450,22 @@ class _ReagentsPageState extends State<ReagentsPage> {
     }
 
     final rooms =
-        rows.where((r) => (r['location_type'] as String?) == 'room').toList()
+        rows
+            .where(
+              (r) =>
+                  (r['location_type'] as String?) == null ||
+                  (r['location_type'] as String?) == 'room',
+            )
+            .toList()
           ..sort(cmp);
     final roomIds = {for (final r in rooms) (r['location_id'] as num).toInt()};
     final childrenByRoom = <int, List<Map<String, dynamic>>>{};
     final orphans = <Map<String, dynamic>>[];
     for (final r in rows) {
-      if ((r['location_type'] as String?) == 'room') continue;
+      if ((r['location_type'] as String?) == null ||
+          (r['location_type'] as String?) == 'room') {
+        continue;
+      }
       final pid = r['location_parent_id'] != null
           ? (r['location_parent_id'] as num).toInt()
           : null;
@@ -465,14 +483,15 @@ class _ReagentsPageState extends State<ReagentsPage> {
     final out = <Map<String, dynamic>>[];
     for (var i = 0; i < rooms.length; i++) {
       final room = rooms[i];
-      final roomCode = 'R${i + 1}';
+      final roomCode = room['location_code']?.toString() ?? 'R${i + 1}';
       out.add({...room, '_display': '$roomCode — ${room['location_name']}'});
       final kids =
           childrenByRoom[(room['location_id'] as num).toInt()] ?? const [];
       for (var j = 0; j < kids.length; j++) {
         out.add({
           ...kids[j],
-          '_display': 'L${i + 1}.${j + 1} — ${kids[j]['location_name']}',
+          '_display':
+              '${kids[j]['location_code'] ?? 'L${i + 1}.${j + 1}'} — ${kids[j]['location_name']}',
         });
       }
     }
@@ -620,6 +639,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
   }
 
   void _saveAndPatch(int id, Map<String, dynamic> dbPatch) {
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
     _patchLocal(id, dbPatch);
     setState(() {});
     final netPatch = Map<String, dynamic>.from(dbPatch)
@@ -732,6 +752,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
     'storageTemp',
     'physicalState',
     'contamination',
+    'room',
     'location',
   };
 
@@ -780,6 +801,12 @@ class _ReagentsPageState extends State<ReagentsPage> {
       '_location_name': locName,
     });
     _advanceFromDropdown(id);
+  }
+
+  void _commitRoomEdit(int id, int? roomId) {
+    // Saving the room itself is intentional: it represents room-only storage.
+    // A subsequent Location selection replaces it with the more specific child.
+    _commitLocationEdit(id, roomId);
   }
 
   void _advanceFromDropdown(int id) {
@@ -865,15 +892,13 @@ class _ReagentsPageState extends State<ReagentsPage> {
       r.openedDate != null
           ? r.openedDate!.toIso8601String().substring(0, 10)
           : '',
+    'room' => _roomDisplayForLocationId(r.locationId) ?? '',
     'location' => r.locationId?.toString() ?? '',
     _ => '',
   };
 
   Future<void> _addNewRow() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.create)) return;
     final code = _nextCode();
     try {
       final row = await Supabase.instance.client
@@ -974,6 +999,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
   }
 
   Future<void> _exportCsv() async {
+    if (!context.requireModuleAction(ModuleAction.export)) return;
     final buf = StringBuffer();
     buf.writeln(
       'ID,Code,Stock Status,Name,Supplier,Brand,Reference,CAS,Synonyms,Category,Subcategory,'
@@ -996,9 +1022,8 @@ class _ReagentsPageState extends State<ReagentsPage> {
       await OpenFilex.open(file.path);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     }
   }
@@ -1184,14 +1209,17 @@ class _ReagentsPageState extends State<ReagentsPage> {
                     size: 18,
                   ),
                   onPressed: () async {
-                    if (!context.canEditModule) {
-                      context.warnReadOnly();
+                    if (!context.requireModuleAction(ModuleAction.create)) {
+                      return;
+                    }
+                    if (!context.requireModuleAction(ModuleAction.bulkUpdate)) {
                       return;
                     }
                     final imported = await Navigator.push<bool>(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const ReagentExcelImportPage(),
+                      modulePageRoute(
+                        context: context,
+                        child: const ReagentExcelImportPage(),
                       ),
                     );
                     if (imported == true) _load();
@@ -1766,8 +1794,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   onViewMore: () =>
                                                       Navigator.push(
                                                         context,
-                                                        MaterialPageRoute(
-                                                          builder: (_) =>
+                                                        modulePageRoute(
+                                                          context: context,
+                                                          child:
                                                               ReagentDetailPage(
                                                                 reagentId: r.id,
                                                               ),
@@ -1811,6 +1840,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                       _commitPhysicalStateEdit,
                                                   onCommitContamination:
                                                       _commitContaminationEdit,
+                                                  onCommitRoom: _commitRoomEdit,
                                                   onCommitLocation:
                                                       _commitLocationEdit,
                                                   locations: _locations,

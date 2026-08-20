@@ -2,8 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '/theme/theme.dart';
 import '/menu/app_nav.dart';
+import '/theme/module_permission.dart';
 import 'item_log/item_register_page.dart';
 import 'qr_scanner/qr_scanner_page.dart';
 
@@ -22,19 +24,30 @@ class CameraPage extends StatelessWidget {
             border: Border(bottom: BorderSide(color: context.appBorder)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(children: [
-            IconButton(
-              icon: const Icon(Icons.menu_rounded, size: 20),
-              color: context.appTextSecondary,
-              tooltip: 'Menu',
-              onPressed: openAppDrawer,
-            ),
-            const Icon(Icons.camera_alt_outlined, size: 18, color: Color(0xFF38BDF8)),
-            const SizedBox(width: 8),
-            Text('Camera', style: GoogleFonts.spaceGrotesk(
-              fontSize: 16, fontWeight: FontWeight.w600,
-              color: context.appTextPrimary)),
-          ]),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.menu_rounded, size: 20),
+                color: context.appTextSecondary,
+                tooltip: 'Menu',
+                onPressed: openAppDrawer,
+              ),
+              const Icon(
+                Icons.camera_alt_outlined,
+                size: 18,
+                color: Color(0xFF38BDF8),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Camera',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: context.appTextPrimary,
+                ),
+              ),
+            ],
+          ),
         ),
         // ── Content ──────────────────────────────────────────────────────────
         Expanded(
@@ -43,15 +56,20 @@ class CameraPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Camera Features', style: GoogleFonts.spaceGrotesk(
-                  fontSize: 13, fontWeight: FontWeight.w600,
-                  color: context.appTextMuted)),
+                Text(
+                  'Mobile workflows',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: context.appTextMuted,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 _FeatureCard(
                   icon: Icons.qr_code_scanner_rounded,
                   color: const Color(0xFF38BDF8),
                   title: 'Scan QR Code',
-                  subtitle: 'Open a record by scanning its QR label',
+                  subtitle: 'Scan, look up, or quickly update a record',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const QrScannerPage()),
@@ -65,7 +83,11 @@ class CameraPage extends StatelessWidget {
                   subtitle: 'Scan or enter items to register in the system',
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const ItemRegisterPage()),
+                    modulePageRoute(
+                      context: context,
+                      moduleId: 'reagents',
+                      child: const ItemRegisterPage(),
+                    ),
                   ),
                 ),
               ],
@@ -106,31 +128,48 @@ class _FeatureCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: context.appBorder),
           ),
-          child: Row(children: [
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 22),
               ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: GoogleFonts.spaceGrotesk(
-                    fontSize: 14, fontWeight: FontWeight.w600,
-                    color: context.appTextPrimary)),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: GoogleFonts.spaceGrotesk(
-                    fontSize: 12, color: context.appTextMuted)),
-                ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.appTextPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 12,
+                        color: context.appTextMuted,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: context.appTextMuted, size: 20),
-          ]),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: context.appTextMuted,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

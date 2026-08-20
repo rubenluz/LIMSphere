@@ -36,9 +36,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>bluelims</string>
+			<string>limsphere</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>limsphere</string>
 				<string>bluelims</string>
 			</array>
 		</dict>

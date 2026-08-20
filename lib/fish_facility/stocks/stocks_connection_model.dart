@@ -29,14 +29,19 @@ class FishStock {
   double? feedingAmount;
   String? feedingAmountUnit;
   DateTime? lastBreeding;
+
   /// Stored date of birth (denormalised from fish_line_date_birth on insert/save).
   final DateTime? dob;
+
   /// Date of birth from the linked fish_line record (from the FK join).
   final DateTime? lineDateBirth;
+
   /// Set post-construction when the FK join returned null but a name-lookup found a date.
   DateTime? lineDateBirthOverride;
+
   /// QR code string stored in fish_stocks_qrcode.
   final String? qrcode;
+
   /// Editable age override (months). When 0, computed from lineDateBirth or arrivalDate.
   int _ageMonths;
 
@@ -73,7 +78,10 @@ class FishStock {
 
   /// Computed next cleaning date. Null if either field is missing.
   DateTime? get nextCleaning {
-    if (lastCleaning == null || cleaningIntervalDays == null || cleaningIntervalDays! <= 0) return null;
+    if (lastCleaning == null ||
+        cleaningIntervalDays == null ||
+        cleaningIntervalDays! <= 0)
+      return null;
     return lastCleaning!.add(Duration(days: cleaningIntervalDays!));
   }
 
@@ -115,46 +123,49 @@ class FishStock {
     final lineData = m['fish_lines'] as Map<String, dynamic>?;
     final dobRaw = lineData?[FishSch.lineDateBirth];
     return FishStock(
-      id:             rawId is int ? rawId : int.tryParse(rawId?.toString() ?? ''),
-      stockId:        rawId?.toString() ?? '',
-      line:           (m[FishSch.stockLine] ?? '').toString(),
-      males:          asInt(m[FishSch.stockMales]),
-      females:        asInt(m[FishSch.stockFemales]),
-      juveniles:      asInt(m[FishSch.stockJuveniles]),
-      mortality:      asInt(m[FishSch.stockMortality]),
-      tankId:         (m[FishSch.stockTankId] ?? '').toString(),
-      responsible:    (m[FishSch.stockResponsible] ?? '').toString(),
-      status:         (m[FishSch.stockStatus] ?? 'active').toString(),
-      health:         (m[FishSch.stockHealthStatus] ?? 'healthy').toString(),
-      origin:         m[FishSch.stockOrigin]?.toString(),
-      experiment:     m[FishSch.stockExperimentId]?.toString(),
-      notes:          m[FishSch.stockNotes]?.toString(),
-      dob:            m[FishSch.stockDob] != null
+      id: rawId is int ? rawId : int.tryParse(rawId?.toString() ?? ''),
+      stockId: rawId?.toString() ?? '',
+      line: (m[FishSch.stockLine] ?? '').toString(),
+      males: asInt(m[FishSch.stockMales]),
+      females: asInt(m[FishSch.stockFemales]),
+      juveniles: asInt(m[FishSch.stockJuveniles]),
+      mortality: asInt(m[FishSch.stockMortality]),
+      tankId: (m[FishSch.stockTankId] ?? '').toString(),
+      responsible: (m[FishSch.stockResponsible] ?? '').toString(),
+      status: (m[FishSch.stockStatus] ?? 'active').toString(),
+      health: (m[FishSch.stockHealthStatus] ?? 'healthy').toString(),
+      origin: m[FishSch.stockOrigin]?.toString(),
+      experiment: m[FishSch.stockExperimentId]?.toString(),
+      notes: m[FishSch.stockNotes]?.toString(),
+      dob: m[FishSch.stockDob] != null
           ? DateTime.tryParse(m[FishSch.stockDob].toString())
           : null,
-      arrivalDate:    m[FishSch.stockArrivalDate] != null
+      arrivalDate: m[FishSch.stockArrivalDate] != null
           ? DateTime.tryParse(m[FishSch.stockArrivalDate].toString())
           : null,
-      created:        m[FishSch.stockCreatedAt] != null
-          ? DateTime.tryParse(m[FishSch.stockCreatedAt].toString()) ?? DateTime.now()
+      created: m[FishSch.stockCreatedAt] != null
+          ? DateTime.tryParse(m[FishSch.stockCreatedAt].toString()) ??
+                DateTime.now()
           : DateTime.now(),
-      lineDateBirth:  dobRaw != null ? DateTime.tryParse(dobRaw.toString()) : null,
-      lastCleaning:   m[FishSch.stockLastCleaning] != null
+      lineDateBirth: dobRaw != null
+          ? DateTime.tryParse(dobRaw.toString())
+          : null,
+      lastCleaning: m[FishSch.stockLastCleaning] != null
           ? DateTime.tryParse(m[FishSch.stockLastCleaning].toString())
           : null,
       cleaningIntervalDays: m[FishSch.stockCleaningInterval] != null
           ? int.tryParse(m[FishSch.stockCleaningInterval].toString())
           : null,
       feedingSchedule: m[FishSch.stockFeedingSchedule]?.toString(),
-      foodType:        m[FishSch.stockFoodType]?.toString(),
-      feedingAmount:   m[FishSch.stockFoodAmount] != null
+      foodType: m[FishSch.stockFoodType]?.toString(),
+      feedingAmount: m[FishSch.stockFoodAmount] != null
           ? double.tryParse(m[FishSch.stockFoodAmount].toString())
           : null,
       feedingAmountUnit: m[FishSch.stockFeedingAmountUnit]?.toString(),
-      lastBreeding:    m[FishSch.stockLastBreeding] != null
+      lastBreeding: m[FishSch.stockLastBreeding] != null
           ? DateTime.tryParse(m[FishSch.stockLastBreeding].toString())
           : null,
-      qrcode:          m[FishSch.stockQrcode]?.toString(),
+      qrcode: m[FishSch.stockQrcode]?.toString(),
     );
   }
 }

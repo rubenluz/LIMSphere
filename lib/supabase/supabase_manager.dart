@@ -66,7 +66,7 @@ class SupabaseManager {
       _currentUrl = null;
     }
 
-    await Supabase.initialize(url: url, anonKey: anonKey);
+    await Supabase.initialize(url: url, publishableKey: anonKey);
     _client = Supabase.instance.client;
     _currentUrl = url;
   }

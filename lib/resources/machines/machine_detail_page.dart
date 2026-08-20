@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+
+import '../../camera/qr_scanner/qr_code_rules.dart';
 import '../../supabase/supabase_manager.dart';
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
@@ -24,12 +26,12 @@ class MachineDetailPage extends StatefulWidget {
 }
 
 class _MachineDetailPageState extends State<MachineDetailPage> {
-  MachineModel?           _machine;
-  List<ReservationModel>  _reservations  = [];
+  MachineModel? _machine;
+  List<ReservationModel> _reservations = [];
   List<Map<String, dynamic>> _allLocations = [];
   List<Map<String, dynamic>> _allUsers = [];
   bool _loading = true;
-  bool _saving  = false;
+  bool _saving = false;
   bool _editMode = false;
   final Set<int> _expanded = {0, 1, 2, 3, 4, 5, 6};
 
@@ -49,8 +51,8 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
   late final TextEditingController _notesCtrl;
 
   // Dropdown / date state
-  String    _status     = 'operational';
-  int?      _locationId;
+  String _status = 'operational';
+  int? _locationId;
   DateTime? _purchaseDate;
   DateTime? _warrantyDate;
   DateTime? _lastMaintenance;
@@ -61,19 +63,19 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl         = TextEditingController();
-    _typeCtrl         = TextEditingController();
-    _brandCtrl        = TextEditingController();
-    _modelCtrl        = TextEditingController();
-    _serialCtrl       = TextEditingController();
-    _patrimonyCtrl    = TextEditingController();
-    _roomCtrl         = TextEditingController();
-    _supplierCtrl     = TextEditingController();
-    _responsibleCtrl  = TextEditingController();
-    _manualCtrl       = TextEditingController();
-    _maintIntervalCtrl= TextEditingController();
-    _calibIntervalCtrl= TextEditingController();
-    _notesCtrl        = TextEditingController();
+    _nameCtrl = TextEditingController();
+    _typeCtrl = TextEditingController();
+    _brandCtrl = TextEditingController();
+    _modelCtrl = TextEditingController();
+    _serialCtrl = TextEditingController();
+    _patrimonyCtrl = TextEditingController();
+    _roomCtrl = TextEditingController();
+    _supplierCtrl = TextEditingController();
+    _responsibleCtrl = TextEditingController();
+    _manualCtrl = TextEditingController();
+    _maintIntervalCtrl = TextEditingController();
+    _calibIntervalCtrl = TextEditingController();
+    _notesCtrl = TextEditingController();
     _load();
   }
 
@@ -119,14 +121,16 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
             .order('location_name'),
         Supabase.instance.client
             .from('users')
-            .select('user_id, user_email, user_name, user_phone, '
-                'user_institution, user_group, user_role')
+            .select(
+              'user_id, user_email, user_name, user_phone, '
+              'user_institution, user_group, user_role',
+            )
             .order('user_name'),
       ]);
 
-      final rows     = results[0] as List<dynamic>;
-      final resRows  = results[1] as List<dynamic>;
-      final locRows  = results[2] as List<dynamic>;
+      final rows = results[0] as List<dynamic>;
+      final resRows = results[1] as List<dynamic>;
+      final locRows = results[2] as List<dynamic>;
       final userRows = results[3] as List<dynamic>;
 
       if (rows.isEmpty) {
@@ -134,42 +138,50 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
         return;
       }
 
-      final r       = rows[0] as Map<String, dynamic>;
+      final r = rows[0] as Map<String, dynamic>;
       final locData = r['location'];
       final machine = MachineModel.fromMap({
         ...r,
-        'location_name': locData is Map ? locData['location_name'] as String? : null,
+        'location_name': locData is Map
+            ? locData['location_name'] as String?
+            : null,
       });
 
       if (mounted) {
-        _nameCtrl.text          = machine.name;
-        _typeCtrl.text          = machine.type ?? '';
-        _brandCtrl.text         = machine.brand ?? '';
-        _modelCtrl.text         = machine.model ?? '';
-        _serialCtrl.text        = machine.serialNumber ?? '';
-        _patrimonyCtrl.text     = machine.patrimonyNumber ?? '';
-        _roomCtrl.text          = machine.room ?? '';
-        _supplierCtrl.text      = machine.supplier ?? '';
-        _responsibleCtrl.text   = machine.responsible ?? '';
-        _manualCtrl.text        = machine.manualLink ?? '';
-        _maintIntervalCtrl.text = machine.maintenanceIntervalDays?.toString() ?? '';
-        _calibIntervalCtrl.text = machine.calibrationIntervalDays?.toString() ?? '';
-        _notesCtrl.text         = machine.notes ?? '';
-        _status          = machine.status;
-        _locationId      = machine.locationId;
-        _purchaseDate    = machine.purchaseDate;
-        _warrantyDate    = machine.warrantyUntil;
+        _nameCtrl.text = machine.name;
+        _typeCtrl.text = machine.type ?? '';
+        _brandCtrl.text = machine.brand ?? '';
+        _modelCtrl.text = machine.model ?? '';
+        _serialCtrl.text = machine.serialNumber ?? '';
+        _patrimonyCtrl.text = machine.patrimonyNumber ?? '';
+        _roomCtrl.text = machine.room ?? '';
+        _supplierCtrl.text = machine.supplier ?? '';
+        _responsibleCtrl.text = machine.responsible ?? '';
+        _manualCtrl.text = machine.manualLink ?? '';
+        _maintIntervalCtrl.text =
+            machine.maintenanceIntervalDays?.toString() ?? '';
+        _calibIntervalCtrl.text =
+            machine.calibrationIntervalDays?.toString() ?? '';
+        _notesCtrl.text = machine.notes ?? '';
+        _status = machine.status;
+        _locationId = machine.locationId;
+        _purchaseDate = machine.purchaseDate;
+        _warrantyDate = machine.warrantyUntil;
         _lastMaintenance = machine.lastMaintenance;
         _nextMaintenance = machine.nextMaintenance;
         _lastCalibration = machine.lastCalibration;
         _nextCalibration = machine.nextCalibration;
 
         setState(() {
-          _machine      = machine;
-          _reservations = resRows.map<ReservationModel>((r) => ReservationModel.fromMap(r as Map<String, dynamic>)).toList();
+          _machine = machine;
+          _reservations = resRows
+              .map<ReservationModel>(
+                (r) => ReservationModel.fromMap(r as Map<String, dynamic>),
+              )
+              .toList();
           _allLocations = List<Map<String, dynamic>>.from(locRows);
-          _allUsers     = List<Map<String, dynamic>>.from(userRows);
-          _loading      = false;
+          _allUsers = List<Map<String, dynamic>>.from(userRows);
+          _loading = false;
         });
       }
     } catch (e) {
@@ -181,31 +193,73 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
   }
 
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty) { _snack('Name is required'); return; }
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
+    if (_nameCtrl.text.trim().isEmpty) {
+      _snack('Name is required');
+      return;
+    }
     setState(() => _saving = true);
     try {
       final data = <String, dynamic>{
-        'equipment_name':                    _nameCtrl.text.trim(),
-        'equipment_status':                  _status,
-        'equipment_type':                    _typeCtrl.text.trim().isEmpty          ? null : _typeCtrl.text.trim(),
-        'equipment_brand':                   _brandCtrl.text.trim().isEmpty         ? null : _brandCtrl.text.trim(),
-        'equipment_model':                   _modelCtrl.text.trim().isEmpty         ? null : _modelCtrl.text.trim(),
-        'equipment_serial_number':           _serialCtrl.text.trim().isEmpty        ? null : _serialCtrl.text.trim(),
-        'equipment_patrimony_number':        _patrimonyCtrl.text.trim().isEmpty     ? null : _patrimonyCtrl.text.trim(),
-        'equipment_location_id':             _locationId,
-        'equipment_room':                    _roomCtrl.text.trim().isEmpty          ? null : _roomCtrl.text.trim(),
-        'equipment_supplier':                _supplierCtrl.text.trim().isEmpty      ? null : _supplierCtrl.text.trim(),
-        'equipment_responsible':             _responsibleCtrl.text.trim().isEmpty   ? null : _responsibleCtrl.text.trim(),
-        'equipment_manual_link':             _manualCtrl.text.trim().isEmpty        ? null : _manualCtrl.text.trim(),
-        'equipment_maintenance_interval_days': int.tryParse(_maintIntervalCtrl.text.trim()),
-        'equipment_calibration_interval_days': int.tryParse(_calibIntervalCtrl.text.trim()),
-        'equipment_purchase_date':           _purchaseDate?.toIso8601String().substring(0, 10),
-        'equipment_warranty_until':          _warrantyDate?.toIso8601String().substring(0, 10),
-        'equipment_last_maintenance':        _lastMaintenance?.toIso8601String().substring(0, 10),
-        'equipment_next_maintenance':        _nextMaintenance?.toIso8601String().substring(0, 10),
-        'equipment_last_calibration':        _lastCalibration?.toIso8601String().substring(0, 10),
-        'equipment_next_calibration':        _nextCalibration?.toIso8601String().substring(0, 10),
-        'equipment_notes':                   _notesCtrl.text.trim().isEmpty         ? null : _notesCtrl.text.trim(),
+        'equipment_name': _nameCtrl.text.trim(),
+        'equipment_status': _status,
+        'equipment_type': _typeCtrl.text.trim().isEmpty
+            ? null
+            : _typeCtrl.text.trim(),
+        'equipment_brand': _brandCtrl.text.trim().isEmpty
+            ? null
+            : _brandCtrl.text.trim(),
+        'equipment_model': _modelCtrl.text.trim().isEmpty
+            ? null
+            : _modelCtrl.text.trim(),
+        'equipment_serial_number': _serialCtrl.text.trim().isEmpty
+            ? null
+            : _serialCtrl.text.trim(),
+        'equipment_patrimony_number': _patrimonyCtrl.text.trim().isEmpty
+            ? null
+            : _patrimonyCtrl.text.trim(),
+        'equipment_location_id': _locationId,
+        'equipment_room': _roomCtrl.text.trim().isEmpty
+            ? null
+            : _roomCtrl.text.trim(),
+        'equipment_supplier': _supplierCtrl.text.trim().isEmpty
+            ? null
+            : _supplierCtrl.text.trim(),
+        'equipment_responsible': _responsibleCtrl.text.trim().isEmpty
+            ? null
+            : _responsibleCtrl.text.trim(),
+        'equipment_manual_link': _manualCtrl.text.trim().isEmpty
+            ? null
+            : _manualCtrl.text.trim(),
+        'equipment_maintenance_interval_days': int.tryParse(
+          _maintIntervalCtrl.text.trim(),
+        ),
+        'equipment_calibration_interval_days': int.tryParse(
+          _calibIntervalCtrl.text.trim(),
+        ),
+        'equipment_purchase_date': _purchaseDate?.toIso8601String().substring(
+          0,
+          10,
+        ),
+        'equipment_warranty_until': _warrantyDate?.toIso8601String().substring(
+          0,
+          10,
+        ),
+        'equipment_last_maintenance': _lastMaintenance
+            ?.toIso8601String()
+            .substring(0, 10),
+        'equipment_next_maintenance': _nextMaintenance
+            ?.toIso8601String()
+            .substring(0, 10),
+        'equipment_last_calibration': _lastCalibration
+            ?.toIso8601String()
+            .substring(0, 10),
+        'equipment_next_calibration': _nextCalibration
+            ?.toIso8601String()
+            .substring(0, 10),
+        'equipment_notes': _notesCtrl.text.trim().isEmpty
+            ? null
+            : _notesCtrl.text.trim(),
       };
       await Supabase.instance.client
           .from('equipment')
@@ -221,7 +275,10 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
     }
   }
 
-  Future<void> _pickDate(DateTime? current, void Function(DateTime?) onPicked) async {
+  Future<void> _pickDate(
+    DateTime? current,
+    void Function(DateTime?) onPicked,
+  ) async {
     final picked = await showDatePicker(
       context: context,
       initialDate: current ?? DateTime.now(),
@@ -232,31 +289,41 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
   }
 
   Future<void> _delete() async {
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
     final name = _machine?.name ?? 'this machine';
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.appSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Delete Machine?',
-            style: GoogleFonts.spaceGrotesk(
-                color: ctx.appTextPrimary, fontWeight: FontWeight.w600)),
+        title: Text(
+          'Delete Machine?',
+          style: GoogleFonts.spaceGrotesk(
+            color: ctx.appTextPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         content: Text(
           'This will permanently delete "$name". This cannot be undone.',
           style: GoogleFonts.spaceGrotesk(
-              color: ctx.appTextSecondary, fontSize: 13),
+            color: ctx.appTextSecondary,
+            fontSize: 13,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel',
-                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary),
+            ),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: AppDS.red,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Delete', style: GoogleFonts.spaceGrotesk()),
@@ -278,12 +345,14 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: const TextStyle(color: Colors.white)),
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: AppDS.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: const TextStyle(color: Colors.white)),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppDS.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -300,7 +369,9 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
         title: Text(
           m?.name ?? 'Machine',
           style: GoogleFonts.spaceGrotesk(
-              color: context.appTextPrimary, fontWeight: FontWeight.w600),
+            color: context.appTextPrimary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         actions: [
           if (m != null) ...[
@@ -320,15 +391,21 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
             ),
             if (_editMode)
               IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    size: 20, color: AppDS.red),
+                icon: const Icon(
+                  Icons.delete_outline,
+                  size: 20,
+                  color: AppDS.red,
+                ),
                 tooltip: 'Delete',
                 onPressed: _delete,
               ),
             if (_editMode && !_saving)
               IconButton(
-                icon: Icon(Icons.close,
-                    size: 20, color: context.appTextSecondary),
+                icon: Icon(
+                  Icons.close,
+                  size: 20,
+                  color: context.appTextSecondary,
+                ),
                 tooltip: 'Cancel',
                 onPressed: () {
                   setState(() => _editMode = false);
@@ -339,189 +416,271 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: SizedBox(
-                        width: 18, height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppDS.accent)))
-                : _editMode
-                    ? TextButton.icon(
-                        onPressed: _save,
-                        icon: const Icon(Icons.save_outlined,
-                            size: 16, color: AppDS.accent),
-                        label: Text('Save',
-                            style: GoogleFonts.spaceGrotesk(
-                                color: AppDS.accent)),
-                      )
-                    : TextButton.icon(
-                        onPressed: () {
-                          if (!context.canEditModule) {
-                            context.warnReadOnly();
-                            return;
-                          }
-                          setState(() => _editMode = true);
-                        },
-                        icon: const Icon(Icons.edit_outlined,
-                            size: 16, color: AppDS.accent),
-                        label: Text('Edit',
-                            style: GoogleFonts.spaceGrotesk(
-                                color: AppDS.accent)),
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppDS.accent,
                       ),
+                    ),
+                  )
+                : _editMode
+                ? TextButton.icon(
+                    onPressed: _save,
+                    icon: const Icon(
+                      Icons.save_outlined,
+                      size: 16,
+                      color: AppDS.accent,
+                    ),
+                    label: Text(
+                      'Save',
+                      style: GoogleFonts.spaceGrotesk(color: AppDS.accent),
+                    ),
+                  )
+                : TextButton.icon(
+                    onPressed: () {
+                      if (!context.canEditModule) {
+                        context.warnReadOnly();
+                        return;
+                      }
+                      setState(() => _editMode = true);
+                    },
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      size: 16,
+                      color: AppDS.accent,
+                    ),
+                    label: Text(
+                      'Edit',
+                      style: GoogleFonts.spaceGrotesk(color: AppDS.accent),
+                    ),
+                  ),
           ],
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : m == null
-              ? Center(
-                  child: Text('Machine not found',
-                      style: GoogleFonts.spaceGrotesk(color: context.appTextMuted)))
-              : _buildBody(context, m),
+          ? Center(
+              child: Text(
+                'Machine not found',
+                style: GoogleFonts.spaceGrotesk(color: context.appTextMuted),
+              ),
+            )
+          : _buildBody(context, m),
     );
   }
 
   Widget _buildBody(BuildContext context, MachineModel m) {
-    final sc     = m.statusColor;
-    final qrData = 'bluelims://${SupabaseManager.projectRef ?? 'local'}/machines/${m.id}';
-    final upcoming = _reservations
-        .where((r) => r.start.isAfter(DateTime.now()) || r.isOngoing)
-        .toList()
-      ..sort((a, b) => a.start.compareTo(b.start));
+    final sc = m.statusColor;
+    final qrData = QrRules.build(
+      SupabaseManager.projectRef ?? 'local',
+      'machines',
+      m.id,
+    );
+    final upcoming =
+        _reservations
+            .where((r) => r.start.isAfter(DateTime.now()) || r.isOngoing)
+            .toList()
+          ..sort((a, b) => a.start.compareTo(b.start));
     final past = _reservations
         .where((r) => r.end.isBefore(DateTime.now()))
         .toList();
 
     return SingleChildScrollView(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        // ── Header ────────────────────────────────────────────────────────────
-        _buildHeader(context, m, sc, qrData),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Header ────────────────────────────────────────────────────────────
+          _buildHeader(context, m, sc, qrData),
 
-        // ── Sections ──────────────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(children: [
-            _Section(
-              index: 0,
-              title: 'MACHINE DETAILS',
-              icon: Icons.precision_manufacturing_outlined,
-              expanded: _expanded.contains(0),
-              onToggle: () => setState(() =>
-                  _expanded.contains(0) ? _expanded.remove(0) : _expanded.add(0)),
-              child: _buildDetailsSection(context),
+          // ── Sections ──────────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _Section(
+                  index: 0,
+                  title: 'MACHINE DETAILS',
+                  icon: Icons.precision_manufacturing_outlined,
+                  expanded: _expanded.contains(0),
+                  onToggle: () => setState(
+                    () => _expanded.contains(0)
+                        ? _expanded.remove(0)
+                        : _expanded.add(0),
+                  ),
+                  child: _buildDetailsSection(context),
+                ),
+                _Section(
+                  index: 1,
+                  title: 'IDENTIFICATION',
+                  icon: Icons.fingerprint_outlined,
+                  expanded: _expanded.contains(1),
+                  onToggle: () => setState(
+                    () => _expanded.contains(1)
+                        ? _expanded.remove(1)
+                        : _expanded.add(1),
+                  ),
+                  child: _buildIdentificationSection(context),
+                ),
+                _Section(
+                  index: 2,
+                  title: 'LOCATION',
+                  icon: Icons.place_outlined,
+                  expanded: _expanded.contains(2),
+                  onToggle: () => setState(
+                    () => _expanded.contains(2)
+                        ? _expanded.remove(2)
+                        : _expanded.add(2),
+                  ),
+                  child: _buildLocationSection(context),
+                ),
+                _Section(
+                  index: 3,
+                  title: 'MAINTENANCE & CALIBRATION',
+                  icon: Icons.build_outlined,
+                  expanded: _expanded.contains(3),
+                  onToggle: () => setState(
+                    () => _expanded.contains(3)
+                        ? _expanded.remove(3)
+                        : _expanded.add(3),
+                  ),
+                  child: _buildMaintenanceSection(context, m),
+                ),
+                _Section(
+                  index: 4,
+                  title: 'PURCHASE & WARRANTY',
+                  icon: Icons.receipt_long_outlined,
+                  expanded: _expanded.contains(4),
+                  onToggle: () => setState(
+                    () => _expanded.contains(4)
+                        ? _expanded.remove(4)
+                        : _expanded.add(4),
+                  ),
+                  child: _buildPurchaseSection(context),
+                ),
+                _Section(
+                  index: 5,
+                  title: 'NOTES',
+                  icon: Icons.notes_rounded,
+                  expanded: _expanded.contains(5),
+                  onToggle: () => setState(
+                    () => _expanded.contains(5)
+                        ? _expanded.remove(5)
+                        : _expanded.add(5),
+                  ),
+                  child: _InlineField(
+                    label: 'Notes',
+                    controller: _notesCtrl,
+                    maxLines: 4,
+                    readOnly: !_editMode,
+                  ),
+                ),
+                _Section(
+                  index: 6,
+                  title: 'RESERVATIONS (${_reservations.length})',
+                  icon: Icons.event_outlined,
+                  expanded: _expanded.contains(6),
+                  onToggle: () => setState(
+                    () => _expanded.contains(6)
+                        ? _expanded.remove(6)
+                        : _expanded.add(6),
+                  ),
+                  child: _buildReservationsSection(context, upcoming, past),
+                ),
+              ],
             ),
-            _Section(
-              index: 1,
-              title: 'IDENTIFICATION',
-              icon: Icons.fingerprint_outlined,
-              expanded: _expanded.contains(1),
-              onToggle: () => setState(() =>
-                  _expanded.contains(1) ? _expanded.remove(1) : _expanded.add(1)),
-              child: _buildIdentificationSection(context),
-            ),
-            _Section(
-              index: 2,
-              title: 'LOCATION',
-              icon: Icons.place_outlined,
-              expanded: _expanded.contains(2),
-              onToggle: () => setState(() =>
-                  _expanded.contains(2) ? _expanded.remove(2) : _expanded.add(2)),
-              child: _buildLocationSection(context),
-            ),
-            _Section(
-              index: 3,
-              title: 'MAINTENANCE & CALIBRATION',
-              icon: Icons.build_outlined,
-              expanded: _expanded.contains(3),
-              onToggle: () => setState(() =>
-                  _expanded.contains(3) ? _expanded.remove(3) : _expanded.add(3)),
-              child: _buildMaintenanceSection(context, m),
-            ),
-            _Section(
-              index: 4,
-              title: 'PURCHASE & WARRANTY',
-              icon: Icons.receipt_long_outlined,
-              expanded: _expanded.contains(4),
-              onToggle: () => setState(() =>
-                  _expanded.contains(4) ? _expanded.remove(4) : _expanded.add(4)),
-              child: _buildPurchaseSection(context),
-            ),
-            _Section(
-              index: 5,
-              title: 'NOTES',
-              icon: Icons.notes_rounded,
-              expanded: _expanded.contains(5),
-              onToggle: () => setState(() =>
-                  _expanded.contains(5) ? _expanded.remove(5) : _expanded.add(5)),
-              child: _InlineField(
-                  label: 'Notes',
-                  controller: _notesCtrl,
-                  maxLines: 4,
-                  readOnly: !_editMode),
-            ),
-            _Section(
-              index: 6,
-              title: 'RESERVATIONS (${_reservations.length})',
-              icon: Icons.event_outlined,
-              expanded: _expanded.contains(6),
-              onToggle: () => setState(() =>
-                  _expanded.contains(6) ? _expanded.remove(6) : _expanded.add(6)),
-              child: _buildReservationsSection(context, upcoming, past),
-            ),
-          ]),
-        ),
-      ]),
+          ),
+        ],
+      ),
     );
   }
 
   // ── Header ─────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader(BuildContext context, MachineModel m, Color sc, String qrData) {
+  Widget _buildHeader(
+    BuildContext context,
+    MachineModel m,
+    Color sc,
+    String qrData,
+  ) {
     return Container(
       color: context.appSurface2,
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        GestureDetector(
-          onTap: () => _showQr(m),
-          child: Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(10),
-            child: QrImageView(data: qrData, size: 110),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => _showQr(m),
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(10),
+              child: QrImageView(data: qrData, size: 110),
+            ),
           ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(m.name,
-                style: GoogleFonts.spaceGrotesk(
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  m.name,
+                  style: GoogleFonts.spaceGrotesk(
                     color: context.appTextPrimary,
                     fontSize: 22,
-                    fontWeight: FontWeight.w700)),
-            if (m.brand != null || m.model != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                [if (m.brand != null) m.brand!, if (m.model != null) m.model!].join(' · '),
-                style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextSecondary, fontSize: 13)),
-            ],
-            const SizedBox(height: 8),
-            Wrap(spacing: 6, runSpacing: 4, children: [
-              _StatusBadge(status: m.status, color: sc),
-              if (m.maintenanceOverdue)
-                _SmallBadge(label: 'Maintenance overdue', color: AppDS.red),
-              if (m.maintenanceDueSoon && !m.maintenanceOverdue)
-                _SmallBadge(label: 'Maintenance due soon', color: AppDS.yellow),
-            ]),
-            const SizedBox(height: 6),
-            GestureDetector(
-              onTap: () async {
-                await Clipboard.setData(ClipboardData(text: qrData));
-                _snack('Link copied');
-              },
-              child: Text(qrData,
-                  style: GoogleFonts.jetBrainsMono(
-                      color: context.appTextMuted, fontSize: 10)),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (m.brand != null || m.model != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if (m.brand != null) m.brand!,
+                      if (m.model != null) m.model!,
+                    ].join(' · '),
+                    style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _StatusBadge(status: m.status, color: sc),
+                    if (m.maintenanceOverdue)
+                      _SmallBadge(
+                        label: 'Maintenance overdue',
+                        color: AppDS.red,
+                      ),
+                    if (m.maintenanceDueSoon && !m.maintenanceOverdue)
+                      _SmallBadge(
+                        label: 'Maintenance due soon',
+                        color: AppDS.yellow,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                GestureDetector(
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: qrData));
+                    _snack('Link copied');
+                  },
+                  child: Text(
+                    qrData,
+                    style: GoogleFonts.jetBrainsMono(
+                      color: context.appTextMuted,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ]),
-        ),
-      ]),
+          ),
+        ],
+      ),
     );
   }
 
@@ -529,225 +688,334 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
 
   Widget _buildDetailsSection(BuildContext context) {
     final ro = !_editMode;
-    return Column(children: [
-      _FieldRow(children: [
-        _InlineField(label: 'Name *', controller: _nameCtrl, readOnly: ro),
-        _InlineDropdown<String>(
-          label: 'Status',
-          value: _status,
-          readOnly: ro,
-          items: MachineModel.statusOptions
-              .map((s) => DropdownMenuItem(
-                    value: s,
-                    child: Text(MachineModel.statusLabel(s),
+    return Column(
+      children: [
+        _FieldRow(
+          children: [
+            _InlineField(label: 'Name *', controller: _nameCtrl, readOnly: ro),
+            _InlineDropdown<String>(
+              label: 'Status',
+              value: _status,
+              readOnly: ro,
+              items: MachineModel.statusOptions
+                  .map(
+                    (s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(
+                        MachineModel.statusLabel(s),
                         style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextPrimary, fontSize: 13)),
-                  ))
-              .toList(),
-          onChanged: (v) => setState(() => _status = v ?? 'operational'),
+                          color: context.appTextPrimary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() => _status = v ?? 'operational'),
+            ),
+          ],
         ),
-      ]),
-      const SizedBox(height: 10),
-      _FieldRow(children: [
-        _InlineField(label: 'Type', controller: _typeCtrl, readOnly: ro),
-        _InlineField(label: 'Brand', controller: _brandCtrl, readOnly: ro),
-      ]),
-      const SizedBox(height: 10),
-      _InlineField(label: 'Model', controller: _modelCtrl, readOnly: ro),
-    ]);
+        const SizedBox(height: 10),
+        _FieldRow(
+          children: [
+            _InlineField(label: 'Type', controller: _typeCtrl, readOnly: ro),
+            _InlineField(label: 'Brand', controller: _brandCtrl, readOnly: ro),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _InlineField(label: 'Model', controller: _modelCtrl, readOnly: ro),
+      ],
+    );
   }
 
   Widget _buildIdentificationSection(BuildContext context) {
     final ro = !_editMode;
-    return Column(children: [
-      _FieldRow(children: [
-        _InlineField(label: 'Serial Number', controller: _serialCtrl, readOnly: ro),
-        _InlineField(label: 'Patrimony Number', controller: _patrimonyCtrl, readOnly: ro),
-      ]),
-      const SizedBox(height: 10),
-      _FieldRow(children: [
-        _InlineField(label: 'Supplier', controller: _supplierCtrl, readOnly: ro),
-        DetailResponsibleField(
-          label: 'Responsible',
-          controller: _responsibleCtrl,
-          users: _allUsers,
+    return Column(
+      children: [
+        _FieldRow(
+          children: [
+            _InlineField(
+              label: 'Serial Number',
+              controller: _serialCtrl,
+              readOnly: ro,
+            ),
+            _InlineField(
+              label: 'Patrimony Number',
+              controller: _patrimonyCtrl,
+              readOnly: ro,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _FieldRow(
+          children: [
+            _InlineField(
+              label: 'Supplier',
+              controller: _supplierCtrl,
+              readOnly: ro,
+            ),
+            DetailResponsibleField(
+              label: 'Responsible',
+              controller: _responsibleCtrl,
+              users: _allUsers,
+              readOnly: ro,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _InlineField(
+          label: 'Manual Link',
+          controller: _manualCtrl,
           readOnly: ro,
         ),
-      ]),
-      const SizedBox(height: 10),
-      _InlineField(label: 'Manual Link', controller: _manualCtrl, readOnly: ro),
-    ]);
+      ],
+    );
   }
 
   Widget _buildLocationSection(BuildContext context) {
     final ro = !_editMode;
-    return _FieldRow(children: [
-      _InlineDropdown<int?>(
-        label: 'Location',
-        value: _locationId,
-        readOnly: ro,
-        items: [
-          DropdownMenuItem<int?>(
-            value: null,
-            child: Text('None', style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted, fontSize: 13)),
-          ),
-          ..._allLocations.map((l) => DropdownMenuItem<int?>(
+    return _FieldRow(
+      children: [
+        _InlineDropdown<int?>(
+          label: 'Location',
+          value: _locationId,
+          readOnly: ro,
+          items: [
+            DropdownMenuItem<int?>(
+              value: null,
+              child: Text(
+                'None',
+                style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextMuted,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            ..._allLocations.map(
+              (l) => DropdownMenuItem<int?>(
                 value: (l['location_id'] as num).toInt(),
-                child: Text(l['location_name'] as String,
-                    style: GoogleFonts.spaceGrotesk(
-                        color: context.appTextPrimary, fontSize: 13)),
-              )),
-        ],
-        onChanged: (v) => setState(() => _locationId = v),
-      ),
-      _InlineField(label: 'Room', controller: _roomCtrl, readOnly: ro),
-    ]);
+                child: Text(
+                  l['location_name'] as String,
+                  style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextPrimary,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
+          onChanged: (v) => setState(() => _locationId = v),
+        ),
+        _InlineField(label: 'Room', controller: _roomCtrl, readOnly: ro),
+      ],
+    );
   }
 
   Widget _buildMaintenanceSection(BuildContext context, MachineModel m) {
     final ro = !_editMode;
-    return Column(children: [
-      _FieldRow(children: [
-        _DateField(
-          label: 'Last Maintenance',
-          date: _lastMaintenance,
-          readOnly: ro,
-          onTap: () => _pickDate(_lastMaintenance, (d) => setState(() => _lastMaintenance = d)),
-          onClear: () => setState(() => _lastMaintenance = null),
+    return Column(
+      children: [
+        _FieldRow(
+          children: [
+            _DateField(
+              label: 'Last Maintenance',
+              date: _lastMaintenance,
+              readOnly: ro,
+              onTap: () => _pickDate(
+                _lastMaintenance,
+                (d) => setState(() => _lastMaintenance = d),
+              ),
+              onClear: () => setState(() => _lastMaintenance = null),
+            ),
+            _DateField(
+              label: 'Next Maintenance',
+              date: _nextMaintenance,
+              readOnly: ro,
+              onTap: () => _pickDate(
+                _nextMaintenance,
+                (d) => setState(() => _nextMaintenance = d),
+              ),
+              onClear: () => setState(() => _nextMaintenance = null),
+              danger: m.maintenanceOverdue,
+              warning: m.maintenanceDueSoon && !m.maintenanceOverdue,
+            ),
+          ],
         ),
-        _DateField(
-          label: 'Next Maintenance',
-          date: _nextMaintenance,
-          readOnly: ro,
-          onTap: () => _pickDate(_nextMaintenance, (d) => setState(() => _nextMaintenance = d)),
-          onClear: () => setState(() => _nextMaintenance = null),
-          danger: m.maintenanceOverdue,
-          warning: m.maintenanceDueSoon && !m.maintenanceOverdue,
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _InlineField(
+                label: 'Maintenance interval (days)',
+                controller: _maintIntervalCtrl,
+                readOnly: ro,
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const Expanded(child: SizedBox()),
+          ],
         ),
-      ]),
-      const SizedBox(height: 10),
-      Row(children: [
-        Expanded(child: _InlineField(
-          label: 'Maintenance interval (days)',
-          controller: _maintIntervalCtrl,
-          readOnly: ro,
-          keyboardType: TextInputType.number,
-        )),
-        const Expanded(child: SizedBox()),
-      ]),
-      const SizedBox(height: 10),
-      _FieldRow(children: [
-        _DateField(
-          label: 'Last Calibration',
-          date: _lastCalibration,
-          readOnly: ro,
-          onTap: () => _pickDate(_lastCalibration, (d) => setState(() => _lastCalibration = d)),
-          onClear: () => setState(() => _lastCalibration = null),
+        const SizedBox(height: 10),
+        _FieldRow(
+          children: [
+            _DateField(
+              label: 'Last Calibration',
+              date: _lastCalibration,
+              readOnly: ro,
+              onTap: () => _pickDate(
+                _lastCalibration,
+                (d) => setState(() => _lastCalibration = d),
+              ),
+              onClear: () => setState(() => _lastCalibration = null),
+            ),
+            _DateField(
+              label: 'Next Calibration',
+              date: _nextCalibration,
+              readOnly: ro,
+              onTap: () => _pickDate(
+                _nextCalibration,
+                (d) => setState(() => _nextCalibration = d),
+              ),
+              onClear: () => setState(() => _nextCalibration = null),
+            ),
+          ],
         ),
-        _DateField(
-          label: 'Next Calibration',
-          date: _nextCalibration,
-          readOnly: ro,
-          onTap: () => _pickDate(_nextCalibration, (d) => setState(() => _nextCalibration = d)),
-          onClear: () => setState(() => _nextCalibration = null),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _InlineField(
+                label: 'Calibration interval (days)',
+                controller: _calibIntervalCtrl,
+                readOnly: ro,
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const Expanded(child: SizedBox()),
+          ],
         ),
-      ]),
-      const SizedBox(height: 10),
-      Row(children: [
-        Expanded(child: _InlineField(
-          label: 'Calibration interval (days)',
-          controller: _calibIntervalCtrl,
-          readOnly: ro,
-          keyboardType: TextInputType.number,
-        )),
-        const Expanded(child: SizedBox()),
-      ]),
-    ]);
+      ],
+    );
   }
 
   Widget _buildPurchaseSection(BuildContext context) {
     final ro = !_editMode;
-    return _FieldRow(children: [
-      _DateField(
-        label: 'Purchase Date',
-        date: _purchaseDate,
-        readOnly: ro,
-        onTap: () => _pickDate(_purchaseDate, (d) => setState(() => _purchaseDate = d)),
-        onClear: () => setState(() => _purchaseDate = null),
-      ),
-      _DateField(
-        label: 'Warranty Until',
-        date: _warrantyDate,
-        readOnly: ro,
-        onTap: () => _pickDate(_warrantyDate, (d) => setState(() => _warrantyDate = d)),
-        onClear: () => setState(() => _warrantyDate = null),
-        warning: _warrantyDate != null &&
-            _warrantyDate!.isAfter(DateTime.now()) &&
-            _warrantyDate!.difference(DateTime.now()).inDays <= 30,
-        danger: _warrantyDate != null && _warrantyDate!.isBefore(DateTime.now()),
-      ),
-    ]);
+    return _FieldRow(
+      children: [
+        _DateField(
+          label: 'Purchase Date',
+          date: _purchaseDate,
+          readOnly: ro,
+          onTap: () => _pickDate(
+            _purchaseDate,
+            (d) => setState(() => _purchaseDate = d),
+          ),
+          onClear: () => setState(() => _purchaseDate = null),
+        ),
+        _DateField(
+          label: 'Warranty Until',
+          date: _warrantyDate,
+          readOnly: ro,
+          onTap: () => _pickDate(
+            _warrantyDate,
+            (d) => setState(() => _warrantyDate = d),
+          ),
+          onClear: () => setState(() => _warrantyDate = null),
+          warning:
+              _warrantyDate != null &&
+              _warrantyDate!.isAfter(DateTime.now()) &&
+              _warrantyDate!.difference(DateTime.now()).inDays <= 30,
+          danger:
+              _warrantyDate != null && _warrantyDate!.isBefore(DateTime.now()),
+        ),
+      ],
+    );
   }
 
   Widget _buildReservationsSection(
-      BuildContext context,
-      List<ReservationModel> upcoming,
-      List<ReservationModel> past) {
+    BuildContext context,
+    List<ReservationModel> upcoming,
+    List<ReservationModel> past,
+  ) {
     if (_reservations.isEmpty) {
-      return Text('No reservations recorded.',
-          style: GoogleFonts.spaceGrotesk(
-              color: context.appTextMuted, fontSize: 13));
+      return Text(
+        'No reservations recorded.',
+        style: GoogleFonts.spaceGrotesk(
+          color: context.appTextMuted,
+          fontSize: 13,
+        ),
+      );
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (upcoming.isNotEmpty) ...[
-        Text('Upcoming / Ongoing',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (upcoming.isNotEmpty) ...[
+          Text(
+            'Upcoming / Ongoing',
             style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6)),
-        const SizedBox(height: 6),
-        ...upcoming.map((r) => _ReservationTile(reservation: r)),
-        if (past.isNotEmpty) const SizedBox(height: 12),
-      ],
-      if (past.isNotEmpty) ...[
-        Text('Past (last ${past.take(5).length})',
+              color: context.appTextMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...upcoming.map((r) => _ReservationTile(reservation: r)),
+          if (past.isNotEmpty) const SizedBox(height: 12),
+        ],
+        if (past.isNotEmpty) ...[
+          Text(
+            'Past (last ${past.take(5).length})',
             style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6)),
-        const SizedBox(height: 6),
-        ...past.take(5).map((r) => _ReservationTile(reservation: r, past: true)),
+              color: context.appTextMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...past
+              .take(5)
+              .map((r) => _ReservationTile(reservation: r, past: true)),
+        ],
       ],
-    ]);
+    );
   }
 
   // ── QR dialog ──────────────────────────────────────────────────────────────
 
   void _showQr(MachineModel m) {
-    final ref  = SupabaseManager.projectRef ?? 'local';
-    final data = 'bluelims://$ref/machines/${m.id}';
+    final ref = SupabaseManager.projectRef ?? 'local';
+    final data = QrRules.build(ref, 'machines', m.id);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.appSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('QR — ${m.name}',
-            style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary)),
+        title: Text(
+          'QR — ${m.name}',
+          style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary),
+        ),
         content: SizedBox(
           width: 260,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
                 color: Colors.white,
                 padding: const EdgeInsets.all(12),
-                child: QrImageView(data: data, size: 200)),
-            const SizedBox(height: 10),
-            Text(data,
+                child: QrImageView(data: data, size: 200),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                data,
                 style: GoogleFonts.spaceGrotesk(
-                    color: ctx.appTextMuted, fontSize: 11)),
-          ]),
+                  color: ctx.appTextMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -756,13 +1024,17 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
               if (context.mounted) Navigator.pop(ctx);
               _snack('Link copied');
             },
-            child: Text('Copy Link',
-                style: GoogleFonts.spaceGrotesk(color: AppDS.accent)),
+            child: Text(
+              'Copy Link',
+              style: GoogleFonts.spaceGrotesk(color: AppDS.accent),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Close',
-                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
+            child: Text(
+              'Close',
+              style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary),
+            ),
           ),
         ],
       ),
@@ -778,7 +1050,7 @@ class _ReservationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r  = reservation;
+    final r = reservation;
     final sc = r.statusColor;
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -787,38 +1059,52 @@ class _ReservationTile extends StatelessWidget {
         color: context.appSurface,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-            color: past ? context.appBorder : sc.withValues(alpha: 0.4)),
+          color: past ? context.appBorder : sc.withValues(alpha: 0.4),
+        ),
       ),
-      child: Row(children: [
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              '${_fmtDt(r.start)} → ${_fmtDt(r.end)}',
-              style: GoogleFonts.spaceGrotesk(
-                  color: past
-                      ? context.appTextSecondary
-                      : context.appTextPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${_fmtDt(r.start)} → ${_fmtDt(r.end)}',
+                  style: GoogleFonts.spaceGrotesk(
+                    color: past
+                        ? context.appTextSecondary
+                        : context.appTextPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (r.purpose != null || r.project != null)
+                  Text(
+                    [
+                      if (r.purpose != null) r.purpose!,
+                      if (r.project != null) r.project!,
+                    ].join(' · '),
+                    style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+              ],
             ),
-            if (r.purpose != null || r.project != null)
-              Text(
-                [if (r.purpose != null) r.purpose!, if (r.project != null) r.project!].join(' · '),
-                style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextMuted, fontSize: 11),
-              ),
-          ]),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: sc.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(4),
           ),
-          child: Text(r.status,
-              style: GoogleFonts.spaceGrotesk(color: sc, fontSize: 11)),
-        ),
-      ]),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: sc.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              r.status,
+              style: GoogleFonts.spaceGrotesk(color: sc, fontSize: 11),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -853,42 +1139,52 @@ class _Section extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: context.appBorder),
       ),
-      child: Column(children: [
-        InkWell(
-          onTap: onToggle,
-          borderRadius: BorderRadius.vertical(
-            top: const Radius.circular(10),
-            bottom: Radius.circular(expanded ? 0 : 10),
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-            decoration: BoxDecoration(
-              color: context.appSurface2,
-              borderRadius: BorderRadius.vertical(
-                top: const Radius.circular(10),
-                bottom: Radius.circular(expanded ? 0 : 10),
-              ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.vertical(
+              top: const Radius.circular(10),
+              bottom: Radius.circular(expanded ? 0 : 10),
             ),
-            child: Row(children: [
-              Icon(icon, size: 14, color: AppDS.accent),
-              const SizedBox(width: 8),
-              Text(title,
-                  style: GoogleFonts.spaceGrotesk(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              decoration: BoxDecoration(
+                color: context.appSurface2,
+                borderRadius: BorderRadius.vertical(
+                  top: const Radius.circular(10),
+                  bottom: Radius.circular(expanded ? 0 : 10),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, size: 14, color: AppDS.accent),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: GoogleFonts.spaceGrotesk(
                       color: context.appTextSecondary,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8)),
-              const Spacer(),
-              Icon(expanded ? Icons.expand_less : Icons.expand_more,
-                  size: 18, color: context.appTextMuted),
-            ]),
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: context.appTextMuted,
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        if (expanded) ...[
-          Divider(height: 1, color: context.appBorder),
-          Padding(padding: const EdgeInsets.all(14), child: child),
+          if (expanded) ...[
+            Divider(height: 1, color: context.appBorder),
+            Padding(padding: const EdgeInsets.all(14), child: child),
+          ],
         ],
-      ]),
+      ),
     );
   }
 }
@@ -901,10 +1197,11 @@ class _FieldRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: children
-          .expand((w) => [Expanded(child: w), const SizedBox(width: 10)])
-          .toList()
-        ..removeLast(),
+      children:
+          children
+              .expand((w) => [Expanded(child: w), const SizedBox(width: 10)])
+              .toList()
+            ..removeLast(),
     );
   }
 }
@@ -932,25 +1229,35 @@ class _InlineField extends StatelessWidget {
       keyboardType: keyboardType,
       readOnly: readOnly,
       style: GoogleFonts.spaceGrotesk(
-          color: readOnly ? context.appTextSecondary : context.appTextPrimary,
-          fontSize: 13),
+        color: readOnly ? context.appTextSecondary : context.appTextPrimary,
+        fontSize: 13,
+      ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.spaceGrotesk(
-            color: context.appTextSecondary, fontSize: 11),
+          color: context.appTextSecondary,
+          fontSize: 11,
+        ),
         filled: true,
         fillColor: readOnly ? context.appSurface2 : context.appSurface3,
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.appBorder)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.appBorder)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-                color: readOnly ? context.appBorder : AppDS.accent)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: readOnly ? context.appBorder : AppDS.accent,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
       ),
     );
   }
@@ -977,15 +1284,19 @@ class _InlineDropdown<T> extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.spaceGrotesk(
-            color: context.appTextSecondary, fontSize: 11),
+          color: context.appTextSecondary,
+          fontSize: 11,
+        ),
         filled: true,
         fillColor: readOnly ? context.appSurface2 : context.appSurface3,
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.appBorder)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.appBorder)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
       child: DropdownButtonHideUnderline(
@@ -994,8 +1305,9 @@ class _InlineDropdown<T> extends StatelessWidget {
           isExpanded: true,
           dropdownColor: context.appSurface,
           style: GoogleFonts.spaceGrotesk(
-              color: readOnly ? context.appTextSecondary : context.appTextPrimary,
-              fontSize: 13),
+            color: readOnly ? context.appTextSecondary : context.appTextPrimary,
+            fontSize: 13,
+          ),
           items: items,
           onChanged: readOnly ? null : onChanged,
           disabledHint: _disabledHint(context),
@@ -1012,7 +1324,9 @@ class _InlineDropdown<T> extends StatelessWidget {
     if (match.isEmpty) return null;
     return DefaultTextStyle.merge(
       style: GoogleFonts.spaceGrotesk(
-          color: context.appTextSecondary, fontSize: 13),
+        color: context.appTextSecondary,
+        fontSize: 13,
+      ),
       child: match.first.child,
     );
   }
@@ -1032,55 +1346,72 @@ class _DateField extends StatelessWidget {
     required this.date,
     required this.onTap,
     required this.onClear,
-    this.danger  = false,
+    this.danger = false,
     this.warning = false,
     this.readOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? AppDS.red : warning ? AppDS.yellow : AppDS.accent;
+    final color = danger
+        ? AppDS.red
+        : warning
+        ? AppDS.yellow
+        : AppDS.accent;
     return GestureDetector(
       onTap: readOnly ? null : onTap,
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
           labelStyle: GoogleFonts.spaceGrotesk(
-              color: context.appTextSecondary, fontSize: 11),
+            color: context.appTextSecondary,
+            fontSize: 11,
+          ),
           filled: true,
           fillColor: readOnly ? context.appSurface2 : context.appSurface3,
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color: (danger || warning)
-                      ? color.withValues(alpha: 0.5)
-                      : context.appBorder)),
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(
+              color: (danger || warning)
+                  ? color.withValues(alpha: 0.5)
+                  : context.appBorder,
+            ),
+          ),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                  color: (danger || warning)
-                      ? color.withValues(alpha: 0.5)
-                      : context.appBorder)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(
+              color: (danger || warning)
+                  ? color.withValues(alpha: 0.5)
+                  : context.appBorder,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
           suffixIcon: readOnly
               ? null
               : date != null
-                  ? GestureDetector(
-                      onTap: onClear,
-                      child: Icon(Icons.clear,
-                          size: 16, color: context.appTextMuted))
-                  : const Icon(Icons.calendar_today_outlined, size: 14),
+              ? GestureDetector(
+                  onTap: onClear,
+                  child: Icon(
+                    Icons.clear,
+                    size: 16,
+                    color: context.appTextMuted,
+                  ),
+                )
+              : const Icon(Icons.calendar_today_outlined, size: 14),
         ),
         child: Text(
           date != null
               ? '${date!.year}-${date!.month.toString().padLeft(2, '0')}-${date!.day.toString().padLeft(2, '0')}'
               : '—',
           style: GoogleFonts.spaceGrotesk(
-              color: date != null
-                  ? (danger || warning ? color : context.appTextPrimary)
-                  : context.appTextMuted,
-              fontSize: 13),
+            color: date != null
+                ? (danger || warning ? color : context.appTextPrimary)
+                : context.appTextMuted,
+            fontSize: 13,
+          ),
         ),
       ),
     );
@@ -1095,15 +1426,20 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(MachineModel.statusLabel(status),
-            style: GoogleFonts.spaceGrotesk(
-                color: color, fontSize: 13, fontWeight: FontWeight.w600)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      MachineModel.statusLabel(status),
+      style: GoogleFonts.spaceGrotesk(
+        color: color,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 }
 
 class _SmallBadge extends StatelessWidget {
@@ -1113,12 +1449,14 @@ class _SmallBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(label,
-            style: GoogleFonts.spaceGrotesk(color: color, fontSize: 11)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Text(
+      label,
+      style: GoogleFonts.spaceGrotesk(color: color, fontSize: 11),
+    ),
+  );
 }

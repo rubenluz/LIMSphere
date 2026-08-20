@@ -15,8 +15,15 @@ part of '../label_page.dart';
 /// Printable dot widths per tape width (mm) at 300 DPI, from the Brother QL spec.
 /// The printable area is always smaller than the physical tape width due to margins.
 const _kQl700PrintableDots300 = <int, int>{
-  12: 120, 17: 165, 23: 202, 29: 306,
-  38: 413, 50: 554, 54: 590, 58: 618, 62: 696,
+  12: 120,
+  17: 165,
+  23: 202,
+  29: 306,
+  38: 413,
+  50: 554,
+  54: 590,
+  58: 618,
+  62: 696,
 };
 
 const _kQl700Port = 9100;
@@ -25,8 +32,9 @@ const _kQl700Port = 9100;
 /// Falls back to an approximate formula for unlisted widths.
 int _ql700PrintableDots(double tapeMm, int dpi) {
   final key = tapeMm.round();
-  final base = _kQl700PrintableDots300[key]
-      ?? ((tapeMm * 300 / 25.4) * 0.88).round().clamp(1, 720).toInt();
+  final base =
+      _kQl700PrintableDots300[key] ??
+      ((tapeMm * 300 / 25.4) * 0.88).round().clamp(1, 720).toInt();
   return dpi == 600 ? base * 2 : base;
 }
 
@@ -92,33 +100,54 @@ int _ql700ContinuousEndByte(String cutMode, int pageIdx, int totalPages) {
 /// sensor resets cleanly. ESC @ and ESC i a are sent once per job — repeating
 /// them causes a media-sensing advance that misaligns subsequent labels.
 Future<Uint8List> _generateBrotherQl700Data(
-    LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) async {
+  LabelTemplate tpl,
+  List<Map<String, dynamic>> records,
+  PrinterConfig cfg,
+) async {
   final printRecords = records.isEmpty ? [<String, dynamic>{}] : records;
   final buf = BytesBuilder();
 
-  final pxPerMm     = tpl.dpi / 25.4;
-  final rasterH     = (tpl.labelH * pxPerMm).ceil();
-  final rasterBytes = [rasterH & 0xFF, (rasterH >> 8) & 0xFF, (rasterH >> 16) & 0xFF, (rasterH >> 24) & 0xFF];
-  final mediaTypeByte = cfg.continuousRoll ? _kQl700MediaTypeContinuous : _kQl700MediaTypeDieCut;
-  final labelLenByte  = cfg.continuousRoll ? _kQl700LabelLenContinuous  : tpl.labelH.round();
+  final pxPerMm = tpl.dpi / 25.4;
+  final rasterH = (tpl.labelH * pxPerMm).ceil();
+  final rasterBytes = [
+    rasterH & 0xFF,
+    (rasterH >> 8) & 0xFF,
+    (rasterH >> 16) & 0xFF,
+    (rasterH >> 24) & 0xFF,
+  ];
+  final mediaTypeByte = cfg.continuousRoll
+      ? _kQl700MediaTypeContinuous
+      : _kQl700MediaTypeDieCut;
+  final labelLenByte = cfg.continuousRoll
+      ? _kQl700LabelLenContinuous
+      : tpl.labelH.round();
 
   // Single initialisation for the whole job.
   // ESC @ and ESC i a must NOT be repeated per label — on die-cut media,
   // ESC @ triggers a media-sensing advance that misaligns every subsequent label.
-  buf.add(List.filled(200, 0));               // Invalidate
-  buf.add(const [0x1B, 0x40]);               // ESC @: initialize
-  buf.add(const [0x1B, 0x69, 0x61, 0x01]);  // ESC i a: raster mode (once per job)
+  buf.add(List.filled(200, 0)); // Invalidate
+  buf.add(const [0x1B, 0x40]); // ESC @: initialize
+  buf.add(const [
+    0x1B,
+    0x69,
+    0x61,
+    0x01,
+  ]); // ESC i a: raster mode (once per job)
   if (cfg.continuousRoll) {
     buf.add([0x1B, 0x69, 0x4D, _ql700ContinuousAutoCutFlag(tpl.cutMode)]);
   } else {
-    buf.add(const [0x1B, 0x69, 0x4D, 0x00]); // auto-cut off; 0x1A drives cut per label
+    buf.add(const [
+      0x1B,
+      0x69,
+      0x4D,
+      0x00,
+    ]); // auto-cut off; 0x1A drives cut per label
   }
 
   final totalPages = printRecords.fold(0, (s, _) => s + tpl.copies);
   int pageIdx = 0;
   for (final record in printRecords) {
     for (int c = 0; c < tpl.copies; c++, pageIdx++) {
-
       // Print info (ESC i z).
       // PI flags: bit7=media type, bit6=tape width, bit5=label length.
       // All three set (0xEE) activates gap-detection for die-cut.
@@ -126,15 +155,17 @@ Future<Uint8List> _generateBrotherQl700Data(
         0x1B, 0x69, 0x7A,
         cfg.continuousRoll ? 0x8E : 0xEE,
         mediaTypeByte,
-        tpl.labelW.round(),     // tape width in mm
-        labelLenByte,           // 0 for continuous, label height for die-cut
-        ...rasterBytes,         // raster line count (little-endian)
-        0x00,                   // page# — always 0
+        tpl.labelW.round(), // tape width in mm
+        labelLenByte, // 0 for continuous, label height for die-cut
+        ...rasterBytes, // raster line count (little-endian)
+        0x00, // page# — always 0
         0,
       ]);
 
       final image = await _renderLabelToImage(tpl, record, tpl.dpi);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final byteData = await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
       if (byteData == null) continue;
       final rgba = byteData.buffer.asUint8List();
       final iw = image.width;
@@ -143,19 +174,23 @@ Future<Uint8List> _generateBrotherQl700Data(
       // Raster line is always bytesPerLine wide regardless of tape width.
       // printableDots is the tape's actual print area; image is centered within totalDots.
       final bytesPerLine = _ql700BytesPerLine(tpl.dpi);
-      final totalDots    = _ql700TotalDots(tpl.dpi);
-      final printable    = _ql700PrintableDots(tpl.labelW, tpl.dpi);
-      final leftOffset   = (totalDots - printable) ~/ 2;
+      final totalDots = _ql700TotalDots(tpl.dpi);
+      final printable = _ql700PrintableDots(tpl.labelW, tpl.dpi);
+      final leftOffset = (totalDots - printable) ~/ 2;
 
       for (int row = 0; row < ih; row++) {
         final line = List<int>.filled(bytesPerLine, 0);
         for (int dot = 0; dot < printable; dot++) {
           final col = (dot * iw ~/ printable).clamp(0, iw - 1);
           final idx = (row * iw + col) * 4;
-          final gray = (rgba[idx] * 0.299 + rgba[idx + 1] * 0.587 + rgba[idx + 2] * 0.114).round();
+          final gray =
+              (rgba[idx] * 0.299 +
+                      rgba[idx + 1] * 0.587 +
+                      rgba[idx + 2] * 0.114)
+                  .round();
           if (gray < 128) {
             final physDot = leftOffset + dot;
-            final revDot  = totalDots - 1 - physDot;
+            final revDot = totalDots - 1 - physDot;
             line[revDot ~/ 8] |= (1 << (7 - revDot % 8));
           }
         }
@@ -179,8 +214,11 @@ Future<Uint8List> _generateBrotherQl700Data(
 
 /// Sends Brother QL raster data to the printer over raw TCP port 9100.
 Future<void> _sendBrotherQl700(String ip, Uint8List data) async {
-  final socket =
-      await Socket.connect(ip, _kQl700Port, timeout: const Duration(seconds: 8));
+  final socket = await Socket.connect(
+    ip,
+    _kQl700Port,
+    timeout: const Duration(seconds: 8),
+  );
   try {
     socket.add(data);
     await socket.flush();
@@ -204,13 +242,20 @@ Future<_ConnState> _checkBrotherQl700Connection(PrinterConfig cfg) async {
 }
 
 Future<void> _printBrotherQl700(
-    LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) async {
+  LabelTemplate tpl,
+  List<Map<String, dynamic>> records,
+  PrinterConfig cfg,
+) async {
   final data = await _generateBrotherQl700Data(tpl, records, cfg);
   if (cfg.connectionType == 'usb') {
-    debugPrint('[PRINT] QL-700 raster data: ${data.length} bytes -> USB "${cfg.usbPath}"');
+    debugPrint(
+      '[PRINT] QL-700 raster data: ${data.length} bytes -> USB "${cfg.usbPath}"',
+    );
     await _sendBrotherQl700Usb(cfg, data);
   } else {
-    debugPrint('[PRINT] QL-700 raster data: ${data.length} bytes -> TCP ${cfg.ipAddress}:$_kQl700Port');
+    debugPrint(
+      '[PRINT] QL-700 raster data: ${data.length} bytes -> TCP ${cfg.ipAddress}:$_kQl700Port',
+    );
     await _sendBrotherQl700(cfg.ipAddress, data);
   }
 }

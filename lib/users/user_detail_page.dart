@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 import '../theme/theme_controller.dart';
@@ -108,11 +109,7 @@ class UserDetailPage extends StatefulWidget {
   final Map<String, dynamic> userMap;
   final VoidCallback? onSaved;
 
-  const UserDetailPage({
-    super.key,
-    required this.userMap,
-    this.onSaved,
-  });
+  const UserDetailPage({super.key, required this.userMap, this.onSaved});
 
   @override
   State<UserDetailPage> createState() => _UserDetailPageState();
@@ -120,7 +117,7 @@ class UserDetailPage extends StatefulWidget {
 
 class _UserDetailPageState extends State<UserDetailPage> {
   bool _editing = false;
-  bool _saving  = false;
+  bool _saving = false;
   bool _loadingViewerAccess = true;
 
   // Controllers for all editable fields
@@ -145,12 +142,12 @@ class _UserDetailPageState extends State<UserDetailPage> {
   late String _permCulture;
   late String _permFish;
   late String _permResources;
-  late bool   _notificationsEnabled;
-  late bool   _supportsGranularPermissions;
+  late bool _notificationsEnabled;
+  late bool _supportsGranularPermissions;
   late Map<String, dynamic> _permissionJson;
 
   // Read-only info
-  late int      _id;
+  late int _id;
   String? _authUid;
   DateTime? _createdAt;
   DateTime? _updatedAt;
@@ -158,9 +155,15 @@ class _UserDetailPageState extends State<UserDetailPage> {
   int? _viewerUserId;
   String _viewerRole = '';
 
-  static const _roleOptions   = ['superadmin', 'admin', 'technician', 'researcher', 'viewer'];
+  static const _roleOptions = [
+    'superadmin',
+    'admin',
+    'technician',
+    'researcher',
+    'viewer',
+  ];
   static const _statusOptions = ['pending', 'active', 'inactive'];
-  static const _permOptions        = ['none', 'read', 'write'];
+  static const _permOptions = ['none', 'read', 'write'];
   static const _backupsPermOptions = ['none', 'see'];
 
   @override
@@ -181,35 +184,35 @@ class _UserDetailPageState extends State<UserDetailPage> {
   }
 
   void _loadFromMap(Map<String, dynamic> m) {
-    _id          = m['user_id']     as int? ?? 0;
-    _authUid     = m['user_auth_uid'] as String?;
-    _createdAt   = _dt(m['user_created_at']);
-    _updatedAt   = _dt(m['user_updated_at']);
-    _lastLogin   = _dt(m['user_last_login']);
-    _role        = (m['user_role']   as String?) ?? 'researcher';
-    _status      = (m['user_status'] as String?) ?? 'pending';
-    _permDashboard = (m['user_table_dashboard']          as String?) ?? 'none';
-    _permLabels    = (m['user_table_labels']             as String?) ?? 'none';
-    _permChat      = (m['user_table_chat']               as String?) ?? 'none';
-    _permBackups   = (m['user_table_backups']            as String?) ?? 'none';
-    _permCulture   = (m['user_table_culture_collection'] as String?) ?? 'none';
-    _permFish      = (m['user_table_fish_facility']      as String?) ?? 'none';
-    _permResources = (m['user_table_resources']          as String?) ?? 'none';
+    _id = m['user_id'] as int? ?? 0;
+    _authUid = m['user_auth_uid'] as String?;
+    _createdAt = _dt(m['user_created_at']);
+    _updatedAt = _dt(m['user_updated_at']);
+    _lastLogin = _dt(m['user_last_login']);
+    _role = (m['user_role'] as String?) ?? 'researcher';
+    _status = (m['user_status'] as String?) ?? 'pending';
+    _permDashboard = (m['user_table_dashboard'] as String?) ?? 'none';
+    _permLabels = (m['user_table_labels'] as String?) ?? 'none';
+    _permChat = (m['user_table_chat'] as String?) ?? 'none';
+    _permBackups = (m['user_table_backups'] as String?) ?? 'none';
+    _permCulture = (m['user_table_culture_collection'] as String?) ?? 'none';
+    _permFish = (m['user_table_fish_facility'] as String?) ?? 'none';
+    _permResources = (m['user_table_resources'] as String?) ?? 'none';
     _supportsGranularPermissions =
         (m['__supports_granular_permissions'] as bool?) ??
         m.containsKey('user_permissions_json');
     _permissionJson = normalizeUserPermissionsJson(m['user_permissions_json']);
     _notificationsEnabled = (m['user_notifications_enabled'] as bool?) ?? true;
-    _name.text        = m['user_name']        as String? ?? '';
-    _email.text       = m['user_email']       as String? ?? '';
-    _phone.text       = m['user_phone']       as String? ?? '';
-    _orcid.text       = m['user_orcid']       as String? ?? '';
+    _name.text = m['user_name'] as String? ?? '';
+    _email.text = m['user_email'] as String? ?? '';
+    _phone.text = m['user_phone'] as String? ?? '';
+    _orcid.text = m['user_orcid'] as String? ?? '';
     _institution.text = m['user_institution'] as String? ?? '';
-    _group.text       = m['user_group']       as String? ?? '';
-    _bio.text         = m['user_bio']         as String? ?? '';
-    _timezone.text    = m['user_timezone']    as String? ?? '';
-    _language.text    = m['user_language']    as String? ?? '';
-    _avatarUrl.text   = m['user_avatar_url']  as String? ?? '';
+    _group.text = m['user_group'] as String? ?? '';
+    _bio.text = m['user_bio'] as String? ?? '';
+    _timezone.text = m['user_timezone'] as String? ?? '';
+    _language.text = m['user_language'] as String? ?? '';
+    _avatarUrl.text = m['user_avatar_url'] as String? ?? '';
     _resetWorkflowControllers();
   }
 
@@ -220,7 +223,8 @@ class _UserDetailPageState extends State<UserDetailPage> {
   }
 
   bool get _isSelf => _viewerUserId != null && _viewerUserId == _id;
-  bool get _canManageUserAccess => _viewerRole == 'admin' || _viewerRole == 'superadmin';
+  bool get _canManageUserAccess =>
+      _viewerRole == 'admin' || _viewerRole == 'superadmin';
   bool get _canEditProfile => _canManageUserAccess || _isSelf;
 
   Map<String, dynamic> get _draftUserMap => {
@@ -238,7 +242,8 @@ class _UserDetailPageState extends State<UserDetailPage> {
 
   Future<void> _loadViewerAccess() async {
     try {
-      final email = Supabase.instance.client.auth.currentSession?.user.email ??
+      final email =
+          Supabase.instance.client.auth.currentSession?.user.email ??
           Supabase.instance.client.auth.currentUser?.email ??
           '';
       if (email.isEmpty) return;
@@ -265,13 +270,16 @@ class _UserDetailPageState extends State<UserDetailPage> {
     }
     _workflowStateCtrls.clear();
     for (final moduleId in kPermissionModuleLabels.keys) {
-      _workflowStateCtrls[moduleId] =
-          TextEditingController(text: _workflowStatesText(moduleId));
+      _workflowStateCtrls[moduleId] = TextEditingController(
+        text: _workflowStatesText(moduleId),
+      );
     }
   }
 
   Map<String, dynamic> _pageRule(String moduleId) {
-    final pages = Map<String, dynamic>.from(_permissionJson['pages'] as Map? ?? const {});
+    final pages = Map<String, dynamic>.from(
+      _permissionJson['pages'] as Map? ?? const {},
+    );
     final raw = pages[moduleId];
     return raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
   }
@@ -315,14 +323,19 @@ class _UserDetailPageState extends State<UserDetailPage> {
         .toList();
   }
 
-  ModuleAccess _moduleAccess(String moduleId, {bool ignoreActionOverrides = false}) {
+  ModuleAccess _moduleAccess(
+    String moduleId, {
+    bool ignoreActionOverrides = false,
+  }) {
     final row = Map<String, dynamic>.from(_draftUserMap);
     if (!ignoreActionOverrides) {
       return resolveModuleAccess(moduleId: moduleId, userRow: row);
     }
 
     final normalized = normalizeUserPermissionsJson(_permissionJson);
-    final pages = Map<String, dynamic>.from(normalized['pages'] as Map? ?? const {});
+    final pages = Map<String, dynamic>.from(
+      normalized['pages'] as Map? ?? const {},
+    );
     final rule = _pageRule(moduleId);
     if (rule.isNotEmpty) {
       final sanitized = Map<String, dynamic>.from(rule)..remove('actions');
@@ -343,10 +356,12 @@ class _UserDetailPageState extends State<UserDetailPage> {
     final pageAccess = rule['page_access']?.toString() ?? 'inherit';
     final scope = rule['scope']?.toString() ?? 'all';
     final publication = rule['publication_access']?.toString() ?? 'inherit';
-    final responsibility = rule['responsibility_scope']?.toString() ?? 'inherit';
+    final responsibility =
+        rule['responsibility_scope']?.toString() ?? 'inherit';
     final recordLockBypass = rule['record_lock_bypass'] == true;
     final workflowStates = rule['workflow_edit_states'];
-    final hasWorkflowStates = workflowStates is List && workflowStates.isNotEmpty;
+    final hasWorkflowStates =
+        workflowStates is List && workflowStates.isNotEmpty;
     final actions = rule['actions'];
     final hasActions = actions is Map && actions.isNotEmpty;
     return pageAccess == 'inherit' &&
@@ -363,13 +378,17 @@ class _UserDetailPageState extends State<UserDetailPage> {
     Map<String, dynamic> Function(Map<String, dynamic> rule) mutate,
   ) {
     setState(() {
-      final pages = Map<String, dynamic>.from(_permissionJson['pages'] as Map? ?? const {});
+      final pages = Map<String, dynamic>.from(
+        _permissionJson['pages'] as Map? ?? const {},
+      );
       final next = mutate(_pageRule(moduleId));
 
       if (next['page_access'] == 'inherit') next.remove('page_access');
       if (next['scope'] == 'all') next.remove('scope');
-      if (next['publication_access'] == 'inherit') next.remove('publication_access');
-      if (next['responsibility_scope'] == 'inherit') next.remove('responsibility_scope');
+      if (next['publication_access'] == 'inherit')
+        next.remove('publication_access');
+      if (next['responsibility_scope'] == 'inherit')
+        next.remove('responsibility_scope');
       if (next['record_lock_bypass'] != true) next.remove('record_lock_bypass');
 
       final workflowStates = next['workflow_edit_states'];
@@ -486,10 +505,15 @@ class _UserDetailPageState extends State<UserDetailPage> {
 
   void _togglePageAction(String moduleId, String action) {
     final effective = _moduleAccess(moduleId).allows(action);
-    final base = _moduleAccess(moduleId, ignoreActionOverrides: true).allows(action);
+    final base = _moduleAccess(
+      moduleId,
+      ignoreActionOverrides: true,
+    ).allows(action);
     final desired = !effective;
     _updatePageRule(moduleId, (rule) {
-      final actions = Map<String, dynamic>.from(rule['actions'] as Map? ?? const {});
+      final actions = Map<String, dynamic>.from(
+        rule['actions'] as Map? ?? const {},
+      );
       if (desired == base) {
         actions.remove(action);
       } else {
@@ -512,20 +536,29 @@ class _UserDetailPageState extends State<UserDetailPage> {
   @override
   void dispose() {
     for (final c in [
-      _name, _email, _phone, _orcid, _institution,
-      _group, _bio, _timezone, _language, _avatarUrl,
+      _name,
+      _email,
+      _phone,
+      _orcid,
+      _institution,
+      _group,
+      _bio,
+      _timezone,
+      _language,
+      _avatarUrl,
       ..._workflowStateCtrls.values,
-    ]) { c.dispose(); }
+    ]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   void _snack(String msg, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: isError ? AppDS.red : null,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: isError ? AppDS.red : null),
+    );
   }
 
   String get _displayName {
@@ -537,7 +570,8 @@ class _UserDetailPageState extends State<UserDetailPage> {
     final n = _name.text.trim();
     if (n.isNotEmpty) {
       final parts = n.split(' ');
-      if (parts.length >= 2) return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+      if (parts.length >= 2)
+        return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
       return n[0].toUpperCase();
     }
     final e = _email.text.trim();
@@ -546,54 +580,77 @@ class _UserDetailPageState extends State<UserDetailPage> {
 
   Color get _roleColor {
     switch (_role) {
-      case 'superadmin': return AppDS.red;
-      case 'admin':      return AppDS.orange;
-      case 'technician': return AppDS.accent;
-      case 'researcher': return AppDS.green;
-      case 'viewer':     return AppDS.textMuted;
-      default:           return AppDS.textSecondary;
+      case 'superadmin':
+        return AppDS.red;
+      case 'admin':
+        return AppDS.orange;
+      case 'technician':
+        return AppDS.accent;
+      case 'researcher':
+        return AppDS.green;
+      case 'viewer':
+        return AppDS.textMuted;
+      default:
+        return AppDS.textSecondary;
     }
   }
 
   Color get _statusColor {
     switch (_status) {
-      case 'active':   return AppDS.green;
-      case 'pending':  return AppDS.orange;
-      case 'inactive': return AppDS.textMuted;
-      default:         return AppDS.textSecondary;
+      case 'active':
+        return AppDS.green;
+      case 'pending':
+        return AppDS.orange;
+      case 'inactive':
+        return AppDS.textMuted;
+      default:
+        return AppDS.textSecondary;
     }
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
   Future<void> _save() async {
     if (!_canEditProfile) return;
+    final previousStatus = widget.userMap['user_status']?.toString();
+    final action = previousStatus == 'pending' && _status == 'active'
+        ? ModuleAction.approve
+        : ModuleAction.edit;
+    if (!_isSelf && !context.requireModuleAction(action)) return;
     setState(() => _saving = true);
     try {
       final data = <String, dynamic>{
-        'user_name':        _name.text.trim().isEmpty ? null : _name.text.trim(),
-        'user_phone':       _phone.text.trim().isEmpty ? null : _phone.text.trim(),
-        'user_orcid':       _orcid.text.trim().isEmpty ? null : _orcid.text.trim(),
-        'user_institution': _institution.text.trim().isEmpty ? null : _institution.text.trim(),
-        'user_group':       _group.text.trim().isEmpty ? null : _group.text.trim(),
-        'user_bio':         _bio.text.trim().isEmpty ? null : _bio.text.trim(),
-        'user_timezone':    _timezone.text.trim().isEmpty ? null : _timezone.text.trim(),
-        'user_language':    _language.text.trim().isEmpty ? null : _language.text.trim(),
-        'user_avatar_url':  _avatarUrl.text.trim().isEmpty ? null : _avatarUrl.text.trim(),
-        'user_notifications_enabled':    _notificationsEnabled,
+        'user_name': _name.text.trim().isEmpty ? null : _name.text.trim(),
+        'user_phone': _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+        'user_orcid': _orcid.text.trim().isEmpty ? null : _orcid.text.trim(),
+        'user_institution': _institution.text.trim().isEmpty
+            ? null
+            : _institution.text.trim(),
+        'user_group': _group.text.trim().isEmpty ? null : _group.text.trim(),
+        'user_bio': _bio.text.trim().isEmpty ? null : _bio.text.trim(),
+        'user_timezone': _timezone.text.trim().isEmpty
+            ? null
+            : _timezone.text.trim(),
+        'user_language': _language.text.trim().isEmpty
+            ? null
+            : _language.text.trim(),
+        'user_avatar_url': _avatarUrl.text.trim().isEmpty
+            ? null
+            : _avatarUrl.text.trim(),
+        'user_notifications_enabled': _notificationsEnabled,
         'user_updated_at': DateTime.now().toIso8601String(),
       };
       if (_canManageUserAccess) {
         data.addAll({
-          'user_email':       _email.text.trim(),
-          'user_role':        _role,
-          'user_status':      _status,
-          'user_table_dashboard':          _permDashboard,
-          'user_table_labels':             _permLabels,
-          'user_table_chat':               _permChat,
-          'user_table_backups':            _permBackups,
+          'user_email': _email.text.trim(),
+          'user_role': _role,
+          'user_status': _status,
+          'user_table_dashboard': _permDashboard,
+          'user_table_labels': _permLabels,
+          'user_table_chat': _permChat,
+          'user_table_backups': _permBackups,
           'user_table_culture_collection': _permCulture,
-          'user_table_fish_facility':      _permFish,
-          'user_table_resources':          _permResources,
+          'user_table_fish_facility': _permFish,
+          'user_table_resources': _permResources,
           if (_supportsGranularPermissions)
             'user_permissions_json': _permissionJson,
         });
@@ -620,7 +677,9 @@ class _UserDetailPageState extends State<UserDetailPage> {
   }
 
   void _cancelEdit() {
-    setState(() { _editing = false; });
+    setState(() {
+      _editing = false;
+    });
     _loadFromMap(widget.userMap); // restore original values
   }
 
@@ -636,17 +695,22 @@ class _UserDetailPageState extends State<UserDetailPage> {
         title: Text(
           _displayName,
           style: _spaceGrotesk(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: context.appTextPrimary),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: context.appTextPrimary,
+          ),
         ),
         actions: [
           if (_editing) ...[
             TextButton(
               onPressed: _cancelEdit,
-              child: Text('Cancel',
-                  style: _spaceGrotesk(
-                      color: context.appTextSecondary, fontSize: 13)),
+              child: Text(
+                'Cancel',
+                style: _spaceGrotesk(
+                  color: context.appTextSecondary,
+                  fontSize: 13,
+                ),
+              ),
             ),
             const SizedBox(width: 4),
             ElevatedButton(
@@ -655,28 +719,43 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 backgroundColor: AppDS.accent,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: _saving
                   ? const SizedBox(
-                      width: 14, height: 14,
+                      width: 14,
+                      height: 14,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : Text('Save',
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      'Save',
                       style: _spaceGrotesk(
-                          fontWeight: FontWeight.w600, fontSize: 13)),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
             ),
             const SizedBox(width: 12),
           ] else if (!_loadingViewerAccess && _canEditProfile) ...[
             TextButton.icon(
               onPressed: () => setState(() => _editing = true),
-              icon: const Icon(Icons.edit_outlined, size: 15,
-                  color: AppDS.accent),
-              label: Text('Edit',
-                  style: _spaceGrotesk(
-                      color: AppDS.accent, fontSize: 13)),
+              icon: const Icon(
+                Icons.edit_outlined,
+                size: 15,
+                color: AppDS.accent,
+              ),
+              label: Text(
+                'Edit',
+                style: _spaceGrotesk(color: AppDS.accent, fontSize: 13),
+              ),
             ),
             const SizedBox(width: 12),
           ],
@@ -698,37 +777,80 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 const SizedBox(height: 24),
                 _buildSection('Contact & Identity', [
                   _row2(
-                    _field('Full Name', _name, enabled: _editing && _canEditProfile),
-                    _field('Email', _email, enabled: _editing && _canManageUserAccess),
+                    _field(
+                      'Full Name',
+                      _name,
+                      enabled: _editing && _canEditProfile,
+                    ),
+                    _field(
+                      'Email',
+                      _email,
+                      enabled: _editing && _canManageUserAccess,
+                    ),
                   ),
                   _row2(
-                    _field('Phone', _phone, enabled: _editing && _canEditProfile,
-                        hint: '+351 912 345 678'),
-                    _field('ORCID', _orcid, enabled: _editing && _canEditProfile,
-                        hint: '0000-0000-0000-0000', mono: true),
+                    _field(
+                      'Phone',
+                      _phone,
+                      enabled: _editing && _canEditProfile,
+                      hint: '+351 912 345 678',
+                    ),
+                    _field(
+                      'ORCID',
+                      _orcid,
+                      enabled: _editing && _canEditProfile,
+                      hint: '0000-0000-0000-0000',
+                      mono: true,
+                    ),
                   ),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Organization', [
                   _row2(
-                    _field('Institution', _institution, enabled: _editing && _canEditProfile),
-                    _field('Group / Lab', _group, enabled: _editing && _canEditProfile),
+                    _field(
+                      'Institution',
+                      _institution,
+                      enabled: _editing && _canEditProfile,
+                    ),
+                    _field(
+                      'Group / Lab',
+                      _group,
+                      enabled: _editing && _canEditProfile,
+                    ),
                   ),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Profile', [
-                  _field('Bio', _bio, enabled: _editing && _canEditProfile, maxLines: 4,
-                      hint: 'Short description…'),
-                  const SizedBox(height: 10),
-                  _row2(
-                    _field('Timezone', _timezone, enabled: _editing && _canEditProfile,
-                        hint: 'Europe/Lisbon'),
-                    _field('Language', _language, enabled: _editing && _canEditProfile,
-                        hint: 'en, pt, de…'),
+                  _field(
+                    'Bio',
+                    _bio,
+                    enabled: _editing && _canEditProfile,
+                    maxLines: 4,
+                    hint: 'Short description…',
                   ),
                   const SizedBox(height: 10),
-                  _field('Avatar URL', _avatarUrl, enabled: _editing && _canEditProfile,
-                      hint: 'https://…', mono: true),
+                  _row2(
+                    _field(
+                      'Timezone',
+                      _timezone,
+                      enabled: _editing && _canEditProfile,
+                      hint: 'Europe/Lisbon',
+                    ),
+                    _field(
+                      'Language',
+                      _language,
+                      enabled: _editing && _canEditProfile,
+                      hint: 'en, pt, de…',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _field(
+                    'Avatar URL',
+                    _avatarUrl,
+                    enabled: _editing && _canEditProfile,
+                    hint: 'https://…',
+                    mono: true,
+                  ),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Access & Role', [
@@ -736,15 +858,22 @@ class _UserDetailPageState extends State<UserDetailPage> {
                     _infoBanner(
                       'Only admins can change roles, status, and permission assignments.',
                     ),
-                  if (!_canManageUserAccess)
-                    const SizedBox(height: 12),
+                  if (!_canManageUserAccess) const SizedBox(height: 12),
                   _row2(
-                    _dropDown('Role', _role, _roleOptions,
-                        (v) => setState(() => _role = v ?? _role),
-                        enabled: _editing && _canManageUserAccess),
-                    _dropDown('Status', _status, _statusOptions,
-                        (v) => setState(() => _status = v ?? _status),
-                        enabled: _editing && _canManageUserAccess),
+                    _dropDown(
+                      'Role',
+                      _role,
+                      _roleOptions,
+                      (v) => setState(() => _role = v ?? _role),
+                      enabled: _editing && _canManageUserAccess,
+                    ),
+                    _dropDown(
+                      'Status',
+                      _status,
+                      _statusOptions,
+                      (v) => setState(() => _status = v ?? _status),
+                      enabled: _editing && _canManageUserAccess,
+                    ),
                   ),
                 ]),
                 const SizedBox(height: 16),
@@ -753,37 +882,39 @@ class _UserDetailPageState extends State<UserDetailPage> {
                     _infoBanner(
                       'Granular access is visible here, but only administrators can modify it.',
                     ),
-                  if (!_canManageUserAccess)
-                    const SizedBox(height: 12),
+                  if (!_canManageUserAccess) const SizedBox(height: 12),
                   _permTable(),
                   const SizedBox(height: 10),
-                  Row(children: [
-                    _editing && _canEditProfile
-                        ? Switch(
-                            value: _notificationsEnabled,
-                            onChanged: (v) =>
-                                setState(() => _notificationsEnabled = v),
-                            activeThumbColor: AppDS.accent,
-                          )
-                        : Icon(
-                            _notificationsEnabled
-                                ? Icons.notifications_active_outlined
-                                : Icons.notifications_off_outlined,
-                            size: 16,
-                            color: _notificationsEnabled
-                                ? AppDS.accent
-                                : AppDS.textMuted,
-                          ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Notifications ${_notificationsEnabled ? 'enabled' : 'disabled'}',
-                      style: _spaceGrotesk(
+                  Row(
+                    children: [
+                      _editing && _canEditProfile
+                          ? Switch(
+                              value: _notificationsEnabled,
+                              onChanged: (v) =>
+                                  setState(() => _notificationsEnabled = v),
+                              activeThumbColor: AppDS.accent,
+                            )
+                          : Icon(
+                              _notificationsEnabled
+                                  ? Icons.notifications_active_outlined
+                                  : Icons.notifications_off_outlined,
+                              size: 16,
+                              color: _notificationsEnabled
+                                  ? AppDS.accent
+                                  : AppDS.textMuted,
+                            ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Notifications ${_notificationsEnabled ? 'enabled' : 'disabled'}',
+                        style: _spaceGrotesk(
                           fontSize: 12,
                           color: _notificationsEnabled
                               ? AppDS.textPrimary
-                              : AppDS.textMuted),
-                    ),
-                  ]),
+                              : AppDS.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Granular Page Permissions', [
@@ -791,15 +922,26 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Metadata', [
-                  _metaRow('User ID',     '$_id'),
-                  if (_authUid != null)
-                    _metaRow('Auth UID', _authUid!),
-                  _metaRow('Created',
-                      _createdAt != null ? _dtTimeFmt.format(_createdAt!.toLocal()) : '—'),
-                  _metaRow('Last Updated',
-                      _updatedAt != null ? _dtTimeFmt.format(_updatedAt!.toLocal()) : '—'),
-                  _metaRow('Last Login',
-                      _lastLogin != null ? _dtTimeFmt.format(_lastLogin!.toLocal()) : '—'),
+                  _metaRow('User ID', '$_id'),
+                  if (_authUid != null) _metaRow('Auth UID', _authUid!),
+                  _metaRow(
+                    'Created',
+                    _createdAt != null
+                        ? _dtTimeFmt.format(_createdAt!.toLocal())
+                        : '—',
+                  ),
+                  _metaRow(
+                    'Last Updated',
+                    _updatedAt != null
+                        ? _dtTimeFmt.format(_updatedAt!.toLocal())
+                        : '—',
+                  ),
+                  _metaRow(
+                    'Last Login',
+                    _lastLogin != null
+                        ? _dtTimeFmt.format(_lastLogin!.toLocal())
+                        : '—',
+                  ),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Appearance', [
@@ -807,11 +949,26 @@ class _UserDetailPageState extends State<UserDetailPage> {
                     animation: appThemeCtrl,
                     builder: (_, x) => Row(
                       children: [
-                        _themeBtn(context, 'Light', ThemeMode.light, Icons.light_mode_outlined),
+                        _themeBtn(
+                          context,
+                          'Light',
+                          ThemeMode.light,
+                          Icons.light_mode_outlined,
+                        ),
                         const SizedBox(width: 8),
-                        _themeBtn(context, 'Dark', ThemeMode.dark, Icons.dark_mode_outlined),
+                        _themeBtn(
+                          context,
+                          'Dark',
+                          ThemeMode.dark,
+                          Icons.dark_mode_outlined,
+                        ),
                         const SizedBox(width: 8),
-                        _themeBtn(context, 'System', ThemeMode.system, Icons.brightness_auto_outlined),
+                        _themeBtn(
+                          context,
+                          'System',
+                          ThemeMode.system,
+                          Icons.brightness_auto_outlined,
+                        ),
                       ],
                     ),
                   ),
@@ -834,15 +991,15 @@ class _UserDetailPageState extends State<UserDetailPage> {
         CircleAvatar(
           radius: 40,
           backgroundColor: _roleColor.withValues(alpha: 0.18),
-          backgroundImage:
-              url.isNotEmpty ? NetworkImage(url) : null,
+          backgroundImage: url.isNotEmpty ? NetworkImage(url) : null,
           child: url.isEmpty
               ? Text(
                   _initials,
                   style: _spaceGrotesk(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: _roleColor),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: _roleColor,
+                  ),
                 )
               : null,
         ),
@@ -854,15 +1011,18 @@ class _UserDetailPageState extends State<UserDetailPage> {
               Text(
                 _displayName,
                 style: _spaceGrotesk(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: context.appTextPrimary),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: context.appTextPrimary,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 _email.text,
                 style: _jetBrainsMono(
-                    fontSize: 12, color: context.appTextSecondary),
+                  fontSize: 12,
+                  color: context.appTextSecondary,
+                ),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -882,13 +1042,48 @@ class _UserDetailPageState extends State<UserDetailPage> {
   // ── Permission table ──────────────────────────────────────────────────────
   Widget _permTable() {
     final modules = [
-      ('Dashboard',         _permDashboard, (String v) => setState(() => _permDashboard = v), _permOptions),
-      ('Labels',            _permLabels,    (String v) => setState(() => _permLabels = v),    _permOptions),
-      ('Chat',              _permChat,      (String v) => setState(() => _permChat = v),      _permOptions),
-      ('Backups',           _permBackups,   (String v) => setState(() => _permBackups = v),   _backupsPermOptions),
-      ('Culture Collection',_permCulture,   (String v) => setState(() => _permCulture = v),   _permOptions),
-      ('Fish Facility',     _permFish,      (String v) => setState(() => _permFish = v),      _permOptions),
-      ('Resources',         _permResources, (String v) => setState(() => _permResources = v), _permOptions),
+      (
+        'Dashboard',
+        _permDashboard,
+        (String v) => setState(() => _permDashboard = v),
+        _permOptions,
+      ),
+      (
+        'Labels',
+        _permLabels,
+        (String v) => setState(() => _permLabels = v),
+        _permOptions,
+      ),
+      (
+        'Chat',
+        _permChat,
+        (String v) => setState(() => _permChat = v),
+        _permOptions,
+      ),
+      (
+        'Backups',
+        _permBackups,
+        (String v) => setState(() => _permBackups = v),
+        _backupsPermOptions,
+      ),
+      (
+        'Culture Collection',
+        _permCulture,
+        (String v) => setState(() => _permCulture = v),
+        _permOptions,
+      ),
+      (
+        'Fish Facility',
+        _permFish,
+        (String v) => setState(() => _permFish = v),
+        _permOptions,
+      ),
+      (
+        'Resources',
+        _permResources,
+        (String v) => setState(() => _permResources = v),
+        _permOptions,
+      ),
     ];
 
     return Container(
@@ -905,18 +1100,20 @@ class _UserDetailPageState extends State<UserDetailPage> {
             decoration: BoxDecoration(
               border: isLast
                   ? null
-                  : Border(
-                      bottom: BorderSide(color: context.appBorder)),
+                  : Border(bottom: BorderSide(color: context.appBorder)),
             ),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
                 SizedBox(
                   width: 160,
-                  child: Text(m.$1,
-                      style: _spaceGrotesk(
-                          fontSize: 13, color: context.appTextPrimary)),
+                  child: Text(
+                    m.$1,
+                    style: _spaceGrotesk(
+                      fontSize: 13,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
                 ),
                 if (_editing && _canManageUserAccess)
                   Wrap(
@@ -928,27 +1125,28 @@ class _UserDetailPageState extends State<UserDetailPage> {
                         onTap: () => m.$3(opt),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 3),
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: selected
                                 ? c.withValues(alpha: 0.18)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
-                              color: selected
-                                  ? c
-                                  : context.appBorder,
+                              color: selected ? c : context.appBorder,
                             ),
                           ),
-                          child: Text(opt,
-                              style: _spaceGrotesk(
-                                  fontSize: 11,
-                                  fontWeight: selected
-                                      ? FontWeight.w700
-                                      : FontWeight.normal,
-                                  color: selected
-                                      ? c
-                                      : context.appTextMuted)),
+                          child: Text(
+                            opt,
+                            style: _spaceGrotesk(
+                              fontSize: 11,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.normal,
+                              color: selected ? c : context.appTextMuted,
+                            ),
+                          ),
                         ),
                       );
                     }).toList(),
@@ -984,8 +1182,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
           _infoBanner(
             'These per-page rules are shown read-only. Administrators can tune page access, actions, scopes, and workflow restrictions here.',
           ),
-        if (!_canManageUserAccess)
-          const SizedBox(height: 12),
+        if (!_canManageUserAccess) const SizedBox(height: 12),
         ...groups.expand((group) {
           final widgets = <Widget>[
             Text(
@@ -1001,7 +1198,9 @@ class _UserDetailPageState extends State<UserDetailPage> {
           ];
 
           for (final moduleId in group.value) {
-            widgets.add(_granularPageCard(moduleId, canEditRules: canEditRules));
+            widgets.add(
+              _granularPageCard(moduleId, canEditRules: canEditRules),
+            );
             widgets.add(const SizedBox(height: 10));
           }
           return widgets;
@@ -1079,11 +1278,10 @@ class _UserDetailPageState extends State<UserDetailPage> {
               ),
               if (_hasPageRule(moduleId))
                 TextButton(
-                  onPressed: canEditRules ? () => _resetPageRule(moduleId) : null,
-                  child: Text(
-                    'Reset',
-                    style: _spaceGrotesk(fontSize: 12),
-                  ),
+                  onPressed: canEditRules
+                      ? () => _resetPageRule(moduleId)
+                      : null,
+                  child: Text('Reset', style: _spaceGrotesk(fontSize: 12)),
                 ),
             ],
           ),
@@ -1121,7 +1319,8 @@ class _UserDetailPageState extends State<UserDetailPage> {
               children: [
                 Switch(
                   value: _pageRecordLockBypass(moduleId),
-                  onChanged: (value) => _setPageRecordLockBypass(moduleId, value),
+                  onChanged: (value) =>
+                      _setPageRecordLockBypass(moduleId, value),
                   activeThumbColor: AppDS.accent,
                 ),
                 const SizedBox(width: 8),
@@ -1185,10 +1384,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
             TextField(
               controller: _workflowStateCtrls[moduleId],
               onChanged: (value) => _setWorkflowStates(moduleId, value),
-              style: _spaceGrotesk(
-                fontSize: 12,
-                color: context.appTextPrimary,
-              ),
+              style: _spaceGrotesk(fontSize: 12, color: context.appTextPrimary),
               decoration: InputDecoration(
                 hintText: 'draft, active, approved',
                 hintStyle: _spaceGrotesk(
@@ -1197,7 +1393,10 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 ),
                 filled: true,
                 fillColor: context.appSurface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(color: context.appBorder2),
@@ -1243,10 +1442,11 @@ class _UserDetailPageState extends State<UserDetailPage> {
         Text(
           title.toUpperCase(),
           style: _spaceGrotesk(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: context.appTextMuted,
-              letterSpacing: 1.0),
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: context.appTextMuted,
+            letterSpacing: 1.0,
+          ),
         ),
         const SizedBox(height: 8),
         Container(
@@ -1284,29 +1484,37 @@ class _UserDetailPageState extends State<UserDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: _spaceGrotesk(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: context.appTextMuted,
-                letterSpacing: 0.5)),
+        Text(
+          label,
+          style: _spaceGrotesk(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: context.appTextMuted,
+            letterSpacing: 0.5,
+          ),
+        ),
         const SizedBox(height: 4),
         enabled
             ? TextFormField(
                 controller: ctrl,
                 maxLines: maxLines,
-                style: (mono
-                        ? _jetBrainsMono(fontSize: 12)
-                        : _spaceGrotesk(fontSize: 13))
-                    .copyWith(color: context.appTextPrimary),
+                style:
+                    (mono
+                            ? _jetBrainsMono(fontSize: 12)
+                            : _spaceGrotesk(fontSize: 13))
+                        .copyWith(color: context.appTextPrimary),
                 decoration: InputDecoration(
                   hintText: hint,
                   hintStyle: _spaceGrotesk(
-                      fontSize: 12, color: context.appTextMuted),
+                    fontSize: 12,
+                    color: context.appTextMuted,
+                  ),
                   filled: true,
                   fillColor: context.appSurface2,
                   contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 8),
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(6),
                     borderSide: BorderSide(color: context.appBorder2),
@@ -1323,13 +1531,15 @@ class _UserDetailPageState extends State<UserDetailPage> {
               )
             : Text(
                 ctrl.text.isEmpty ? (hint ?? '—') : ctrl.text,
-                style: (mono
-                        ? _jetBrainsMono(fontSize: 12)
-                        : _spaceGrotesk(fontSize: 13))
-                    .copyWith(
-                        color: ctrl.text.isEmpty
-                            ? context.appTextMuted
-                            : context.appTextPrimary),
+                style:
+                    (mono
+                            ? _jetBrainsMono(fontSize: 12)
+                            : _spaceGrotesk(fontSize: 13))
+                        .copyWith(
+                          color: ctrl.text.isEmpty
+                              ? context.appTextMuted
+                              : context.appTextPrimary,
+                        ),
               ),
         const SizedBox(height: 10),
       ],
@@ -1346,12 +1556,15 @@ class _UserDetailPageState extends State<UserDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: _spaceGrotesk(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: context.appTextMuted,
-                letterSpacing: 0.5)),
+        Text(
+          label,
+          style: _spaceGrotesk(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: context.appTextMuted,
+            letterSpacing: 0.5,
+          ),
+        ),
         const SizedBox(height: 4),
         enabled
             ? Container(
@@ -1368,22 +1581,28 @@ class _UserDetailPageState extends State<UserDetailPage> {
                     isExpanded: true,
                     dropdownColor: context.appSurface2,
                     style: _spaceGrotesk(
-                        fontSize: 13, color: context.appTextPrimary),
+                      fontSize: 13,
+                      color: context.appTextPrimary,
+                    ),
                     items: options
-                        .map((o) => DropdownMenuItem(
-                              value: o,
-                              child: Text(o),
-                            ))
+                        .map((o) => DropdownMenuItem(value: o, child: Text(o)))
                         .toList(),
                     onChanged: onChanged,
-                    icon: Icon(Icons.expand_more,
-                        size: 16, color: context.appTextMuted),
+                    icon: Icon(
+                      Icons.expand_more,
+                      size: 16,
+                      color: context.appTextMuted,
+                    ),
                   ),
                 ),
               )
-            : Text(value,
+            : Text(
+                value,
                 style: _spaceGrotesk(
-                    fontSize: 13, color: context.appTextPrimary)),
+                  fontSize: 13,
+                  color: context.appTextPrimary,
+                ),
+              ),
         const SizedBox(height: 10),
       ],
     );
@@ -1398,12 +1617,15 @@ class _UserDetailPageState extends State<UserDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: _spaceGrotesk(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: context.appTextMuted,
-                letterSpacing: 0.5)),
+        Text(
+          label,
+          style: _spaceGrotesk(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: context.appTextMuted,
+            letterSpacing: 0.5,
+          ),
+        ),
         const SizedBox(height: 4),
         Container(
           height: 40,
@@ -1418,19 +1640,20 @@ class _UserDetailPageState extends State<UserDetailPage> {
               value: value,
               isExpanded: true,
               dropdownColor: context.appSurface,
-              style: _spaceGrotesk(
-                  fontSize: 13, color: context.appTextPrimary),
+              style: _spaceGrotesk(fontSize: 13, color: context.appTextPrimary),
               items: options
-                  .map((o) => DropdownMenuItem<String>(
-                        value: o,
-                        child: Text(o),
-                      ))
+                  .map(
+                    (o) => DropdownMenuItem<String>(value: o, child: Text(o)),
+                  )
                   .toList(),
               onChanged: (next) {
                 if (next != null) onChanged(next);
               },
-              icon: Icon(Icons.expand_more,
-                  size: 16, color: context.appTextMuted),
+              icon: Icon(
+                Icons.expand_more,
+                size: 16,
+                color: context.appTextMuted,
+              ),
             ),
           ),
         ),
@@ -1439,7 +1662,12 @@ class _UserDetailPageState extends State<UserDetailPage> {
     );
   }
 
-  Widget _themeBtn(BuildContext context, String label, ThemeMode mode, IconData icon) {
+  Widget _themeBtn(
+    BuildContext context,
+    String label,
+    ThemeMode mode,
+    IconData icon,
+  ) {
     final active = appThemeCtrl.mode == mode;
     return Expanded(
       child: OutlinedButton.icon(
@@ -1463,14 +1691,19 @@ class _UserDetailPageState extends State<UserDetailPage> {
         children: [
           SizedBox(
             width: 120,
-            child: Text(label,
-                style: _spaceGrotesk(
-                    fontSize: 12, color: context.appTextMuted)),
+            child: Text(
+              label,
+              style: _spaceGrotesk(fontSize: 12, color: context.appTextMuted),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: _jetBrainsMono(
-                    fontSize: 11, color: context.appTextSecondary)),
+            child: Text(
+              value,
+              style: _jetBrainsMono(
+                fontSize: 11,
+                color: context.appTextSecondary,
+              ),
+            ),
           ),
         ],
       ),
@@ -1514,10 +1747,11 @@ class _UserDetailPageState extends State<UserDetailPage> {
     child: Text(
       label,
       style: _spaceGrotesk(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: color,
-          letterSpacing: 0.2),
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: color,
+        letterSpacing: 0.2,
+      ),
     ),
   );
 
@@ -1533,9 +1767,10 @@ class _UserDetailPageState extends State<UserDetailPage> {
       child: Text(
         perm,
         style: _spaceGrotesk(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: c),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: c,
+        ),
       ),
     );
   }
@@ -1559,10 +1794,14 @@ class _UserDetailPageState extends State<UserDetailPage> {
 
   static Color _permColor(String p) {
     switch (p) {
-      case 'write': return AppDS.green;
-      case 'read':  return AppDS.accent;
-      case 'see':   return AppDS.yellow;
-      default:      return AppDS.textMuted;
+      case 'write':
+        return AppDS.green;
+      case 'read':
+        return AppDS.accent;
+      case 'see':
+        return AppDS.yellow;
+      default:
+        return AppDS.textMuted;
     }
   }
 }

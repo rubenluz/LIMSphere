@@ -1,17 +1,17 @@
 // qr_code_rules.dart - Canonical format for all LIMS Sphere QR codes.
 //
-// Format:  bluelims://<projectRef>/<type>/<id>
+// Format:  limsphere://<projectCode>/<category>/<uniqueId>
 //
-//   scheme      : "bluelims"  (always)
-//   projectRef  : Supabase project ref (e.g. "jtckynsibyxhshvcnpcm") or "local"
+//   scheme      : "limsphere"  (always for newly generated codes)
+//   projectCode : Supabase project ref (e.g. "jtckynsibyxhshvcnpcm") or "local"
 //                 Used to reject codes from a different LIMS instance.
 //   type        : one of the recognised entity types listed in [QrRules.validTypes]
 //   id          : positive integer primary key of the record
 //
 // Examples:
-//   bluelims://jtckynsibyxhshvcnpcm/reagents/42
-//   bluelims://jtckynsibyxhshvcnpcm/machines/7
-//   bluelims://jtckynsibyxhshvcnpcm/locations/15
+//   limsphere://jtckynsibyxhshvcnpcm/reagents/42
+//   limsphere://jtckynsibyxhshvcnpcm/machines/7
+//   limsphere://jtckynsibyxhshvcnpcm/locations/15
 //
 // Generation — always use [QrRules.build]; never hand-craft the string.
 // Validation — [QrRules.parse] returns null on any format violation.
@@ -19,7 +19,8 @@
 class QrRules {
   QrRules._();
 
-  static const String scheme = 'bluelims';
+  static const String scheme = 'limsphere';
+  static const String legacyScheme = 'bluelims';
 
   /// All entity types that can be encoded in a QR code.
   static const List<String> validTypes = [
@@ -36,14 +37,21 @@ class QrRules {
 
   // ── Generation ─────────────────────────────────────────────────────────────
 
-  /// Build a QR payload string for [type] / [id] in [projectRef].
+  /// Build a QR payload string for [type] / [id] in [projectCode].
   ///
   /// Throws [ArgumentError] if [type] is not in [validTypes] or [id] < 1.
-  static String build(String projectRef, String type, int id) {
-    assert(validTypes.contains(type),
-        'QrRules.build: unknown type "$type". Add it to QrRules.validTypes.');
-    assert(id > 0, 'QrRules.build: id must be a positive integer, got $id.');
-    return '$scheme://$projectRef/$type/$id';
+  static String build(String projectCode, String type, int id) {
+    if (!validTypes.contains(type)) {
+      throw ArgumentError.value(type, 'type', 'unknown QR category');
+    }
+    if (id < 1) {
+      throw ArgumentError.value(id, 'id', 'must be a positive integer');
+    }
+    final normalizedProjectCode = projectCode.trim().toLowerCase();
+    if (normalizedProjectCode.isEmpty) {
+      throw ArgumentError.value(projectCode, 'projectCode', 'cannot be empty');
+    }
+    return '$scheme://$normalizedProjectCode/$type/$id';
   }
 
   // ── Parsing / validation ────────────────────────────────────────────────────
@@ -55,10 +63,11 @@ class QrRules {
   static QrPayload? parse(String raw) {
     final uri = Uri.tryParse(raw);
     if (uri == null) return null;
-    if (uri.scheme != scheme) return null;
+    if (uri.scheme != scheme && uri.scheme != legacyScheme) return null;
+    if (uri.host.isEmpty) return null;
 
     final segments = uri.pathSegments;
-    if (segments.length < 2) return null;
+    if (segments.length != 2) return null;
 
     final type = segments[0];
     if (!validTypes.contains(type)) return null;
@@ -66,22 +75,31 @@ class QrRules {
     final id = int.tryParse(segments[1]);
     if (id == null || id < 1) return null;
 
-    return QrPayload(projectRef: uri.host, type: type, id: id);
+    return QrPayload(projectCode: uri.host, type: type, id: id);
   }
 
   /// Returns true if [raw] is a valid LIMS Sphere QR code string.
   static bool isValid(String raw) => parse(raw) != null;
+
+  /// Whether [raw] already uses the current LIMSphere scheme.
+  static bool isCanonical(String raw) {
+    final uri = Uri.tryParse(raw);
+    return uri?.scheme == scheme && parse(raw) != null;
+  }
+
+  static bool belongsToProject(QrPayload payload, String projectCode) =>
+      payload.projectCode.toLowerCase() == projectCode.trim().toLowerCase();
 }
 
 // ── Payload ───────────────────────────────────────────────────────────────────
 
 class QrPayload {
-  final String projectRef;
+  final String projectCode;
   final String type;
   final int id;
 
   const QrPayload({
-    required this.projectRef,
+    required this.projectCode,
     required this.type,
     required this.id,
   });

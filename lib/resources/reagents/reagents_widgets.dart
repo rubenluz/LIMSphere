@@ -25,6 +25,7 @@ class _ReagentRow extends StatelessWidget {
   final void Function(int id, String? value) onCommitStorageTemp;
   final void Function(int id, String? value) onCommitPhysicalState;
   final void Function(int id, String value) onCommitContamination;
+  final void Function(int id, int? value) onCommitRoom;
   final void Function(int id, int? value) onCommitLocation;
   final List<Map<String, dynamic>> locations;
 
@@ -48,6 +49,7 @@ class _ReagentRow extends StatelessWidget {
     required this.onCommitStorageTemp,
     required this.onCommitPhysicalState,
     required this.onCommitContamination,
+    required this.onCommitRoom,
     required this.onCommitLocation,
     required this.locations,
   });
@@ -132,6 +134,53 @@ class _ReagentRow extends StatelessWidget {
     );
   }
 
+  Map<String, dynamic>? _locationById(int? id) {
+    if (id == null) return null;
+    for (final location in locations) {
+      if ((location['location_id'] as num).toInt() == id) return location;
+    }
+    return null;
+  }
+
+  int? get _selectedRoomId {
+    final selected = _locationById(reagent.locationId);
+    if (selected == null) return null;
+    if (selected['location_type'] == null ||
+        selected['location_type'] == 'room') {
+      return reagent.locationId;
+    }
+    return (selected['location_parent_id'] as num?)?.toInt();
+  }
+
+  int? get _selectedChildLocationId {
+    final selected = _locationById(reagent.locationId);
+    return selected?['location_type'] == null ||
+            selected?['location_type'] == 'room'
+        ? null
+        : reagent.locationId;
+  }
+
+  List<Map<String, dynamic>> get _rooms => locations
+      .where(
+        (location) =>
+            location['location_type'] == null ||
+            location['location_type'] == 'room',
+      )
+      .toList();
+
+  List<Map<String, dynamic>> get _locationsInSelectedRoom {
+    final roomId = _selectedRoomId;
+    if (roomId == null) return const [];
+    return locations
+        .where(
+          (location) =>
+              location['location_type'] != null &&
+              location['location_type'] != 'room' &&
+              (location['location_parent_id'] as num?)?.toInt() == roomId,
+        )
+        .toList();
+  }
+
   // Wrap a cell's display widget so hovering with the mouse reveals the full
   // string when it was truncated with ellipsis. Skips the tooltip for empty
   // values to avoid an empty hover bubble.
@@ -163,6 +212,9 @@ class _ReagentRow extends StatelessWidget {
     if (id == null) return null;
     for (final loc in locations) {
       if ((loc['location_id'] as num).toInt() == id) {
+        if (loc['location_type'] == null || loc['location_type'] == 'room') {
+          return '/';
+        }
         return (loc['_display'] as String?) ??
             (loc['location_name'] as String?);
       }
@@ -507,15 +559,39 @@ class _ReagentRow extends StatelessWidget {
           // ── Room / Location ──────────────────────────────────────────────
           SizedBox(
             width: _colRoom,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              child: _tip(
-                roomName,
-                Text(
-                  roomName ?? '—',
-                  overflow: TextOverflow.ellipsis,
-                  style: roomName != null ? tsCell : tsMuted,
-                ),
+            child: GestureDetector(
+              onDoubleTap: () => onStartEdit(r.id, 'room', ''),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                child: _isEditing('room')
+                    ? _ArrowDropdown<int?>(
+                        values: [
+                          null,
+                          ..._rooms.map(
+                            (room) => (room['location_id'] as num).toInt(),
+                          ),
+                        ],
+                        current: _selectedRoomId,
+                        labelOf: (id) {
+                          if (id == null) return 'None';
+                          final room = _locationById(id);
+                          return (room?['_display'] as String?) ??
+                              (room?['location_name'] as String?) ??
+                              '—';
+                        },
+                        onSelect: (value) => onCommitRoom(r.id, value),
+                        onCancel: onCancel,
+                        onAddNewRow: onAddNewRow,
+                        autoOpen: true,
+                      )
+                    : _tip(
+                        roomName,
+                        Text(
+                          roomName ?? '—',
+                          overflow: TextOverflow.ellipsis,
+                          style: roomName != null ? tsCell : tsMuted,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -529,13 +605,17 @@ class _ReagentRow extends StatelessWidget {
                     ? _ArrowDropdown<int?>(
                         values: [
                           null,
-                          ...locations.map(
+                          ..._locationsInSelectedRoom.map(
                             (l) => (l['location_id'] as num).toInt(),
                           ),
                         ],
-                        current: r.locationId,
+                        current: _selectedChildLocationId,
                         labelOf: (id) {
-                          if (id == null) return 'None';
+                          if (id == null) {
+                            return _selectedRoomId == null
+                                ? 'Select a room first'
+                                : '/';
+                          }
                           final loc = locations.firstWhere(
                             (l) => (l['location_id'] as num).toInt() == id,
                             orElse: () => <String, dynamic>{},
@@ -544,7 +624,8 @@ class _ReagentRow extends StatelessWidget {
                               (loc['location_name'] as String?) ??
                               '—';
                         },
-                        onSelect: (v) => onCommitLocation(r.id, v),
+                        onSelect: (value) =>
+                            onCommitLocation(r.id, value ?? _selectedRoomId),
                         onCancel: onCancel,
                         onAddNewRow: onAddNewRow,
                         autoOpen: true,
@@ -1088,6 +1169,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
   String _contamination = 'none';
   String? _physicalState;
   String? _storageTemp;
+  int? _roomId;
   int? _locationId;
   DateTime? _expiryDate;
   DateTime? _receivedDate;
@@ -1134,7 +1216,21 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
     _contamination = e?.contamination ?? 'none';
     _physicalState = e?.physicalState;
     _storageTemp = e?.storageTemp;
-    _locationId = e?.locationId;
+    final selectedLocation = widget.locations
+        .cast<Map<String, dynamic>?>()
+        .firstWhere(
+          (location) =>
+              (location?['location_id'] as num?)?.toInt() == e?.locationId,
+          orElse: () => null,
+        );
+    if ((selectedLocation?['location_type'] as String?) == null ||
+        (selectedLocation?['location_type'] as String?) == 'room') {
+      _roomId = e?.locationId;
+      _locationId = null;
+    } else {
+      _roomId = (selectedLocation?['location_parent_id'] as num?)?.toInt();
+      _locationId = e?.locationId;
+    }
     _expiryDate = e?.expiryDate;
     _receivedDate = e?.receivedDate;
     _openedDate = e?.openedDate;
@@ -1171,7 +1267,31 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
     super.dispose();
   }
 
+  List<Map<String, dynamic>> get _rooms => widget.locations
+      .where(
+        (location) =>
+            location['location_type'] == null ||
+            location['location_type'] == 'room',
+      )
+      .toList();
+
+  List<Map<String, dynamic>> get _locationsInSelectedRoom {
+    if (_roomId == null) return const [];
+    return widget.locations
+        .where(
+          (location) =>
+              location['location_type'] != null &&
+              location['location_type'] != 'room' &&
+              (location['location_parent_id'] as num?)?.toInt() == _roomId,
+        )
+        .toList();
+  }
+
   Future<void> _save() async {
+    final action = widget.existing == null
+        ? ModuleAction.create
+        : ModuleAction.edit;
+    if (!context.requireModuleAction(action)) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
@@ -1206,9 +1326,10 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
         if (_concCtrl.text.isNotEmpty)
           'reagent_concentration': _concCtrl.text.trim(),
         if (_storageTemp != null) 'reagent_storage_temp': _storageTemp,
-        if (_locationId != null) 'reagent_location_id': _locationId,
-        if (_positionCtrl.text.isNotEmpty)
-          'reagent_position': _positionCtrl.text.trim(),
+        'reagent_location_id': _locationId ?? _roomId,
+        'reagent_position': _positionCtrl.text.trim().isEmpty
+            ? null
+            : _positionCtrl.text.trim(),
         if (_lotCtrl.text.isNotEmpty)
           'reagent_lot_number': _lotCtrl.text.trim(),
         if (_expiryDate != null)
@@ -1272,9 +1393,8 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
       debugPrint('ReagentFormDialog save error: $e');
       setState(() => _saving = false);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to save: $e')));
       }
     }
   }
@@ -1643,8 +1763,8 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
                       Expanded(
                         child: _dropdownField<int?>(
                           context,
-                          label: 'Location',
-                          value: _locationId,
+                          label: 'Room',
+                          value: _roomId,
                           items: [
                             DropdownMenuItem<int?>(
                               value: null,
@@ -1656,7 +1776,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
                                 ),
                               ),
                             ),
-                            ...widget.locations.map(
+                            ..._rooms.map(
                               (l) => DropdownMenuItem<int?>(
                                 value: (l['location_id'] as num).toInt(),
                                 child: Text(
@@ -1670,12 +1790,64 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
                               ),
                             ),
                           ],
-                          onChanged: (v) => setState(() => _locationId = v),
+                          onChanged: (value) => setState(() {
+                            _roomId = value;
+                            _locationId = null;
+                            _positionCtrl.clear();
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _dropdownField<int?>(
+                          context,
+                          label: 'Location',
+                          value: _locationId,
+                          items: [
+                            DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text(
+                                _roomId == null ? 'Select a room first' : '/',
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: context.appTextMuted,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            ..._locationsInSelectedRoom.map(
+                              (location) => DropdownMenuItem<int?>(
+                                value: (location['location_id'] as num).toInt(),
+                                child: Text(
+                                  (location['_display'] as String?) ??
+                                      (location['location_name'] as String),
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: context.appTextPrimary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                          onChanged: _roomId == null
+                              ? null
+                              : (value) => setState(() {
+                                  _locationId = value;
+                                  _positionCtrl.clear();
+                                }),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: _field(context, _positionCtrl, 'Position'),
+                        child: _field(
+                          context,
+                          _positionCtrl,
+                          'Exact position',
+                          enabled: _roomId != null,
+                        ),
                       ),
                     ],
                   ),
@@ -1845,9 +2017,11 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
     int maxLines = 1,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    bool enabled = true,
   }) {
     return TextFormField(
       controller: ctrl,
+      enabled: enabled,
       maxLines: maxLines,
       keyboardType: keyboardType,
       validator: validator,
@@ -1888,7 +2062,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
     required String label,
     required T value,
     required List<DropdownMenuItem<T>> items,
-    required void Function(T?) onChanged,
+    required void Function(T?)? onChanged,
   }) {
     return InputDecorator(
       decoration: InputDecoration(

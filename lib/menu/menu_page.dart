@@ -3,13 +3,18 @@
 
 import 'dart:async';
 import 'dart:io';
+
 import 'package:app_links/app_links.dart';
+
 import '../camera/qr_scanner/qr_code_rules.dart';
 import '../camera/qr_scanner/qr_scanner_page.dart';
 import '../camera/camera_page.dart';
+import '../supabase/supabase_manager.dart';
 import 'app_nav.dart';
+
 import 'package:limsphere/lab_chat/lab_chat_page.dart';
 import 'package:limsphere/labels/label_page.dart';
+
 import '../resources/lab/lab_page.dart';
 import '../resources/locations/locations_page.dart';
 import '../resources/reagents/reagents_page.dart';
@@ -20,6 +25,7 @@ import '/theme/module_permission.dart';
 import '../admin/settings_page.dart';
 import '../backups/backups_page.dart';
 import '../backups/backup_service.dart';
+
 import 'package:limsphere/fish_facility/lines/fish_lines_page.dart';
 import 'package:limsphere/fish_facility/water_qc/water_qc_page.dart';
 import 'package:limsphere/sops/sops_page.dart';
@@ -27,6 +33,7 @@ import 'package:limsphere/fish_facility/stocks/stocks_page.dart';
 import 'package:limsphere/fish_facility/tanks/tanks_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+
 import '../culture_collection/samples/samples_page.dart';
 import '../culture_collection/strains/strains_page.dart';
 import '../dashboard/dashboard_page.dart';
@@ -115,6 +122,7 @@ class _MenuPageState extends State<MenuPage> {
   static const _perItemVisibilityKeys = {'reservations'};
   Timer? _connectivityTimer;
   bool _wasOffline = false;
+  bool _qrRefreshStarted = false;
   StreamSubscription<Uri>? _deepLinkSub;
 
   final Set<String> _expandedGroups = {
@@ -332,8 +340,25 @@ class _MenuPageState extends State<MenuPage> {
     LabChatPage.startBackgroundListener();
     RequestsPage.startBackgroundListener();
     unawaited(BackupService.instance.startForSession());
+    unawaited(_refreshStoredQrLinks());
     _startConnectivityTimer();
     if (Platform.isAndroid || Platform.isIOS) _initDeepLinks();
+  }
+
+  Future<void> _refreshStoredQrLinks() async {
+    if (_qrRefreshStarted) return;
+    final projectCode = SupabaseManager.projectRef;
+    if (projectCode == null || projectCode.isEmpty) return;
+    _qrRefreshStarted = true;
+    try {
+      await Supabase.instance.client.rpc(
+        'refresh_limsphere_qr_codes',
+        params: {'project_code': projectCode},
+      );
+    } catch (e) {
+      // Existing installations may not have run the QR migration yet.
+      debugPrint('QR link refresh skipped: $e');
+    }
   }
 
   @override
@@ -360,6 +385,19 @@ class _MenuPageState extends State<MenuPage> {
   Future<void> _handleDeepLink(Uri uri) async {
     final payload = QrRules.parse(uri.toString());
     if (payload == null) return;
+    final currentProject = SupabaseManager.projectRef ?? 'local';
+    if (!QrRules.belongsToProject(payload, currentProject)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'This QR code belongs to project ${payload.projectCode}, not $currentProject.',
+          ),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
     Widget page;
     try {
       page = await resolveQrRoute(payload);
@@ -680,6 +718,14 @@ class _MenuPageState extends State<MenuPage> {
 
   Widget _maybeWrapReadOnly(String id, Widget content) {
     final access = _getModuleAccess(id);
+    if (!access.canView) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('You do not have permission to view this page.'),
+        ),
+      );
+    }
     final permWidget = ModulePermission(access: access, child: content);
     if (!access.isReadOnly) return permWidget;
     return Column(

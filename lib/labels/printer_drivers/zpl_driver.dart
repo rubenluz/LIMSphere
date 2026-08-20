@@ -18,7 +18,11 @@ const _kZplPort = 9100;
 
 /// Generates a ZPL string for all [records]. Each record produces [tpl.copies]
 /// labels. Pass an empty list to produce one label from template placeholders only.
-String _generateZpl(LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) {
+String _generateZpl(
+  LabelTemplate tpl,
+  List<Map<String, dynamic>> records,
+  PrinterConfig cfg,
+) {
   final buf = StringBuffer();
   final dotsPerMm = tpl.dpi / 25.4;
   int mm(double v) => (v * dotsPerMm).round().clamp(0, 9999);
@@ -76,7 +80,11 @@ String _generateZpl(LabelTemplate tpl, List<Map<String, dynamic>> records, Print
 
 /// Sends ZPL to a Wi-Fi printer on port [_kZplPort] (raw TCP).
 Future<void> _sendZplOverWifi(String ip, String zpl) async {
-  final socket = await Socket.connect(ip, _kZplPort, timeout: const Duration(seconds: 8));
+  final socket = await Socket.connect(
+    ip,
+    _kZplPort,
+    timeout: const Duration(seconds: 8),
+  );
   try {
     socket.write(zpl);
     await socket.flush();
@@ -100,13 +108,18 @@ Future<_ConnState> _checkZplConnection(PrinterConfig cfg) async {
 }
 
 Future<void> _printZpl(
-    LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) async {
+  LabelTemplate tpl,
+  List<Map<String, dynamic>> records,
+  PrinterConfig cfg,
+) async {
   final zpl = _generateZpl(tpl, records, cfg);
   if (cfg.connectionType == 'usb') {
     debugPrint('[PRINT] ZPL data: ${zpl.length} chars -> USB "${cfg.usbPath}"');
     await _sendZplOverUsb(cfg, zpl);
   } else {
-    debugPrint('[PRINT] ZPL: ${zpl.length} chars -> TCP ${cfg.ipAddress}:$_kZplPort');
+    debugPrint(
+      '[PRINT] ZPL: ${zpl.length} chars -> TCP ${cfg.ipAddress}:$_kZplPort',
+    );
     await _sendZplOverWifi(cfg.ipAddress, zpl);
   }
 }

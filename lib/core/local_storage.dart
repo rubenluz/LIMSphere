@@ -2,14 +2,20 @@
 // session expiry, remember-me duration, last-used email.
 
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../database_connection/database_connection_model.dart';
 
 class LocalStorage {
+  /// Sentinel used when the user wants the session remembered indefinitely.
+  static const int rememberForever = -1;
+
   static const _connectionsKey = 'connections';
   static const _lastConnectionKey = 'last_connection';
   static const _sessionExpiryKey = 'session_expiry_ms';
-  static const _rememberDurationKey = 'remember_duration_days'; // 0 = session only
+  static const _rememberDurationKey =
+      'remember_duration_days'; // 0 = session only
   static const _rememberedEmailKey = 'remembered_email';
 
   // ── Connections list ────────────────────────────────────────────────────────
@@ -64,12 +70,17 @@ class LocalStorage {
 
   // ── Session persistence ─────────────────────────────────────────────────────
 
-  /// Save session expiry. [days] = 0 means "this session only" (don't persist).
+  /// Save session expiry. [days] = 0 means "this session only" and
+  /// [rememberForever] means the session has no app-imposed expiry.
   static Future<void> saveSessionExpiry(int days) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_rememberDurationKey, days);
-    if (days > 0) {
-      final expiry = DateTime.now().add(Duration(days: days)).millisecondsSinceEpoch;
+    if (days == rememberForever) {
+      await prefs.remove(_sessionExpiryKey);
+    } else if (days > 0) {
+      final expiry = DateTime.now()
+          .add(Duration(days: days))
+          .millisecondsSinceEpoch;
       await prefs.setInt(_sessionExpiryKey, expiry);
     } else {
       await prefs.remove(_sessionExpiryKey);
@@ -79,12 +90,13 @@ class LocalStorage {
   /// Returns true if there is a valid, non-expired saved session.
   static Future<bool> hasValidSession() async {
     final prefs = await SharedPreferences.getInstance();
+    if (prefs.getInt(_rememberDurationKey) == rememberForever) return true;
     final expiry = prefs.getInt(_sessionExpiryKey);
     if (expiry == null) return false;
     return DateTime.now().millisecondsSinceEpoch < expiry;
   }
 
-  /// Returns how many days the user chose to remember (0 = never saved).
+  /// Returns the saved duration (0 = session only, [rememberForever] = forever).
   static Future<int> getRememberDays() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_rememberDurationKey) ?? 0;
@@ -106,5 +118,4 @@ class LocalStorage {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_rememberedEmailKey);
   }
-
 }

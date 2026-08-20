@@ -37,8 +37,15 @@ const _kQl570TotalDots = 720;
 /// Printable dot widths per tape width (mm) at 300 DPI, from the Brother QL spec.
 /// The printable area is always smaller than the physical tape width due to margins.
 const _kQl570PrintableDots300 = <int, int>{
-  12: 120, 17: 165, 23: 202, 29: 306,
-  38: 413, 50: 554, 54: 590, 58: 618, 62: 696,
+  12: 120,
+  17: 165,
+  23: 202,
+  29: 306,
+  38: 413,
+  50: 554,
+  54: 590,
+  58: 618,
+  62: 696,
 };
 
 const _kQl570MediaTypeContinuous = 0x0B;
@@ -101,8 +108,8 @@ typedef _Ql570MediaSpec = ({
 /// Legacy models are always 300 DPI; falls back to an approximate formula for unlisted widths.
 int _ql570PrintableDots(double tapeMm) {
   final key = tapeMm.round();
-  return _kQl570PrintableDots300[key]
-      ?? ((tapeMm * 300 / 25.4) * 0.88).round().clamp(1, 720).toInt();
+  return _kQl570PrintableDots300[key] ??
+      ((tapeMm * 300 / 25.4) * 0.88).round().clamp(1, 720).toInt();
 }
 
 String _ql570ModelKey(PrinterConfig cfg) =>
@@ -165,7 +172,9 @@ _Ql570MediaSpec _ql570MediaSpec(LabelTemplate tpl, PrinterConfig cfg) {
 
   final printable = _ql570PrintableDots(tpl.labelW);
   return (
-    mediaType: cfg.continuousRoll ? _kQl570MediaTypeContinuous : _kQl570MediaTypeDieCut,
+    mediaType: cfg.continuousRoll
+        ? _kQl570MediaTypeContinuous
+        : _kQl570MediaTypeDieCut,
     tapeWidthMm: width.clamp(0, 255).toInt(),
     labelLengthMm: length.clamp(0, 255).toInt(),
     printableDots: printable,
@@ -213,7 +222,7 @@ int _ql570ContinuousEndByte(String cutMode, int pageIdx, int totalPages) {
 /// places dot 0 (leftmost printable) at byte 88 and dot N-1 at byte 1.
 void _ql570SetDot(List<int> line, int dot, int leftOffset) {
   final physDot = leftOffset + dot;
-  final revDot  = _kQl570TotalDots - 1 - physDot;
+  final revDot = _kQl570TotalDots - 1 - physDot;
   line[revDot ~/ 8] |= (1 << (7 - revDot % 8));
 }
 
@@ -223,10 +232,12 @@ void _ql570SetDot(List<int> line, int dot, int leftOffset) {
 
 /// Dispatches to the correct sub-protocol based on media type.
 Future<Uint8List> _generateBrotherQl570Data(
-    LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) =>
-    cfg.continuousRoll
-        ? _ql570Continuous(tpl, records, cfg)
-        : _ql570DieCut(tpl, records, cfg);
+  LabelTemplate tpl,
+  List<Map<String, dynamic>> records,
+  PrinterConfig cfg,
+) => cfg.continuousRoll
+    ? _ql570Continuous(tpl, records, cfg)
+    : _ql570DieCut(tpl, records, cfg);
 
 List<int> _ql570PageHeader(
   LabelTemplate tpl,
@@ -257,7 +268,12 @@ List<int> _ql570PageHeader(
     pageHeader.addAll([0x1B, 0x69, 0x4D, autoCut ? _kQl570AutoCutFlag : 0x00]);
   }
   if (autoCut && _ql570SupportsCutEvery(cfg)) {
-    pageHeader.addAll([0x1B, 0x69, 0x41, _ql570CutEveryCount(tpl.cutMode, totalPages)]);
+    pageHeader.addAll([
+      0x1B,
+      0x69,
+      0x41,
+      _ql570CutEveryCount(tpl.cutMode, totalPages),
+    ]);
   }
   if (_ql570SupportsExpandedMode(cfg)) {
     pageHeader.addAll([
@@ -313,9 +329,14 @@ Future<void> _sendBrotherQl570(PrinterConfig cfg, Uint8List data) async {
 }
 
 Future<void> _printBrotherQl570(
-    LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) async {
+  LabelTemplate tpl,
+  List<Map<String, dynamic>> records,
+  PrinterConfig cfg,
+) async {
   final data = await _generateBrotherQl570Data(tpl, records, cfg);
-  debugPrint('[PRINT] QL-570 legacy data: ${data.length} bytes -> USB "${cfg.usbPath}"');
+  debugPrint(
+    '[PRINT] QL-570 legacy data: ${data.length} bytes -> USB "${cfg.usbPath}"',
+  );
   await _sendBrotherQl570(cfg, data);
 }
 
@@ -341,7 +362,10 @@ double _ql570PrintableWidthMm(LabelTemplate tpl, PrinterConfig cfg) {
 /// to a printable dot — no fractional-pixel scaling in the raster loop.
 /// Height uses floor() to avoid a spurious extra partial-dot line.
 Future<Uint8List> _ql570DieCut(
-    LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) async {
+  LabelTemplate tpl,
+  List<Map<String, dynamic>> records,
+  PrinterConfig cfg,
+) async {
   final printRecords = records.isEmpty ? [<String, dynamic>{}] : records;
   final buf = BytesBuilder();
   final spec = _ql570MediaSpec(tpl, cfg);
@@ -351,15 +375,25 @@ Future<Uint8List> _ql570DieCut(
   buf.add(List.filled(200, 0));
   buf.add(const [0x1B, 0x40]);
 
-  debugPrint('[QL570] mode=die-cut tape=${tpl.labelW}mm label=${tpl.labelW}×${tpl.labelH}mm '
-      'printable=${spec.printableDots} dots leftMargin=${spec.leftMarginDots} copies=${tpl.copies} records=${printRecords.length}');
-  debugPrint('[QL570] fields=${tpl.fields.length} topOffsetMm=${tpl.topOffsetMm} cutMode=${tpl.cutMode}');
+  debugPrint(
+    '[QL570] mode=die-cut tape=${tpl.labelW}mm label=${tpl.labelW}×${tpl.labelH}mm '
+    'printable=${spec.printableDots} dots leftMargin=${spec.leftMarginDots} copies=${tpl.copies} records=${printRecords.length}',
+  );
+  debugPrint(
+    '[QL570] fields=${tpl.fields.length} topOffsetMm=${tpl.topOffsetMm} cutMode=${tpl.cutMode}',
+  );
 
   for (final record in printRecords) {
     for (int c = 0; c < tpl.copies; c++) {
-      final image = await _renderLabelToImage(tpl, record, _kQl570Dpi,
-          printableW: spec.printableDots);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final image = await _renderLabelToImage(
+        tpl,
+        record,
+        _kQl570Dpi,
+        printableW: spec.printableDots,
+      );
+      final byteData = await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
       if (byteData == null) continue;
       final rgba = byteData.buffer.asUint8List();
       final iw = image.width;
@@ -377,7 +411,11 @@ Future<Uint8List> _ql570DieCut(
       for (int row = 0; row < ih; row++) {
         for (int dot = 0; dot < iw; dot++) {
           final idx = (row * iw + dot) * 4;
-          final gray = (rgba[idx] * 0.299 + rgba[idx + 1] * 0.587 + rgba[idx + 2] * 0.114).round();
+          final gray =
+              (rgba[idx] * 0.299 +
+                      rgba[idx + 1] * 0.587 +
+                      rgba[idx + 2] * 0.114)
+                  .round();
           if (gray < 128) {
             firstContentRow = row;
             break rowSearch;
@@ -388,19 +426,23 @@ Future<Uint8List> _ql570DieCut(
       final contentLines = (ih - firstContentRow).clamp(0, targetLines);
       final padLines = targetLines - contentLines;
 
-      debugPrint('[QL570] die-cut copy=${c + 1} image=$iw×${ih}px '
-          'firstContentRow=$firstContentRow contentLines=$contentLines '
-          'padLines=$padLines targetLines=$targetLines '
-          'endByte=0x${_kQl570DieCutEndByte.toRadixString(16).toUpperCase()}');
+      debugPrint(
+        '[QL570] die-cut copy=${c + 1} image=$iw×${ih}px '
+        'firstContentRow=$firstContentRow contentLines=$contentLines '
+        'padLines=$padLines targetLines=$targetLines '
+        'endByte=0x${_kQl570DieCutEndByte.toRadixString(16).toUpperCase()}',
+      );
 
-      buf.add(_ql570PageHeader(
-        tpl,
-        cfg,
-        spec,
-        rasterLines: targetLines,
-        pageIdx: pageIdx,
-        totalPages: totalPages,
-      ));
+      buf.add(
+        _ql570PageHeader(
+          tpl,
+          cfg,
+          spec,
+          rasterLines: targetLines,
+          pageIdx: pageIdx,
+          totalPages: totalPages,
+        ),
+      );
 
       _ql570WriteRasterRows(
         buf,
@@ -437,15 +479,20 @@ Future<Uint8List> _ql570DieCut(
 /// Each page carries its own legacy Brother job-data header, followed by raster
 /// rows and a cut/feed end byte.
 Future<Uint8List> _ql570Continuous(
-    LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) async {
+  LabelTemplate tpl,
+  List<Map<String, dynamic>> records,
+  PrinterConfig cfg,
+) async {
   final printRecords = records.isEmpty ? [<String, dynamic>{}] : records;
   final buf = BytesBuilder();
   final spec = _ql570MediaSpec(tpl, cfg);
 
   final totalPages = printRecords.fold(0, (s, _) => s + tpl.copies);
-  debugPrint('[QL570] mode=continuous tape=${tpl.labelW}mm label=${tpl.labelW}×${tpl.labelH}mm '
-      'printable=${spec.printableDots} dots leftMargin=${spec.leftMarginDots} copies=${tpl.copies} records=${printRecords.length} '
-      'totalPages=$totalPages cutMode=${tpl.cutMode} topOffsetMm=${tpl.topOffsetMm}');
+  debugPrint(
+    '[QL570] mode=continuous tape=${tpl.labelW}mm label=${tpl.labelW}×${tpl.labelH}mm '
+    'printable=${spec.printableDots} dots leftMargin=${spec.leftMarginDots} copies=${tpl.copies} records=${printRecords.length} '
+    'totalPages=$totalPages cutMode=${tpl.cutMode} topOffsetMm=${tpl.topOffsetMm}',
+  );
   debugPrint('[QL570] fields=${tpl.fields.length}');
 
   buf.add(List.filled(200, 0));
@@ -454,27 +501,37 @@ Future<Uint8List> _ql570Continuous(
   int pageIdx = 0;
   for (final record in printRecords) {
     for (int c = 0; c < tpl.copies; c++, pageIdx++) {
-      final image = await _renderLabelToImage(tpl, record, _kQl570Dpi,
-          printableW: spec.printableDots);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final image = await _renderLabelToImage(
+        tpl,
+        record,
+        _kQl570Dpi,
+        printableW: spec.printableDots,
+      );
+      final byteData = await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
       if (byteData == null) continue;
       final rgba = byteData.buffer.asUint8List();
       final iw = image.width;
       final ih = image.height;
 
       final endByte = _ql570ContinuousEndByte(tpl.cutMode, pageIdx, totalPages);
-      buf.add(_ql570PageHeader(
-        tpl,
-        cfg,
-        spec,
-        rasterLines: ih,
-        pageIdx: pageIdx,
-        totalPages: totalPages,
-      ));
-      debugPrint('[QL570] continuous page=${pageIdx + 1}/$totalPages image=$iw×${ih}px '
-          '(${(iw/(_kQl570Dpi/25.4)).toStringAsFixed(1)}×${(ih/(_kQl570Dpi/25.4)).toStringAsFixed(1)}mm) '
-          'rasterLines=$ih endByte=0x${endByte.toRadixString(16).toUpperCase()} '
-          '(${endByte == 0x1A ? "cut" : "no-cut"})');
+      buf.add(
+        _ql570PageHeader(
+          tpl,
+          cfg,
+          spec,
+          rasterLines: ih,
+          pageIdx: pageIdx,
+          totalPages: totalPages,
+        ),
+      );
+      debugPrint(
+        '[QL570] continuous page=${pageIdx + 1}/$totalPages image=$iw×${ih}px '
+        '(${(iw / (_kQl570Dpi / 25.4)).toStringAsFixed(1)}×${(ih / (_kQl570Dpi / 25.4)).toStringAsFixed(1)}mm) '
+        'rasterLines=$ih endByte=0x${endByte.toRadixString(16).toUpperCase()} '
+        '(${endByte == 0x1A ? "cut" : "no-cut"})',
+      );
 
       _ql570WriteRasterRows(
         buf,
@@ -502,9 +559,13 @@ Future<Uint8List> _ql570Continuous(
 /// [continuousRoll] — true for continuous tape, false for die-cut labels.
 /// [cutMode] — 'none' (0x0C feed only) | 'end' (0x1A feed+cut). Only used
 ///   when [continuousRoll] is true; die-cut always uses 0x1A.
-Uint8List _ql570SolidBlack(double tapeMm, double labelHMm,
-    {bool continuousRoll = false, String cutMode = 'end',
-    String deviceName = 'Brother QL-570'}) {
+Uint8List _ql570SolidBlack(
+  double tapeMm,
+  double labelHMm, {
+  bool continuousRoll = false,
+  String cutMode = 'end',
+  String deviceName = 'Brother QL-570',
+}) {
   final tpl = LabelTemplate(
     id: '_ql570_test',
     name: 'QL570 Test',
@@ -522,26 +583,30 @@ Uint8List _ql570SolidBlack(double tapeMm, double labelHMm,
   );
   final spec = _ql570MediaSpec(tpl, cfg);
   final height = (labelHMm * _kQl570Dpi / 25.4).round();
-  final endByte    = continuousRoll
+  final endByte = continuousRoll
       ? (cutMode == 'none' ? 0x0C : 0x1A)
       : _kQl570DieCutEndByte;
 
-  debugPrint('[QL570] solid-black test tape=${tapeMm}mm height=${labelHMm}mm '
-      'media=${continuousRoll ? "continuous" : "die-cut"} cutMode=$cutMode '
-      'rasterLines=$height '
-      'endByte=0x${endByte.toRadixString(16).toUpperCase()}');
+  debugPrint(
+    '[QL570] solid-black test tape=${tapeMm}mm height=${labelHMm}mm '
+    'media=${continuousRoll ? "continuous" : "die-cut"} cutMode=$cutMode '
+    'rasterLines=$height '
+    'endByte=0x${endByte.toRadixString(16).toUpperCase()}',
+  );
 
   final buf = BytesBuilder();
   buf.add(List.filled(200, 0));
   buf.add(const [0x1B, 0x40]);
-  buf.add(_ql570PageHeader(
-    tpl,
-    cfg,
-    spec,
-    rasterLines: height,
-    pageIdx: 0,
-    totalPages: 1,
-  ));
+  buf.add(
+    _ql570PageHeader(
+      tpl,
+      cfg,
+      spec,
+      rasterLines: height,
+      pageIdx: 0,
+      totalPages: 1,
+    ),
+  );
 
   for (int row = 0; row < height; row++) {
     final line = List<int>.filled(_kQl570BytesPerLine, 0);

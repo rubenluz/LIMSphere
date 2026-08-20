@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
 import 'detail_widgets.dart';
@@ -36,9 +37,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl        = TextEditingController();
+    _nameCtrl = TextEditingController();
     _responsibleCtrl = TextEditingController();
-    _notesCtrl       = TextEditingController();
+    _notesCtrl = TextEditingController();
     _load();
   }
 
@@ -68,29 +69,31 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
       final roomRows = await Supabase.instance.client
           .from('storage_locations')
-          .select('location_id, location_name, location_sort_order')
+          .select(
+            'location_id, location_name, location_code, location_sort_order',
+          )
           .eq('location_type', LocationModel.roomType);
-      final allRooms = roomRows
-          .map<LocationModel>((c) => LocationModel.fromMap(c))
-          .toList()
-        ..sort(_bySortThenName);
+      final allRooms =
+          roomRows.map<LocationModel>((c) => LocationModel.fromMap(c)).toList()
+            ..sort(_bySortThenName);
       final roomIdx = allRooms.indexWhere((r) => r.id == room.id);
 
       final childRows = await Supabase.instance.client
           .from('storage_locations')
           .select()
           .eq('location_parent_id', widget.locationId);
-      final children = childRows
-          .map<LocationModel>((c) => LocationModel.fromMap(c))
-          .toList()
-        ..sort(_bySortThenName);
+      final children =
+          childRows.map<LocationModel>((c) => LocationModel.fromMap(c)).toList()
+            ..sort(_bySortThenName);
 
       List<Map<String, dynamic>> users = [];
       try {
         final userRows = await Supabase.instance.client
             .from('users')
-            .select('user_id, user_email, user_name, user_phone, '
-                'user_institution, user_group, user_role')
+            .select(
+              'user_id, user_email, user_name, user_phone, '
+              'user_institution, user_group, user_role',
+            )
             .order('user_name');
         users = List<Map<String, dynamic>>.from(userRows);
       } catch (e) {
@@ -100,22 +103,23 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       final codes = <int, String>{
         for (var i = 0; i < children.length; i++)
           children[i].id:
-              roomIdx >= 0 ? 'L${roomIdx + 1}.${i + 1}' : 'L?.${i + 1}',
+              children[i].code ??
+              (roomIdx >= 0 ? 'L${roomIdx + 1}.${i + 1}' : 'L?.${i + 1}'),
       };
 
       if (mounted) {
-        _nameCtrl.text        = stripLocationCodePrefix(room.name);
+        _nameCtrl.text = stripLocationCodePrefix(room.name);
         _responsibleCtrl.text = room.responsible ?? '';
-        _notesCtrl.text       = room.notes ?? '';
+        _notesCtrl.text = room.notes ?? '';
 
         setState(() {
-          _room      = room;
-          _children  = children;
-          _users     = users;
+          _room = room;
+          _children = children;
+          _users = users;
           _childCodes
             ..clear()
             ..addAll(codes);
-          _loading   = false;
+          _loading = false;
         });
       }
     } catch (e) {
@@ -137,6 +141,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _save() async {
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
     if (_nameCtrl.text.trim().isEmpty) {
       detailSnack(context, 'Name is required');
       return;
@@ -149,8 +154,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         'location_responsible': _responsibleCtrl.text.trim().isEmpty
             ? null
             : _responsibleCtrl.text.trim(),
-        'location_notes':
-            _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+        'location_notes': _notesCtrl.text.trim().isEmpty
+            ? null
+            : _notesCtrl.text.trim(),
         'location_parent_id': null,
         'location_temperature': null,
         'location_capacity': null,
@@ -173,31 +179,41 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _delete() async {
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
     final name = _room?.name ?? 'this room';
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.appSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Delete Room?',
-            style: GoogleFonts.spaceGrotesk(
-                color: ctx.appTextPrimary, fontWeight: FontWeight.w600)),
+        title: Text(
+          'Delete Room?',
+          style: GoogleFonts.spaceGrotesk(
+            color: ctx.appTextPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         content: Text(
           'This will permanently delete "$name". Sub-locations inside will be unlinked but kept. This cannot be undone.',
           style: GoogleFonts.spaceGrotesk(
-              color: ctx.appTextSecondary, fontSize: 13),
+            color: ctx.appTextSecondary,
+            fontSize: 13,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel',
-                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary),
+            ),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: AppDS.red,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Delete', style: GoogleFonts.spaceGrotesk()),
@@ -249,21 +265,29 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         title: Text(
           'Room',
           style: GoogleFonts.spaceGrotesk(
-              color: context.appTextPrimary, fontWeight: FontWeight.w600),
+            color: context.appTextPrimary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         actions: [
           if (room != null) ...[
             if (_editMode)
               IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    size: 20, color: AppDS.red),
+                icon: const Icon(
+                  Icons.delete_outline,
+                  size: 20,
+                  color: AppDS.red,
+                ),
                 tooltip: 'Delete',
                 onPressed: _delete,
               ),
             if (_editMode && !_saving)
               IconButton(
-                icon: Icon(Icons.close,
-                    size: 20, color: context.appTextSecondary),
+                icon: Icon(
+                  Icons.close,
+                  size: 20,
+                  color: context.appTextSecondary,
+                ),
                 tooltip: 'Cancel',
                 onPressed: () {
                   setState(() => _editMode = false);
@@ -274,93 +298,114 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white)))
-                : _editMode
-                    ? TextButton.icon(
-                        onPressed: _save,
-                        icon: const Icon(Icons.save_outlined,
-                            size: 16, color: AppDS.accent),
-                        label: Text('Save',
-                            style: GoogleFonts.spaceGrotesk(
-                                color: AppDS.accent)),
-                      )
-                    : TextButton.icon(
-                        onPressed: () {
-                          if (!context.canEditModule) {
-                            context.warnReadOnly();
-                            return;
-                          }
-                          setState(() => _editMode = true);
-                        },
-                        icon: const Icon(Icons.edit_outlined,
-                            size: 16, color: AppDS.accent),
-                        label: Text('Edit',
-                            style: GoogleFonts.spaceGrotesk(
-                                color: AppDS.accent)),
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
                       ),
+                    ),
+                  )
+                : _editMode
+                ? TextButton.icon(
+                    onPressed: _save,
+                    icon: const Icon(
+                      Icons.save_outlined,
+                      size: 16,
+                      color: AppDS.accent,
+                    ),
+                    label: Text(
+                      'Save',
+                      style: GoogleFonts.spaceGrotesk(color: AppDS.accent),
+                    ),
+                  )
+                : TextButton.icon(
+                    onPressed: () {
+                      if (!context.canEditModule) {
+                        context.warnReadOnly();
+                        return;
+                      }
+                      setState(() => _editMode = true);
+                    },
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      size: 16,
+                      color: AppDS.accent,
+                    ),
+                    label: Text(
+                      'Edit',
+                      style: GoogleFonts.spaceGrotesk(color: AppDS.accent),
+                    ),
+                  ),
           ],
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : room == null
-              ? Center(
-                  child: Text('Room not found',
-                      style: GoogleFonts.spaceGrotesk(color: context.appTextMuted)))
-              : _buildBody(context, room, accent),
+          ? Center(
+              child: Text(
+                'Room not found',
+                style: GoogleFonts.spaceGrotesk(color: context.appTextMuted),
+              ),
+            )
+          : _buildBody(context, room, accent),
     );
   }
 
   Widget _buildBody(BuildContext context, LocationModel room, Color accent) {
     return SingleChildScrollView(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _buildHeader(context, room, accent),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(children: [
-            DetailSection(
-              title: 'ROOM DETAILS',
-              icon: Icons.info_outline,
-              expanded: _expanded.contains(0),
-              onToggle: () => setState(() {
-                _expanded.contains(0)
-                    ? _expanded.remove(0)
-                    : _expanded.add(0);
-              }),
-              child: _buildDetailsSection(context, room),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(context, room, accent),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                DetailSection(
+                  title: 'ROOM DETAILS',
+                  icon: Icons.info_outline,
+                  expanded: _expanded.contains(0),
+                  onToggle: () => setState(() {
+                    _expanded.contains(0)
+                        ? _expanded.remove(0)
+                        : _expanded.add(0);
+                  }),
+                  child: _buildDetailsSection(context, room),
+                ),
+                DetailSection(
+                  title: 'NOTES',
+                  icon: Icons.notes_rounded,
+                  expanded: _expanded.contains(1),
+                  onToggle: () => setState(() {
+                    _expanded.contains(1)
+                        ? _expanded.remove(1)
+                        : _expanded.add(1);
+                  }),
+                  child: DetailInlineField(
+                    label: 'Notes',
+                    controller: _notesCtrl,
+                    maxLines: 4,
+                    readOnly: !_editMode,
+                  ),
+                ),
+                DetailSection(
+                  title: 'SUB-LOCATIONS (${_children.length})',
+                  icon: Icons.account_tree_outlined,
+                  expanded: _expanded.contains(2),
+                  onToggle: () => setState(() {
+                    _expanded.contains(2)
+                        ? _expanded.remove(2)
+                        : _expanded.add(2);
+                  }),
+                  child: _buildChildrenSection(context),
+                ),
+              ],
             ),
-            DetailSection(
-              title: 'NOTES',
-              icon: Icons.notes_rounded,
-              expanded: _expanded.contains(1),
-              onToggle: () => setState(() {
-                _expanded.contains(1)
-                    ? _expanded.remove(1)
-                    : _expanded.add(1);
-              }),
-              child: DetailInlineField(
-                  label: 'Notes',
-                  controller: _notesCtrl,
-                  maxLines: 4,
-                  readOnly: !_editMode),
-            ),
-            DetailSection(
-              title: 'SUB-LOCATIONS (${_children.length})',
-              icon: Icons.account_tree_outlined,
-              expanded: _expanded.contains(2),
-              onToggle: () => setState(() {
-                _expanded.contains(2)
-                    ? _expanded.remove(2)
-                    : _expanded.add(2);
-              }),
-              child: _buildChildrenSection(context),
-            ),
-          ]),
-        ),
-      ]),
+          ),
+        ],
+      ),
     );
   }
 
@@ -377,23 +422,45 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               color: accent.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(LocationModel.typeIcon(LocationModel.roomType),
-                  color: accent, size: 13),
-              const SizedBox(width: 5),
-              Text('Room',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  LocationModel.typeIcon(LocationModel.roomType),
+                  color: accent,
+                  size: 13,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'Room',
                   style: GoogleFonts.spaceGrotesk(
-                      color: accent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-            ]),
+                    color: accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
+          if (room.code != null) ...[
+            const SizedBox(width: 10),
+            Text(
+              room.code!,
+              style: GoogleFonts.jetBrainsMono(
+                color: context.appTextSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           if (room.responsible != null &&
               room.responsible!.trim().isNotEmpty) ...[
             const SizedBox(width: 10),
             Flexible(
               child: DetailResponsibleChips(
-                  raw: room.responsible, users: _users),
+                raw: room.responsible,
+                users: _users,
+              ),
             ),
           ],
         ],
@@ -403,35 +470,49 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
   Widget _buildDetailsSection(BuildContext context, LocationModel room) {
     final ro = !_editMode;
-    return Column(children: [
-      DetailFieldRow(children: [
-        DetailInlineField(label: 'Name', controller: _nameCtrl, readOnly: ro),
-        DetailResponsibleField(
-          label: 'Responsible',
-          controller: _responsibleCtrl,
-          users: _users,
-          readOnly: ro,
+    return Column(
+      children: [
+        DetailFieldRow(
+          children: [
+            DetailInlineField(
+              label: 'Name',
+              controller: _nameCtrl,
+              readOnly: ro,
+            ),
+            DetailResponsibleField(
+              label: 'Responsible',
+              controller: _responsibleCtrl,
+              users: _users,
+              readOnly: ro,
+            ),
+          ],
         ),
-      ]),
-      if (room.createdAt != null) ...[
-        const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Created ${detailFmtDate(room.createdAt!)}',
-            style:
-                GoogleFonts.spaceGrotesk(color: context.appTextMuted, fontSize: 11),
+        if (room.createdAt != null) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Created ${detailFmtDate(room.createdAt!)}',
+              style: GoogleFonts.spaceGrotesk(
+                color: context.appTextMuted,
+                fontSize: 11,
+              ),
+            ),
           ),
-        ),
+        ],
       ],
-    ]);
+    );
   }
 
   Widget _buildChildrenSection(BuildContext context) {
     if (_children.isEmpty) {
-      return Text('No sub-locations in this room.',
-          style: GoogleFonts.spaceGrotesk(
-              color: context.appTextMuted, fontSize: 13));
+      return Text(
+        'No sub-locations in this room.',
+        style: GoogleFonts.spaceGrotesk(
+          color: context.appTextMuted,
+          fontSize: 13,
+        ),
+      );
     }
     return Wrap(
       spacing: 8,
@@ -447,8 +528,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           onTap: () async {
             await Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => LocationDetailPage(locationId: c.id)),
+              modulePageRoute(
+                context: context,
+                child: LocationDetailPage(locationId: c.id),
+              ),
             );
             if (mounted) _load();
           },
@@ -460,25 +543,35 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: context.appBorder),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(LocationModel.typeIcon(c.type), color: acc, size: 16),
-              const SizedBox(width: 6),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(display,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LocationModel.typeIcon(c.type), color: acc, size: 16),
+                const SizedBox(width: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      display,
                       style: GoogleFonts.spaceGrotesk(
-                          color: context.appTextPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500)),
-                  if (c.temperature != null)
-                    Text(c.temperature!,
+                        color: context.appTextPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (c.temperature != null)
+                      Text(
+                        c.temperature!,
                         style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextMuted, fontSize: 11)),
-                ],
-              ),
-            ]),
+                          color: context.appTextMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       }).toList(),

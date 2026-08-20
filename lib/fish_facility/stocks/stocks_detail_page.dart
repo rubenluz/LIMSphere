@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../tanks/tanks_connection_model.dart';
 import '../lines/fish_lines_connection_model.dart';
 import '../lines/fish_lines_detail_page.dart';
@@ -350,10 +351,6 @@ class _TankDetailPageState extends State<TankDetailPage> {
   }
 
   void _enterEditMode() {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
     setState(() => _editMode = true);
   }
 
@@ -571,11 +568,8 @@ class _TankDetailPageState extends State<TankDetailPage> {
   }
 
   Future<void> _save() async {
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
     if (!_editMode) return;
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
     setState(() => _saving = true);
     try {
       final payload = <String, dynamic>{'fish_stocks_tank_id': _currentTankId};
@@ -622,16 +616,17 @@ class _TankDetailPageState extends State<TankDetailPage> {
       payload['fish_stocks_line_id'] = _selectedLineId;
       // Sync DOB from linked fish_line
       payload['fish_stocks_dob'] = _lineDateBirth;
-      // Generate qrcode if not already stored
+      // Keep the stored QR payload in the canonical LIMSphere link format.
       final stockId = _data['fish_stocks_id'] as int?;
-      if (stockId != null &&
-          (_data['fish_stocks_qrcode'] == null ||
-              (_data['fish_stocks_qrcode'] as String?)?.isEmpty == true)) {
-        payload['fish_stocks_qrcode'] = QrRules.build(
+      if (stockId != null) {
+        final expectedQr = QrRules.build(
           SupabaseManager.projectRef ?? 'local',
           'fish_stocks',
           stockId,
         );
+        if (_data['fish_stocks_qrcode']?.toString() != expectedQr) {
+          payload['fish_stocks_qrcode'] = expectedQr;
+        }
       }
 
       final client = Supabase.instance.client;
@@ -662,10 +657,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
   }
 
   Future<void> _delete() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
     final tankId = _recordTankId;
     final confirm = await showDialog<bool>(
       context: context,

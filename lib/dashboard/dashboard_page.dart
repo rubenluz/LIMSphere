@@ -46,28 +46,119 @@ const _widgetCategories = [
 
 const List<Map<String, dynamic>> _availableWidgets = [
   // ── Fish Facility ────────────────────────────────────────────────────────
-  {'id': 'fish_by_line',        'name': 'Active Fish Lines',        'icon': Icons.biotech_outlined,           'cat': 'Fish Facility'},
-  {'id': 'tank_cleaning',       'name': 'Tank Cleaning',            'icon': Icons.cleaning_services_outlined, 'cat': 'Fish Facility'},
-  {'id': 'cleaning_timeline',   'name': 'Cleaning Timeline',        'icon': Icons.timeline_rounded,           'cat': 'Fish Facility'},
-  {'id': 'maintenance_overview','name': 'Fish Facility Maintenance', 'icon': Icons.build_circle_outlined,      'cat': 'Fish Facility'},
-  {'id': 'breeding_activity',  'name': 'Breeding Activity',        'icon': Icons.egg_outlined,               'cat': 'Fish Facility'},
+  {
+    'id': 'fish_by_line',
+    'name': 'Active Fish Lines',
+    'icon': Icons.biotech_outlined,
+    'cat': 'Fish Facility',
+  },
+  {
+    'id': 'tank_cleaning',
+    'name': 'Tank Cleaning',
+    'icon': Icons.cleaning_services_outlined,
+    'cat': 'Fish Facility',
+  },
+  {
+    'id': 'cleaning_timeline',
+    'name': 'Cleaning Timeline',
+    'icon': Icons.timeline_rounded,
+    'cat': 'Fish Facility',
+  },
+  {
+    'id': 'maintenance_overview',
+    'name': 'Fish Facility Maintenance',
+    'icon': Icons.build_circle_outlined,
+    'cat': 'Fish Facility',
+  },
+  {
+    'id': 'breeding_activity',
+    'name': 'Breeding Activity',
+    'icon': Icons.egg_outlined,
+    'cat': 'Fish Facility',
+  },
   // ── Culture Collection ───────────────────────────────────────────────────
-  {'id': 'next_transfer',       'name': 'Next Transfers',           'icon': Icons.schedule,                   'cat': 'Culture Collection'},
-  {'id': 'need_new_transfer',   'name': 'Needs New Transfer',       'icon': Icons.event_repeat_rounded,       'cat': 'Culture Collection'},
-  {'id': 'transfer_status',     'name': 'Transfer Status',          'icon': Icons.warning_amber,              'cat': 'Culture Collection'},
-  {'id': 'transfer_timeline',   'name': 'Transfer Timeline',        'icon': Icons.timeline_rounded,           'cat': 'Culture Collection'},
-  {'id': 'in_care',             'name': 'In Care',                  'icon': Icons.medical_services,           'cat': 'Culture Collection'},
-  {'id': 'strains_by_origin',   'name': 'Strains by Origin',        'icon': Icons.pie_chart,                  'cat': 'Culture Collection'},
-  {'id': 'strains_by_medium',   'name': 'Strains by Medium',        'icon': Icons.water_drop,                 'cat': 'Culture Collection'},
+  {
+    'id': 'next_transfer',
+    'name': 'Next Transfers',
+    'icon': Icons.schedule,
+    'cat': 'Culture Collection',
+  },
+  {
+    'id': 'need_new_transfer',
+    'name': 'Needs New Transfer',
+    'icon': Icons.event_repeat_rounded,
+    'cat': 'Culture Collection',
+  },
+  {
+    'id': 'transfer_status',
+    'name': 'Transfer Status',
+    'icon': Icons.warning_amber,
+    'cat': 'Culture Collection',
+  },
+  {
+    'id': 'transfer_timeline',
+    'name': 'Transfer Timeline',
+    'icon': Icons.timeline_rounded,
+    'cat': 'Culture Collection',
+  },
+  {
+    'id': 'in_care',
+    'name': 'In Care',
+    'icon': Icons.medical_services,
+    'cat': 'Culture Collection',
+  },
+  {
+    'id': 'strains_by_origin',
+    'name': 'Strains by Origin',
+    'icon': Icons.pie_chart,
+    'cat': 'Culture Collection',
+  },
+  {
+    'id': 'strains_by_medium',
+    'name': 'Strains by Medium',
+    'icon': Icons.water_drop,
+    'cat': 'Culture Collection',
+  },
   // ── Resources ────────────────────────────────────────────────────────────
-  {'id': 'low_stock',           'name': 'Low Stock Alerts',         'icon': Icons.inventory_2_outlined,       'cat': 'Resources'},
-  {'id': 'reagents_by_type',    'name': 'Reagents by Type',         'icon': Icons.donut_small_outlined,       'cat': 'Resources'},
-  {'id': 'today_reservations',  'name': "Today's Reservations",     'icon': Icons.calendar_today_outlined,    'cat': 'Resources'},
+  {
+    'id': 'low_stock',
+    'name': 'Low Stock Alerts',
+    'icon': Icons.inventory_2_outlined,
+    'cat': 'Resources',
+  },
+  {
+    'id': 'reagents_by_type',
+    'name': 'Reagents by Type',
+    'icon': Icons.donut_small_outlined,
+    'cat': 'Resources',
+  },
+  {
+    'id': 'today_reservations',
+    'name': "Today's Reservations",
+    'icon': Icons.calendar_today_outlined,
+    'cat': 'Resources',
+  },
   // ── Requests ────────────────────────────────────────────────────────────
-  {'id': 'open_requests',       'name': 'Open Requests',            'icon': Icons.assignment_outlined,        'cat': 'Requests'},
+  {
+    'id': 'open_requests',
+    'name': 'Open Requests',
+    'icon': Icons.assignment_outlined,
+    'cat': 'Requests',
+  },
   // ── General ──────────────────────────────────────────────────────────────
-  {'id': 'to_do',               'name': 'To-Do',                   'icon': Icons.checklist_rounded,          'cat': 'General'},
-  {'id': 'pending_users',       'name': 'Pending Users',            'icon': Icons.person_add_outlined,        'cat': 'General', 'role': 'admin'},
+  {
+    'id': 'to_do',
+    'name': 'To-Do',
+    'icon': Icons.checklist_rounded,
+    'cat': 'General',
+  },
+  {
+    'id': 'pending_users',
+    'name': 'Pending Users',
+    'icon': Icons.person_add_outlined,
+    'cat': 'General',
+    'role': 'admin',
+  },
 ];
 
 class DashboardPage extends StatefulWidget {
@@ -91,30 +182,35 @@ enum _UpdateStatus { checking, upToDate, updateAvailable, error }
 class _DashboardPageState extends State<DashboardPage> {
   // ── Profiles ───────────────────────────────────────────────────────────────
   int _activeProfile = 0;
-  final List<String> _profileTitles =
-      List.generate(_kProfileCount, (i) => 'Dashboard ${i + 1}');
-  final List<Map<int, String?>> _profileSlots =
-      List.generate(_kProfileCount, (_) => {for (int j = 0; j < 8; j++) j: null});
-  final List<Map<int, int>> _profileSpans =
-      List.generate(_kProfileCount, (_) => {for (int j = 0; j < 4; j++) j: 1});
+  final List<String> _profileTitles = List.generate(
+    _kProfileCount,
+    (i) => 'Dashboard ${i + 1}',
+  );
+  final List<Map<int, String?>> _profileSlots = List.generate(
+    _kProfileCount,
+    (_) => {for (int j = 0; j < 8; j++) j: null},
+  );
+  final List<Map<int, int>> _profileSpans = List.generate(
+    _kProfileCount,
+    (_) => {for (int j = 0; j < 4; j++) j: 1},
+  );
 
   // Convenience getters pointing at the active profile's maps.
   Map<int, String?> get _desktopSlots => _profileSlots[_activeProfile];
-  Map<int, int>    get _desktopSpans  => _profileSpans[_activeProfile];
+  Map<int, int> get _desktopSpans => _profileSpans[_activeProfile];
 
   bool get _isAdmin {
     final role = widget.userInfo['user_role'] as String? ?? '';
     return role == 'admin' || role == 'superadmin';
   }
 
-  List<Map<String, dynamic>> get _visibleWidgets => _availableWidgets
-      .where((w) => w['role'] == null || _isAdmin)
-      .toList();
+  List<Map<String, dynamic>> get _visibleWidgets =>
+      _availableWidgets.where((w) => w['role'] == null || _isAdmin).toList();
 
   // ── Profile title editing ─────────────────────────────────────────────────
   bool _editingTitle = false;
   final _titleController = TextEditingController();
-  final _titleFocusNode  = FocusNode();
+  final _titleFocusNode = FocusNode();
 
   // ── Update check (desktop only) ───────────────────────────────────────────
   _UpdateStatus _updateStatus = _UpdateStatus.checking;
@@ -317,13 +413,17 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _applyDesktopDefaults(int profile) {
-    _profileSlots[profile][0] = 'to_do';           _profileSpans[profile][0] = 2;
+    _profileSlots[profile][0] = 'to_do';
+    _profileSpans[profile][0] = 2;
     _profileSlots[profile][4] = null;
-    _profileSlots[profile][1] = 'next_transfer';   _profileSpans[profile][1] = 1;
+    _profileSlots[profile][1] = 'next_transfer';
+    _profileSpans[profile][1] = 1;
     _profileSlots[profile][5] = 'tank_cleaning';
-    _profileSlots[profile][2] = 'transfer_status'; _profileSpans[profile][2] = 1;
+    _profileSlots[profile][2] = 'transfer_status';
+    _profileSpans[profile][2] = 1;
     _profileSlots[profile][6] = 'fish_by_line';
-    _profileSlots[profile][3] = 'in_care';         _profileSpans[profile][3] = 2;
+    _profileSlots[profile][3] = 'in_care';
+    _profileSpans[profile][3] = 2;
     _profileSlots[profile][7] = null;
   }
 
@@ -341,24 +441,36 @@ class _DashboardPageState extends State<DashboardPage> {
     final prefs = await SharedPreferences.getInstance();
     final toSave = <String, String?>{};
     _desktopSlots.forEach((k, v) => toSave[k.toString()] = v);
-    await prefs.setString('dashboard_slots_$_activeProfile', jsonEncode(toSave));
+    await prefs.setString(
+      'dashboard_slots_$_activeProfile',
+      jsonEncode(toSave),
+    );
   }
 
   Future<void> _saveDesktopSpans() async {
     final prefs = await SharedPreferences.getInstance();
     final toSave = <String, int>{};
     _desktopSpans.forEach((k, v) => toSave[k.toString()] = v);
-    await prefs.setString('dashboard_spans_$_activeProfile', jsonEncode(toSave));
+    await prefs.setString(
+      'dashboard_spans_$_activeProfile',
+      jsonEncode(toSave),
+    );
   }
 
   Future<void> _saveMobileConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('dashboard_mobile_widgets', jsonEncode(_mobileWidgets));
+    await prefs.setString(
+      'dashboard_mobile_widgets',
+      jsonEncode(_mobileWidgets),
+    );
   }
 
   Future<void> _saveProfileTitles() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('dashboard_profile_titles', jsonEncode(_profileTitles));
+    await prefs.setString(
+      'dashboard_profile_titles',
+      jsonEncode(_profileTitles),
+    );
   }
 
   // ── Profile switching & title editing ─────────────────────────────────────
@@ -374,7 +486,9 @@ class _DashboardPageState extends State<DashboardPage> {
   void _startTitleEdit() {
     _titleController.text = _profileTitles[_activeProfile];
     setState(() => _editingTitle = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _titleFocusNode.requestFocus());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _titleFocusNode.requestFocus(),
+    );
   }
 
   Future<void> _commitTitleEdit() async {
@@ -390,25 +504,44 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildWidget(String widgetType) {
     switch (widgetType) {
-      case 'next_transfer':        return const NextTransferWidget();
-      case 'need_new_transfer':    return const NeedNewTransferWidget();
-      case 'strains_by_origin':    return const StrainsByOriginWidget();
-      case 'strains_by_medium':    return const StrainsByMediumWidget();
-      case 'transfer_status':      return const TransferStatusWidget();
-      case 'in_care':              return const InCareWidget();
-      case 'tank_cleaning':        return const TankCleaningWidget();
-      case 'fish_by_line':         return const FishByLineWidget();
-      case 'to_do':                return const ToDoWidget();
-      case 'transfer_timeline':    return const TransferTimelineWidget();
-      case 'cleaning_timeline':    return const TankCleaningTimelineWidget();
-      case 'maintenance_overview': return const MaintenanceOverviewWidget();
-      case 'breeding_activity':    return const BreedingActivityWidget();
-      case 'low_stock':            return const LowStockWidget();
-      case 'reagents_by_type':     return const ReagentsByTypeWidget();
-      case 'open_requests':        return const OpenRequestsWidget();
-      case 'today_reservations':   return const TodayReservationsWidget();
-      case 'pending_users':        return const PendingUsersWidget();
-      default:                     return const SizedBox.shrink();
+      case 'next_transfer':
+        return const NextTransferWidget();
+      case 'need_new_transfer':
+        return const NeedNewTransferWidget();
+      case 'strains_by_origin':
+        return const StrainsByOriginWidget();
+      case 'strains_by_medium':
+        return const StrainsByMediumWidget();
+      case 'transfer_status':
+        return const TransferStatusWidget();
+      case 'in_care':
+        return const InCareWidget();
+      case 'tank_cleaning':
+        return const TankCleaningWidget();
+      case 'fish_by_line':
+        return const FishByLineWidget();
+      case 'to_do':
+        return const ToDoWidget();
+      case 'transfer_timeline':
+        return const TransferTimelineWidget();
+      case 'cleaning_timeline':
+        return const TankCleaningTimelineWidget();
+      case 'maintenance_overview':
+        return const MaintenanceOverviewWidget();
+      case 'breeding_activity':
+        return const BreedingActivityWidget();
+      case 'low_stock':
+        return const LowStockWidget();
+      case 'reagents_by_type':
+        return const ReagentsByTypeWidget();
+      case 'open_requests':
+        return const OpenRequestsWidget();
+      case 'today_reservations':
+        return const TodayReservationsWidget();
+      case 'pending_users':
+        return const PendingUsersWidget();
+      default:
+        return const SizedBox.shrink();
     }
   }
 
@@ -432,24 +565,35 @@ class _DashboardPageState extends State<DashboardPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (isTopRow) ...[
-                  Row(children: [
-                    const Icon(Icons.height, size: 16),
-                    const SizedBox(width: 8),
-                    const Text('Height:',
-                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
-                    const SizedBox(width: 12),
-                    ChoiceChip(
-                      label: const Text('1 row'),
-                      selected: dialogSpan == 1,
-                      onSelected: (v) { if (v) setDs(() => dialogSpan = 1); },
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('2 rows'),
-                      selected: dialogSpan == 2,
-                      onSelected: (v) { if (v) setDs(() => dialogSpan = 2); },
-                    ),
-                  ]),
+                  Row(
+                    children: [
+                      const Icon(Icons.height, size: 16),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Height:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ChoiceChip(
+                        label: const Text('1 row'),
+                        selected: dialogSpan == 1,
+                        onSelected: (v) {
+                          if (v) setDs(() => dialogSpan = 1);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('2 rows'),
+                        selected: dialogSpan == 2,
+                        onSelected: (v) {
+                          if (v) setDs(() => dialogSpan = 2);
+                        },
+                      ),
+                    ],
+                  ),
                   const Divider(height: 16),
                 ],
                 SizedBox(
@@ -466,20 +610,26 @@ class _DashboardPageState extends State<DashboardPage> {
                           return [
                             Padding(
                               padding: const EdgeInsets.fromLTRB(4, 12, 4, 2),
-                              child: Row(children: [
-                                Text(cat.toUpperCase(),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    cat.toUpperCase(),
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 1.0,
                                       color: Theme.of(ctx).colorScheme.outline,
-                                    )),
-                                const SizedBox(width: 8),
-                                Expanded(
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
                                     child: Divider(
-                                        color: Theme.of(ctx).dividerColor,
-                                        height: 1)),
-                              ]),
+                                      color: Theme.of(ctx).dividerColor,
+                                      height: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             for (final w in ws)
                               ListTile(
@@ -488,7 +638,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                 selected: _desktopSlots[slotIndex] == w['id'],
                                 dense: true,
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                                 onTap: () async {
                                   final span = isTopRow ? dialogSpan : 1;
                                   setState(() {
@@ -517,7 +668,9 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           actions: [
-            if (hasWidget && isTopRow && dialogSpan != (_desktopSpans[slotIndex] ?? 1))
+            if (hasWidget &&
+                isTopRow &&
+                dialogSpan != (_desktopSpans[slotIndex] ?? 1))
               TextButton(
                 onPressed: () async {
                   final nav = Navigator.of(ctx);
@@ -574,9 +727,10 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(
-              color: widgetType == null
-                  ? Colors.grey.shade300
-                  : Colors.transparent),
+            color: widgetType == null
+                ? Colors.grey.shade300
+                : Colors.transparent,
+          ),
           borderRadius: BorderRadius.circular(8),
           color: widgetType == null ? Colors.grey.shade50 : null,
         ),
@@ -587,30 +741,41 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     Icon(Icons.add, size: 28, color: Colors.grey.shade400),
                     const SizedBox(height: 6),
-                    Text('Add Widget',
-                        style: TextStyle(
-                            color: Colors.grey.shade500, fontSize: 11)),
+                    Text(
+                      'Add Widget',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 11,
+                      ),
+                    ),
                   ],
                 ),
               )
-            : Stack(children: [
-                Positioned.fill(child: _buildWidget(widgetType)),
-                Positioned(
-                  top: 4, right: 4,
-                  child: Material(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(6),
-                    child: InkWell(
+            : Stack(
+                children: [
+                  Positioned.fill(child: _buildWidget(widgetType)),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Material(
+                      color: Colors.black.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(6),
-                      onTap: () => _showDesktopWidgetPicker(index),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.edit, size: 12, color: Colors.white70),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () => _showDesktopWidgetPicker(index),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.edit,
+                            size: 12,
+                            color: Colors.white70,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ]),
+                ],
+              ),
       ),
     );
   }
@@ -628,11 +793,13 @@ class _DashboardPageState extends State<DashboardPage> {
 
         final Widget colContent = span == 2
             ? _buildDesktopSlot(topIdx)
-            : Column(children: [
-                Expanded(child: _buildDesktopSlot(topIdx)),
-                const SizedBox(height: spacing),
-                Expanded(child: _buildDesktopSlot(botIdx)),
-              ]);
+            : Column(
+                children: [
+                  Expanded(child: _buildDesktopSlot(topIdx)),
+                  const SizedBox(height: spacing),
+                  Expanded(child: _buildDesktopSlot(botIdx)),
+                ],
+              );
 
         return Expanded(
           child: col < cols - 1
@@ -708,8 +875,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 cursorColor: AppDS.accent,
                 decoration: InputDecoration(
                   isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                   filled: true,
                   fillColor: context.appSurface,
                   border: OutlineInputBorder(
@@ -743,7 +912,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Icon(Icons.edit_outlined, size: 13, color: context.appTextMuted),
+                  Icon(
+                    Icons.edit_outlined,
+                    size: 13,
+                    color: context.appTextMuted,
+                  ),
                 ],
               ),
             ),
@@ -756,44 +929,63 @@ class _DashboardPageState extends State<DashboardPage> {
     switch (_updateStatus) {
       case _UpdateStatus.checking:
         return SizedBox(
-          width: 16, height: 16,
+          width: 16,
+          height: 16,
           child: CircularProgressIndicator(
-              strokeWidth: 2, color: context.appTextSecondary),
+            strokeWidth: 2,
+            color: context.appTextSecondary,
+          ),
         );
       case _UpdateStatus.upToDate:
-        return Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.check_circle, size: 15, color: AppDS.green),
-          const SizedBox(width: 5),
-          Text(
-            'Application up to date${_currentVersion != null ? ' (v$_currentVersion)' : ''}',
-            style: const TextStyle(
-                fontSize: 12, color: AppDS.green, fontWeight: FontWeight.w600),
-          ),
-        ]);
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, size: 15, color: AppDS.green),
+            const SizedBox(width: 5),
+            Text(
+              'Application up to date${_currentVersion != null ? ' (v$_currentVersion)' : ''}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppDS.green,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        );
       case _UpdateStatus.updateAvailable:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
           children: [
             if (_currentVersion != null)
-              Text('Current: v$_currentVersion',
-                  style: TextStyle(fontSize: 11, color: context.appTextMuted)),
+              Text(
+                'Current: v$_currentVersion',
+                style: TextStyle(fontSize: 11, color: context.appTextMuted),
+              ),
             const SizedBox(height: 4),
             TextButton.icon(
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
                 backgroundColor: const Color(0xFF38BDF8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onPressed: _openDownload,
               icon: const Icon(Icons.download_rounded, size: 15),
-              label: Text('Download v${_latestVersion ?? ''}',
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600)),
+              label: Text(
+                'Download v${_latestVersion ?? ''}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         );
@@ -808,13 +1000,17 @@ class _DashboardPageState extends State<DashboardPage> {
             },
             child: Padding(
               padding: const EdgeInsets.all(4),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.refresh, size: 14, color: context.appTextMuted),
-                const SizedBox(width: 4),
-                Text('Retry',
-                    style: TextStyle(
-                        fontSize: 12, color: context.appTextMuted)),
-              ]),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.refresh, size: 14, color: context.appTextMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Retry',
+                    style: TextStyle(fontSize: 12, color: context.appTextMuted),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -829,42 +1025,53 @@ class _DashboardPageState extends State<DashboardPage> {
         border: Border(bottom: BorderSide(color: context.appBorder)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(children: [
-        if (isMobile) ...[
-          IconButton(
-            icon: const Icon(Icons.menu_rounded, size: 20),
-            color: context.appTextSecondary,
-            tooltip: 'Menu',
-            onPressed: openAppDrawer,
+      child: Row(
+        children: [
+          if (isMobile) ...[
+            IconButton(
+              icon: const Icon(Icons.menu_rounded, size: 20),
+              color: context.appTextSecondary,
+              tooltip: 'Menu',
+              onPressed: openAppDrawer,
+            ),
+          ],
+          const Icon(
+            Icons.space_dashboard_outlined,
+            size: 18,
+            color: Color(0xFF6366F1),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Dashboard',
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: context.appTextPrimary,
+            ),
+          ),
+          const Spacer(),
+          if (_isDesktop) _buildUpdateButton(),
+          const SizedBox(width: 12),
+          Tooltip(
+            message: 'View on GitHub',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () => launchUrl(
+                Uri.parse('https://github.com/rubenluz/limsphere'),
+                mode: LaunchMode.externalApplication,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: FaIcon(
+                  FontAwesomeIcons.github,
+                  size: 18,
+                  color: context.appTextSecondary,
+                ),
+              ),
+            ),
           ),
         ],
-        const Icon(Icons.space_dashboard_outlined,
-            size: 18, color: Color(0xFF6366F1)),
-        const SizedBox(width: 8),
-        Text('Dashboard',
-            style: GoogleFonts.spaceGrotesk(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: context.appTextPrimary)),
-        const Spacer(),
-        if (_isDesktop) _buildUpdateButton(),
-        const SizedBox(width: 12),
-        Tooltip(
-          message: 'View on GitHub',
-          child: InkWell(
-            borderRadius: BorderRadius.circular(6),
-            onTap: () => launchUrl(
-              Uri.parse('https://github.com/rubenluz/limsphere'),
-              mode: LaunchMode.externalApplication,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: FaIcon(FontAwesomeIcons.github,
-                  size: 18, color: context.appTextSecondary),
-            ),
-          ),
-        ),
-      ]),
+      ),
     );
   }
 
@@ -880,7 +1087,8 @@ class _DashboardPageState extends State<DashboardPage> {
     if (available.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('All widgets are already on your dashboard')),
+          content: Text('All widgets are already on your dashboard'),
+        ),
       );
       return;
     }
@@ -888,7 +1096,8 @@ class _DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: Column(
@@ -906,22 +1115,25 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             const SizedBox(height: 16),
-            Row(children: [
-              const Text('Add Widget',
-                  style:
-                      TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const Spacer(),
-              TextButton.icon(
-                icon: const Icon(Icons.restore, size: 14),
-                label: const Text('Reset', style: TextStyle(fontSize: 13)),
-                onPressed: () async {
-                  final nav = Navigator.of(ctx);
-                  setState(() => _applyMobileDefaults());
-                  await _saveMobileConfig();
-                  nav.pop();
-                },
-              ),
-            ]),
+            Row(
+              children: [
+                const Text(
+                  'Add Widget',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  icon: const Icon(Icons.restore, size: 14),
+                  label: const Text('Reset', style: TextStyle(fontSize: 13)),
+                  onPressed: () async {
+                    final nav = Navigator.of(ctx);
+                    setState(() => _applyMobileDefaults());
+                    await _saveMobileConfig();
+                    nav.pop();
+                  },
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             Flexible(
               child: ListView(
@@ -936,21 +1148,26 @@ class _DashboardPageState extends State<DashboardPage> {
                       return [
                         Padding(
                           padding: const EdgeInsets.fromLTRB(4, 12, 4, 2),
-                          child: Row(children: [
-                            Text(cat.toUpperCase(),
+                          child: Row(
+                            children: [
+                              Text(
+                                cat.toUpperCase(),
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 1.0,
-                                  color:
-                                      Theme.of(ctx).colorScheme.outline,
-                                )),
-                            const SizedBox(width: 8),
-                            Expanded(
+                                  color: Theme.of(ctx).colorScheme.outline,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
                                 child: Divider(
-                                    color: Theme.of(ctx).dividerColor,
-                                    height: 1)),
-                          ]),
+                                  color: Theme.of(ctx).dividerColor,
+                                  height: 1,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         for (final w in ws)
                           ListTile(
@@ -958,11 +1175,13 @@ class _DashboardPageState extends State<DashboardPage> {
                             title: Text(w['name'] as String),
                             dense: true,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             onTap: () async {
                               final nav = Navigator.of(ctx);
-                              setState(() =>
-                                  _mobileWidgets.add(w['id'] as String));
+                              setState(
+                                () => _mobileWidgets.add(w['id'] as String),
+                              );
                               await _saveMobileConfig();
                               nav.pop();
                             },
@@ -985,11 +1204,12 @@ class _DashboardPageState extends State<DashboardPage> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 80),
       itemCount: _mobileWidgets.length + 1,
-      onReorder: (oldIndex, newIndex) async {
+      onReorderItem: (oldIndex, newIndex) async {
         if (oldIndex >= _mobileWidgets.length ||
-            newIndex > _mobileWidgets.length) { return; }
+            newIndex > _mobileWidgets.length) {
+          return;
+        }
         setState(() {
-          if (newIndex > oldIndex) newIndex--;
           final item = _mobileWidgets.removeAt(oldIndex);
           _mobileWidgets.insert(newIndex, item);
         });
@@ -1008,8 +1228,11 @@ class _DashboardPageState extends State<DashboardPage> {
         final widgetId = _mobileWidgets[i];
         final meta = _visibleWidgets.firstWhere(
           (w) => w['id'] == widgetId,
-          orElse: () =>
-              {'id': widgetId, 'name': widgetId, 'icon': Icons.widgets},
+          orElse: () => {
+            'id': widgetId,
+            'name': widgetId,
+            'icon': Icons.widgets,
+          },
         );
 
         return Padding(
@@ -1020,28 +1243,42 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
-                child: Row(children: [
-                  Icon(meta['icon'] as IconData,
-                      size: 14, color: Colors.grey.shade500),
-                  const SizedBox(width: 6),
-                  Text(meta['name'] as String,
+                child: Row(
+                  children: [
+                    Icon(
+                      meta['icon'] as IconData,
+                      size: 14,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      meta['name'] as String,
                       style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500)),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () async {
-                      setState(() => _mobileWidgets.removeAt(i));
-                      await _saveMobileConfig();
-                    },
-                    child:
-                        Icon(Icons.close, size: 14, color: Colors.grey.shade400),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.drag_handle,
-                      size: 16, color: Colors.grey.shade400),
-                ]),
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () async {
+                        setState(() => _mobileWidgets.removeAt(i));
+                        await _saveMobileConfig();
+                      },
+                      child: Icon(
+                        Icons.close,
+                        size: 14,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.drag_handle,
+                      size: 16,
+                      color: Colors.grey.shade400,
+                    ),
+                  ],
+                ),
               ),
               _buildWidget(widgetId),
             ],
@@ -1073,7 +1310,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     child: ListTile(
                       leading: const Icon(Icons.person_add_outlined),
                       title: Text(
-                          '${widget.pendingUsers.length} user(s) awaiting approval'),
+                        '${widget.pendingUsers.length} user(s) awaiting approval',
+                      ),
                       trailing: TextButton(
                         onPressed: widget.onGoToPendingUsers,
                         child: const Text('Review'),
@@ -1106,7 +1344,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     child: ListTile(
                       leading: const Icon(Icons.person_add_outlined),
                       title: Text(
-                          '${widget.pendingUsers.length} user(s) awaiting approval'),
+                        '${widget.pendingUsers.length} user(s) awaiting approval',
+                      ),
                       trailing: TextButton(
                         onPressed: widget.onGoToPendingUsers,
                         child: const Text('Review'),

@@ -3,10 +3,18 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'app_settings.dart';
 import '/theme/theme.dart';
+import '/theme/module_permission.dart';
 
-const _roleOrder = ['viewer', 'technician', 'researcher', 'admin', 'superadmin'];
+const _roleOrder = [
+  'viewer',
+  'technician',
+  'researcher',
+  'admin',
+  'superadmin',
+];
 
 bool _hasRole(String userRole, String required) {
   final ui = _roleOrder.indexOf(userRole);
@@ -39,12 +47,7 @@ class _SettingsPageState extends State<SettingsPage> {
       Icons.label_outline_rounded,
       'Label template builder and printer',
     ),
-    _GroupDef(
-      'chat',
-      'Chat',
-      Icons.forum_outlined,
-      'Lab team messaging',
-    ),
+    _GroupDef('chat', 'Chat', Icons.forum_outlined, 'Lab team messaging'),
     _GroupDef(
       'requests',
       'Requests',
@@ -89,7 +92,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _load() async {
-    final email = Supabase.instance.client.auth.currentSession?.user.email ?? '';
+    final email =
+        Supabase.instance.client.auth.currentSession?.user.email ?? '';
     final results = await Future.wait([
       AppSettings.load(),
       Supabase.instance.client
@@ -109,6 +113,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _toggle(String key, bool value) async {
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
     final updated = Set<String>.from(_enabled);
     if (value) {
       updated.add(key);
@@ -223,7 +228,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                   _GroupToggleRow(
                                     def: visible[i],
                                     enabled: _enabled.contains(visible[i].key),
-                                    onChanged: (v) => _toggle(visible[i].key, v),
+                                    onChanged: (v) =>
+                                        _toggle(visible[i].key, v),
                                   ),
                                 ],
                                 Divider(color: context.appBorder, height: 1),
@@ -240,7 +246,9 @@ class _SettingsPageState extends State<SettingsPage> {
                                         decoration: BoxDecoration(
                                           color: const Color(0xFF6366F1)
                                               .withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: const Icon(
                                           Icons.admin_panel_settings_outlined,
@@ -281,7 +289,9 @@ class _SettingsPageState extends State<SettingsPage> {
                                         decoration: BoxDecoration(
                                           color: const Color(0xFF6366F1)
                                               .withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: const Text(
                                           'Always on',
@@ -294,70 +304,78 @@ class _SettingsPageState extends State<SettingsPage> {
                                     ],
                                   ),
                                 ),
-                              Divider(color: context.appBorder, height: 1),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 14),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981)
-                                            .withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(
-                                        Icons.backup_outlined,
-                                        color: Color(0xFF10B981),
-                                        size: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Backups',
-                                            style: TextStyle(
-                                              color: context.appTextPrimary,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                            ),
+                                Divider(color: context.appBorder, height: 1),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981)
+                                              .withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
                                           ),
-                                          Text(
-                                            'Visible to admins always. Grant per-user in Users page (None / See).',
-                                            style: TextStyle(
-                                              color: context.appTextMuted,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981)
-                                            .withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Text(
-                                        'Per-user',
-                                        style: TextStyle(
+                                        ),
+                                        child: const Icon(
+                                          Icons.backup_outlined,
                                           color: Color(0xFF10B981),
-                                          fontSize: 11,
+                                          size: 18,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Backups',
+                                              style: TextStyle(
+                                                color: context.appTextPrimary,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            Text(
+                                              'Visible to admins always. Grant per-user in Users page (None / See).',
+                                              style: TextStyle(
+                                                color: context.appTextMuted,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981)
+                                              .withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Per-user',
+                                          style: TextStyle(
+                                            color: Color(0xFF10B981),
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
                               ],
                             ),
                           );
@@ -415,14 +433,14 @@ class _GroupToggleRow extends StatelessWidget {
   });
 
   static Color _accentFor(String key) => switch (key) {
-        'dashboard' => const Color(0xFF6366F1),
-        'labels' => const Color(0xFFF97316),
-        'chat' => const Color(0xFF22D3EE),
-        'culture_collection' => const Color(0xFF10B981),
-        'fish_facility' => const Color(0xFF0EA5E9),
-        'resources' => const Color(0xFFF59E0B),
-        _ => const Color(0xFF38BDF8),
-      };
+    'dashboard' => const Color(0xFF6366F1),
+    'labels' => const Color(0xFFF97316),
+    'chat' => const Color(0xFF22D3EE),
+    'culture_collection' => const Color(0xFF10B981),
+    'fish_facility' => const Color(0xFF0EA5E9),
+    'resources' => const Color(0xFFF59E0B),
+    _ => const Color(0xFF38BDF8),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -435,8 +453,9 @@ class _GroupToggleRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: (enabled ? accent : const Color(0xFF334155))
-                  .withValues(alpha: 0.2),
+              color: (enabled ? accent : const Color(0xFF334155)).withValues(
+                alpha: 0.2,
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -462,10 +481,7 @@ class _GroupToggleRow extends StatelessWidget {
                 ),
                 Text(
                   def.description,
-                  style: TextStyle(
-                    color: context.appTextMuted,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: context.appTextMuted, fontSize: 12),
                 ),
               ],
             ),

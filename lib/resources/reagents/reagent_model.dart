@@ -243,9 +243,10 @@ class ReagentModel {
   static List<String> get categoryOptionsSorted {
     final list = [...categoryOptions];
     list.sort(
-      (a, b) => categoryLabel(
-        a,
-      ).toLowerCase().compareTo(categoryLabel(b).toLowerCase()),
+      (a, b) =>
+          categoryLabel(a)
+              .toLowerCase()
+              .compareTo(categoryLabel(b).toLowerCase()),
     );
     return list;
   }
@@ -253,9 +254,10 @@ class ReagentModel {
   static List<String> subcategoryOptionsSorted(String category) {
     final list = [...?subcategoryOptions[category]];
     list.sort(
-      (a, b) => subcategoryLabel(
-        a,
-      ).toLowerCase().compareTo(subcategoryLabel(b).toLowerCase()),
+      (a, b) =>
+          subcategoryLabel(a)
+              .toLowerCase()
+              .compareTo(subcategoryLabel(b).toLowerCase()),
     );
     return list;
   }

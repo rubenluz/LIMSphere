@@ -1,8 +1,10 @@
 // login_page.dart - Login form: email/password fields, remember-me options
-// (session / 1 d / 7 d / 30 d), persist email for next visit, Supabase auth.
+// (session / 1 d / 7 d / 30 d / forever), persist email for next visit,
+// Supabase auth.
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+
 import '../core/local_storage.dart';
 
 class LoginPage extends StatefulWidget {
@@ -18,14 +20,15 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
   bool _showPassword = false;
 
-  // 0 = this session only, 1 = 1 day, 7 = 1 week, 30 = 30 days
+  // 0 = this session only; positive values = days; -1 = indefinitely.
   int _rememberDays = 0;
 
   static const _rememberOptions = [
-    (0,  'Don\'t remember me'),
-    (1,  'Remember for 1 day'),
-    (7,  'Remember for 1 week'),
+    (0, 'Don\'t remember me'),
+    (1, 'Remember for 1 day'),
+    (7, 'Remember for 1 week'),
     (30, 'Remember for 30 days'),
+    (LocalStorage.rememberForever, 'Never forget me'),
   ];
 
   @override
@@ -37,9 +40,14 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _loadSavedPreference() async {
     final days = await LocalStorage.getRememberDays();
-    final email = days > 0 ? await LocalStorage.getRememberedEmail() : null;
+    final savedOption = _rememberOptions.any((option) => option.$1 == days)
+        ? days
+        : 0;
+    final email = savedOption != 0
+        ? await LocalStorage.getRememberedEmail()
+        : null;
     if (!mounted) return;
-    setState(() => _rememberDays = days);
+    setState(() => _rememberDays = savedOption);
     if (email != null && email.isNotEmpty) {
       emailController.text = email;
     }
@@ -115,14 +123,15 @@ class _LoginPageState extends State<LoginPage> {
       }
       final userRow = userRows[0];
 
-      if (userRow['user_role'] != 'superadmin' && userRow['user_status'] == 'pending') {
+      if (userRow['user_role'] != 'superadmin' &&
+          userRow['user_status'] == 'pending') {
         await Supabase.instance.client.auth.signOut();
         _snack('Your account is pending admin approval.');
         return;
       }
 
       await LocalStorage.saveSessionExpiry(_rememberDays);
-      if (_rememberDays > 0) {
+      if (_rememberDays != 0) {
         await LocalStorage.saveRememberedEmail(email);
       } else {
         await LocalStorage.clearRememberedEmail();
@@ -160,7 +169,8 @@ class _LoginPageState extends State<LoginPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Back to connection',
-          onPressed: () => Navigator.pushReplacementNamed(context, '/connections'),
+          onPressed: () =>
+              Navigator.pushReplacementNamed(context, '/connections'),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -177,14 +187,18 @@ class _LoginPageState extends State<LoginPage> {
                   : Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.biotech,
-                            size: 56,
-                            color: Theme.of(context).colorScheme.primary),
+                        Icon(
+                          Icons.biotech,
+                          size: 56,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                         const SizedBox(height: 16),
                         const Text(
                           'LIMS Sphere',
                           style: TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 32),
@@ -211,11 +225,14 @@ class _LoginPageState extends State<LoginPage> {
                             prefixIcon: const Icon(Icons.lock_outline),
                             border: const OutlineInputBorder(),
                             suffixIcon: IconButton(
-                              icon: Icon(_showPassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility),
+                              icon: Icon(
+                                _showPassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                              ),
                               onPressed: () => setState(
-                                  () => _showPassword = !_showPassword),
+                                () => _showPassword = !_showPassword,
+                              ),
                             ),
                           ),
                         ),
@@ -230,10 +247,12 @@ class _LoginPageState extends State<LoginPage> {
                             isDense: true,
                           ),
                           items: _rememberOptions
-                              .map((o) => DropdownMenuItem(
-                                    value: o.$1,
-                                    child: Text(o.$2),
-                                  ))
+                              .map(
+                                (o) => DropdownMenuItem(
+                                  value: o.$1,
+                                  child: Text(o.$2),
+                                ),
+                              )
                               .toList(),
                           onChanged: (v) =>
                               setState(() => _rememberDays = v ?? 0),
@@ -250,8 +269,10 @@ class _LoginPageState extends State<LoginPage> {
                                     height: 18,
                                     width: 18,
                                     child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white))
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
                                 : const Text('Login'),
                           ),
                         ),
@@ -260,15 +281,24 @@ class _LoginPageState extends State<LoginPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text('Not registered yet?',
-                                style: TextStyle(fontSize: 13, color: Colors.grey)),
+                            const Text(
+                              'Not registered yet?',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                              ),
+                            ),
                             TextButton(
                               onPressed: isLoading
                                   ? null
                                   : () => Navigator.pushReplacementNamed(
-                                      context, '/register'),
-                              child: const Text('Register here!',
-                                  style: TextStyle(fontSize: 13)),
+                                      context,
+                                      '/register',
+                                    ),
+                              child: const Text(
+                                'Register here!',
+                                style: TextStyle(fontSize: 13),
+                              ),
                             ),
                           ],
                         ),

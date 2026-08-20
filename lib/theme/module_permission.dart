@@ -111,6 +111,23 @@ const kPermissionActionLabels = <String, String>{
   'bulk_update': 'Bulk Update',
 };
 
+abstract final class ModuleAction {
+  static const view = 'view';
+  static const create = 'insert';
+  static const edit = 'edit';
+  static const delete = 'delete';
+  static const approve = 'approve';
+  static const export = 'export';
+  static const print = 'print';
+  static const bulkUpdate = 'bulk_update';
+}
+
+String normalizeModuleAction(String action) => switch (action) {
+  'create' => ModuleAction.create,
+  'bulk' => ModuleAction.bulkUpdate,
+  _ => action,
+};
+
 const kPermissionPageAccessOptions = <String>[
   'inherit',
   'none',
@@ -396,7 +413,7 @@ class ModuleAccess {
       workflowEditStates = const [],
       hasGranularRules = false;
 
-  bool allows(String action) => actions.contains(action);
+  bool allows(String action) => actions.contains(normalizeModuleAction(action));
   bool get canView => allows('view');
   bool get canInsert => allows('insert');
   bool get canEdit => allows('edit');
@@ -433,7 +450,7 @@ class ModulePermission extends InheritedWidget {
       maybeAccessOf(context)?.pagePermission;
 
   static ModuleAccess accessOf(BuildContext context) =>
-      maybeAccessOf(context) ?? const ModuleAccess.full();
+      maybeAccessOf(context) ?? const ModuleAccess.none();
 
   static String of(BuildContext context) => accessOf(context).pagePermission;
 
@@ -464,6 +481,7 @@ class ResolvedModulePermission extends StatefulWidget {
 class _ResolvedModulePermissionState extends State<ResolvedModulePermission> {
   ModuleAccess _access = const ModuleAccess.none();
   bool _resolved = false;
+  bool _loading = false;
 
   @override
   void didChangeDependencies() {
@@ -487,6 +505,7 @@ class _ResolvedModulePermissionState extends State<ResolvedModulePermission> {
     }
 
     _resolved = true;
+    _loading = true;
     _resolvePermission();
   }
 
@@ -495,7 +514,10 @@ class _ResolvedModulePermissionState extends State<ResolvedModulePermission> {
         Supabase.instance.client.auth.currentUser?.email ??
         Supabase.instance.client.auth.currentSession?.user.email ??
         '';
-    if (email.isEmpty) return;
+    if (email.isEmpty) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
 
     try {
       final row = await Supabase.instance.client
@@ -503,19 +525,50 @@ class _ResolvedModulePermissionState extends State<ResolvedModulePermission> {
           .select()
           .eq('user_email', email)
           .maybeSingle();
-      if (!mounted || row == null) return;
+      if (!mounted) return;
+      if (row == null) {
+        setState(() => _loading = false);
+        return;
+      }
 
       final access = resolveModuleAccess(
         moduleId: widget.moduleId,
         userRow: Map<String, dynamic>.from(row),
       );
-      setState(() => _access = access);
-    } catch (_) {}
+      setState(() {
+        _access = access;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
-  Widget build(BuildContext context) =>
-      ModulePermission(access: _access, child: widget.child);
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (!_access.canView) return const _ModuleAccessDenied();
+    return ModulePermission(access: _access, child: widget.child);
+  }
+}
+
+class _ModuleAccessDenied extends StatelessWidget {
+  const _ModuleAccessDenied();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Padding(
+      padding: EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock_outline, size: 48, color: Color(0xFFD97706)),
+          SizedBox(height: 12),
+          Text('You do not have permission to view this page.'),
+        ],
+      ),
+    ),
+  );
 }
 
 MaterialPageRoute<T> modulePageRoute<T>({
@@ -558,6 +611,37 @@ extension ModulePermissionContext on BuildContext {
     if (!canEditModule) return false;
     if (isLocked && !canBypassRecordLocks) return false;
     return canEditWorkflowState(workflowState);
+  }
+
+  /// Checks an action inside its handler, preventing indirect UI invocation
+  /// from bypassing a disabled or hidden control.
+  bool requireModuleAction(String action) {
+    final normalized = normalizeModuleAction(action);
+    if (moduleAccess.allows(normalized)) return true;
+    warnPermissionDenied(normalized);
+    return false;
+  }
+
+  void warnPermissionDenied(String action) {
+    final normalized = normalizeModuleAction(action);
+    final label = kPermissionActionLabels[normalized] ?? normalized;
+    ScaffoldMessenger.of(this).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 3),
+        content: Row(
+          children: [
+            const Icon(Icons.lock_outline, color: Color(0xFFD97706), size: 16),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '$label permission is required for this action.',
+                style: const TextStyle(color: Color(0xFF334155), fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Shows a read-only snackbar for blocked edit attempts.

@@ -52,7 +52,8 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
@@ -97,9 +98,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Select Database')
-      ),
+      appBar: AppBar(title: const Text('Select Database')),
       floatingActionButton: connections.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: () async {
@@ -117,8 +116,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
             : GridView.builder(
                 padding: const EdgeInsets.all(16),
                 itemCount: connections.length,
-                gridDelegate:
-                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 320,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
@@ -139,7 +137,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
                       boxShadow: [
                         if (selected)
                           BoxShadow(
-                            color: scheme.primary.withOpacity(.25),
+                            color: scheme.primary.withValues(alpha: .25),
                             blurRadius: 12,
                           ),
                       ],
@@ -172,8 +170,8 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
                                       color: healthStatus[index] == null
                                           ? Colors.orange
                                           : healthStatus[index]!
-                                              ? Colors.green
-                                              : Colors.red,
+                                          ? Colors.green
+                                          : Colors.red,
                                     ),
                                   ),
                                   const SizedBox(width: 4),
@@ -184,37 +182,53 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
                                     child: PopupMenuButton<String>(
                                       padding: EdgeInsets.zero,
                                       iconSize: 18,
-                                      icon: Icon(Icons.more_vert,
-                                          color: scheme.outline, size: 18),
+                                      icon: Icon(
+                                        Icons.more_vert,
+                                        color: scheme.outline,
+                                        size: 18,
+                                      ),
                                       shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                       onSelected: (v) {
                                         if (v == 'edit') _editConnection(index);
-                                        if (v == 'delete') _deleteConnection(index);
+                                        if (v == 'delete') {
+                                          _deleteConnection(index);
+                                        }
                                       },
                                       itemBuilder: (_) => [
                                         PopupMenuItem(
                                           value: 'edit',
-                                          child: Row(children: [
-                                            Icon(Icons.edit_outlined,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.edit_outlined,
                                                 size: 16,
-                                                color: scheme.onSurface),
-                                            const SizedBox(width: 10),
-                                            const Text('Edit'),
-                                          ]),
+                                                color: scheme.onSurface,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              const Text('Edit'),
+                                            ],
+                                          ),
                                         ),
                                         PopupMenuItem(
                                           value: 'delete',
-                                          child: Row(children: [
-                                            Icon(Icons.delete_outline,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.delete_outline,
                                                 size: 16,
-                                                color: scheme.error),
-                                            const SizedBox(width: 10),
-                                            Text('Delete',
+                                                color: scheme.error,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Text(
+                                                'Delete',
                                                 style: TextStyle(
-                                                    color: scheme.error)),
-                                          ]),
+                                                  color: scheme.error,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -247,16 +261,19 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
                                 children: [
                                   Text(
                                     _lastConnectedText(conn),
-                                    style:
-                                        Theme.of(context).textTheme.labelSmall,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelSmall,
                                   ),
                                   const Spacer(),
                                   AnimatedScale(
                                     scale: selected ? 1 : 0,
-                                    duration:
-                                        const Duration(milliseconds: 250),
-                                    child: Icon(Icons.check_circle,
-                                        color: scheme.primary, size: 18),
+                                    duration: const Duration(milliseconds: 250),
+                                    child: Icon(
+                                      Icons.check_circle,
+                                      color: scheme.primary,
+                                      size: 18,
+                                    ),
                                   ),
                                 ],
                               ),

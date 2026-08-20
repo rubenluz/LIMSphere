@@ -45,9 +45,13 @@ class _DbFieldPickerState extends State<_DbFieldPicker> {
       if (rows.isNotEmpty) {
         final row = Map<String, dynamic>.from(rows.first);
         for (final entry in row.entries) {
-          if (entry.value == null) { continue; }
+          if (entry.value == null) {
+            continue;
+          }
           final dbKey = '{${entry.key}}';
-          if (hardcodedKeys.contains(dbKey)) { continue; }
+          if (hardcodedKeys.contains(dbKey)) {
+            continue;
+          }
           final label = entry.key
               .split('_')
               .where((s) => s.isNotEmpty)
@@ -67,12 +71,16 @@ class _DbFieldPickerState extends State<_DbFieldPicker> {
   }
 
   List<({String key, String label})> get _filtered {
-    if (_query.isEmpty) { return _fields; }
+    if (_query.isEmpty) {
+      return _fields;
+    }
     final q = _query.toLowerCase();
     return _fields
-        .where((f) =>
-            f.label.toLowerCase().contains(q) ||
-            f.key.toLowerCase().contains(q))
+        .where(
+          (f) =>
+              f.label.toLowerCase().contains(q) ||
+              f.key.toLowerCase().contains(q),
+        )
         .toList();
   }
 
@@ -87,7 +95,8 @@ class _DbFieldPickerState extends State<_DbFieldPicker> {
         Center(
           child: Container(
             margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             decoration: BoxDecoration(
               color: AppDS.border,
               borderRadius: BorderRadius.circular(2),
@@ -97,16 +106,33 @@ class _DbFieldPickerState extends State<_DbFieldPicker> {
         // Header
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
-          child: Row(children: [
-            const Icon(Icons.data_object_rounded, size: 18, color: AppDS.accent),
-            const SizedBox(width: 10),
-            Text(widget.category, style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w700, color: AppDS.textPrimary)),
-            const Spacer(),
-            if (!_loading)
-              Text('${filtered.length} fields', style: const TextStyle(
-                  fontSize: 12, color: AppDS.textSecondary)),
-          ]),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.data_object_rounded,
+                size: 18,
+                color: AppDS.accent,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                widget.category,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppDS.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              if (!_loading)
+                Text(
+                  '${filtered.length} fields',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppDS.textSecondary,
+                  ),
+                ),
+            ],
+          ),
         ),
         // Search
         Padding(
@@ -120,19 +146,31 @@ class _DbFieldPickerState extends State<_DbFieldPicker> {
               filled: true,
               fillColor: AppDS.bg,
               hintText: 'Search fields…',
-              hintStyle: const TextStyle(color: AppDS.textSecondary, fontSize: 13),
-              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppDS.textSecondary),
+              hintStyle: const TextStyle(
+                color: AppDS.textSecondary,
+                fontSize: 13,
+              ),
+              prefixIcon: const Icon(
+                Icons.search_rounded,
+                size: 18,
+                color: AppDS.textSecondary,
+              ),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppDS.border)),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppDS.border),
+              ),
               enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppDS.border)),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppDS.border),
+              ),
               focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppDS.accent)),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppDS.accent),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 9,
+              ),
             ),
           ),
         ),
@@ -142,15 +180,19 @@ class _DbFieldPickerState extends State<_DbFieldPicker> {
           const Padding(
             padding: EdgeInsets.all(24),
             child: Center(
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppDS.accent)),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppDS.accent,
+              ),
+            ),
           )
         else if (filtered.isEmpty)
           Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('No fields match "$_query".',
-                style: const TextStyle(
-                    fontSize: 13, color: AppDS.textSecondary)),
+            child: Text(
+              'No fields match "$_query".',
+              style: const TextStyle(fontSize: 13, color: AppDS.textSecondary),
+            ),
           )
         else
           Flexible(
@@ -163,27 +205,46 @@ class _DbFieldPickerState extends State<_DbFieldPicker> {
                   onTap: () => widget.onSelect(f.key),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    child: Row(children: [
-                      const Icon(Icons.add_circle_outline_rounded,
-                          size: 16, color: AppDS.accent),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(f.label, style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: AppDS.textPrimary)),
-                            Text(f.key, style: const TextStyle(
-                                fontSize: 11, color: AppDS.textSecondary)),
-                          ],
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.add_circle_outline_rounded,
+                          size: 16,
+                          color: AppDS.accent,
                         ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded,
-                          size: 16, color: AppDS.textMuted),
-                    ]),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                f.label,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppDS.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                f.key,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppDS.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: AppDS.textMuted,
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },

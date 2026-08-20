@@ -9,7 +9,7 @@ part of 'sops_page.dart';
 // SOP Card
 // ═════════════════════════════════════════════════════════════════════════════
 class _SopCard extends StatelessWidget {
-  final FacilitySop  sop;
+  final FacilitySop sop;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback? onOpenPdf;
@@ -30,8 +30,8 @@ class _SopCard extends StatelessWidget {
     final reviewWarning = sop.isReviewOverdue
         ? AppDS.red
         : sop.isReviewSoon
-            ? AppDS.yellow
-            : null;
+        ? AppDS.yellow
+        : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -71,13 +71,17 @@ class _SopCard extends StatelessWidget {
                         Text(
                           sop.code!,
                           style: GoogleFonts.jetBrainsMono(
-                              fontSize: 11, color: AppDS.accent),
+                            fontSize: 11,
+                            color: AppDS.accent,
+                          ),
                         ),
                       if (sop.version != null)
                         Text(
                           'v${sop.version}',
                           style: GoogleFonts.jetBrainsMono(
-                              fontSize: 11, color: context.appTextMuted),
+                            fontSize: 11,
+                            color: context.appTextMuted,
+                          ),
                         ),
                     ],
                   ),
@@ -87,11 +91,13 @@ class _SopCard extends StatelessWidget {
                   spacing: 6,
                   children: [
                     _Badge(
-                        label: FacilitySop.typeLabel(sop.type),
-                        color: _DS.typeColor(sop.type)),
+                      label: FacilitySop.typeLabel(sop.type),
+                      color: _DS.typeColor(sop.type),
+                    ),
                     _Badge(
-                        label: FacilitySop.statusLabel(sop.status),
-                        color: _DS.statusColor(sop.status)),
+                      label: FacilitySop.statusLabel(sop.status),
+                      color: _DS.statusColor(sop.status),
+                    ),
                   ],
                 ),
               ],
@@ -117,8 +123,10 @@ class _SopCard extends StatelessWidget {
                       color: reviewWarning,
                     ),
                   if (sop.effectiveDate != null)
-                    _MetaItem(Icons.check_circle_outline,
-                        'Effective: ${_dateFmt.format(sop.effectiveDate!)}'),
+                    _MetaItem(
+                      Icons.check_circle_outline,
+                      'Effective: ${_dateFmt.format(sop.effectiveDate!)}',
+                    ),
                 ],
               ),
             ],
@@ -131,7 +139,9 @@ class _SopCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.spaceGrotesk(
-                    fontSize: 12, color: context.appTextSecondary),
+                  fontSize: 12,
+                  color: context.appTextSecondary,
+                ),
               ),
             ],
 
@@ -148,15 +158,23 @@ class _SopCard extends StatelessWidget {
                     .map((t) {
                       final c = _tagColor(t);
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: c.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: c.withValues(alpha: 0.35)),
                         ),
-                        child: Text(t,
-                            style: GoogleFonts.spaceGrotesk(
-                                fontSize: 10, fontWeight: FontWeight.w600, color: c)),
+                        child: Text(
+                          t,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: c,
+                          ),
+                        ),
                       );
                     })
                     .toList(),
@@ -199,26 +217,46 @@ class _SopCard extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                _ActionBtn(icon: Icons.edit_outlined, label: 'Edit',
-                    color: context.appTextSecondary, onTap: onEdit),
+                _ActionBtn(
+                  icon: Icons.edit_outlined,
+                  label: 'Edit',
+                  color: context.appTextSecondary,
+                  onTap: onEdit,
+                ),
                 if (onOpenPdf != null) ...[
                   const SizedBox(width: 8),
-                  _ActionBtn(icon: Icons.picture_as_pdf_outlined, label: 'PDF',
-                      color: AppDS.accent, onTap: onOpenPdf!),
+                  _ActionBtn(
+                    icon: Icons.picture_as_pdf_outlined,
+                    label: 'PDF',
+                    color: AppDS.accent,
+                    onTap: onOpenPdf!,
+                  ),
                 ],
                 if (onOpenTxt != null) ...[
                   const SizedBox(width: 8),
-                  _ActionBtn(icon: Icons.text_snippet_outlined, label: 'TXT',
-                      color: AppDS.accent, onTap: onOpenTxt!),
+                  _ActionBtn(
+                    icon: Icons.text_snippet_outlined,
+                    label: 'TXT',
+                    color: AppDS.accent,
+                    onTap: onOpenTxt!,
+                  ),
                 ],
                 if (onOpenDoc != null) ...[
                   const SizedBox(width: 8),
-                  _ActionBtn(icon: Icons.article_outlined, label: 'DOC',
-                      color: AppDS.accent, onTap: onOpenDoc!),
+                  _ActionBtn(
+                    icon: Icons.article_outlined,
+                    label: 'DOC',
+                    color: AppDS.accent,
+                    onTap: onOpenDoc!,
+                  ),
                 ],
                 const Spacer(),
-                _ActionBtn(icon: Icons.delete_outline, label: 'Delete',
-                    color: AppDS.red, onTap: onDelete),
+                _ActionBtn(
+                  icon: Icons.delete_outline,
+                  label: 'Delete',
+                  color: AppDS.red,
+                  onTap: onDelete,
+                ),
               ],
             ),
           ],
@@ -261,24 +299,24 @@ class _SopDialogState extends State<_SopDialog> {
   late final TextEditingController _revisionNotes;
   late final TextEditingController _tags;
 
-  String    _type   = 'sop';
-  String    _status = 'draft';
+  String _type = 'sop';
+  String _status = 'draft';
   DateTime? _effectiveDate;
   DateTime? _reviewDate;
   DateTime? _lastReviewed;
 
   // PDF slot
   Uint8List? _pdfBytes;
-  String?    _pdfName;
-  bool       _clearPdf = false;
+  String? _pdfName;
+  bool _clearPdf = false;
   // TXT slot
   Uint8List? _txtBytes;
-  String?    _txtName;
-  bool       _clearTxt = false;
+  String? _txtName;
+  bool _clearTxt = false;
   // DOC/DOCX slot
   Uint8List? _docBytes;
-  String?    _docName;
-  bool       _clearDoc = false;
+  String? _docName;
+  bool _clearDoc = false;
 
   bool _saving = false;
 
@@ -286,59 +324,95 @@ class _SopDialogState extends State<_SopDialog> {
   void initState() {
     super.initState();
     final s = widget.sop;
-    _name          = TextEditingController(text: s?.name ?? '');
-    _code          = TextEditingController(text: s?.code ?? '');
-    _version       = TextEditingController(text: s?.version ?? '1.0');
-    _category      = TextEditingController(text: s?.category ?? '');
-    _description   = TextEditingController(text: s?.description ?? '');
-    _responsible   = TextEditingController(text: s?.responsible ?? '');
-    _author        = TextEditingController(text: s?.author ?? '');
+    _name = TextEditingController(text: s?.name ?? '');
+    _code = TextEditingController(text: s?.code ?? '');
+    _version = TextEditingController(text: s?.version ?? '1.0');
+    _category = TextEditingController(text: s?.category ?? '');
+    _description = TextEditingController(text: s?.description ?? '');
+    _responsible = TextEditingController(text: s?.responsible ?? '');
+    _author = TextEditingController(text: s?.author ?? '');
     _lastUpdatedBy = TextEditingController(text: s?.lastUpdatedBy ?? '');
     _revisionNotes = TextEditingController(text: s?.revisionNotes ?? '');
-    _tags          = TextEditingController(text: s?.tags ?? '');
-    _type          = s?.type   ?? 'sop';
-    _status        = s?.status ?? 'draft';
+    _tags = TextEditingController(text: s?.tags ?? '');
+    _type = s?.type ?? 'sop';
+    _status = s?.status ?? 'draft';
     _effectiveDate = s?.effectiveDate;
-    _reviewDate    = s?.reviewDate;
-    _lastReviewed  = s?.lastReviewed;
+    _reviewDate = s?.reviewDate;
+    _lastReviewed = s?.lastReviewed;
   }
 
   @override
   void dispose() {
     for (final c in [
-      _name, _code, _version, _category, _description,
-      _responsible, _author, _lastUpdatedBy, _revisionNotes, _tags,
-    ]) { c.dispose(); }
+      _name,
+      _code,
+      _version,
+      _category,
+      _description,
+      _responsible,
+      _author,
+      _lastUpdatedBy,
+      _revisionNotes,
+      _tags,
+    ]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   void _snack(String msg, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: TextStyle(color: context.appTextPrimary)),
-      backgroundColor: isError ? AppDS.red : context.appSurface3,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: TextStyle(color: context.appTextPrimary)),
+        backgroundColor: isError ? AppDS.red : context.appSurface3,
+      ),
+    );
   }
 
   Future<void> _pickPdf() async {
     final result = await FilePicker.pickFiles(
-      type: FileType.custom, allowedExtensions: ['pdf'], withData: true);
-    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
-    setState(() { _pdfBytes = result.files.first.bytes; _pdfName = result.files.first.name; _clearPdf = false; });
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+    if (result.isEmpty) return;
+    final file = result.first;
+    final bytes = await file.readAsBytes();
+    setState(() {
+      _pdfBytes = bytes;
+      _pdfName = file.name;
+      _clearPdf = false;
+    });
   }
 
   Future<void> _pickTxt() async {
     final result = await FilePicker.pickFiles(
-      type: FileType.custom, allowedExtensions: ['txt'], withData: true);
-    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
-    setState(() { _txtBytes = result.files.first.bytes; _txtName = result.files.first.name; _clearTxt = false; });
+      type: FileType.custom,
+      allowedExtensions: ['txt'],
+    );
+    if (result.isEmpty) return;
+    final file = result.first;
+    final bytes = await file.readAsBytes();
+    setState(() {
+      _txtBytes = bytes;
+      _txtName = file.name;
+      _clearTxt = false;
+    });
   }
 
   Future<void> _pickDoc() async {
     final result = await FilePicker.pickFiles(
-      type: FileType.custom, allowedExtensions: ['doc', 'docx'], withData: true);
-    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
-    setState(() { _docBytes = result.files.first.bytes; _docName = result.files.first.name; _clearDoc = false; });
+      type: FileType.custom,
+      allowedExtensions: ['doc', 'docx'],
+    );
+    if (result.isEmpty) return;
+    final file = result.first;
+    final bytes = await file.readAsBytes();
+    setState(() {
+      _docBytes = bytes;
+      _docName = file.name;
+      _clearDoc = false;
+    });
   }
 
   Future<void> _save() async {
@@ -347,23 +421,38 @@ class _SopDialogState extends State<_SopDialog> {
     try {
       final isEdit = widget.sop?.id != null;
       final data = <String, dynamic>{
-        SopSch.name:          _name.text.trim(),
-        SopSch.code:          _code.text.trim().isEmpty          ? null : _code.text.trim(),
-        SopSch.version:       _version.text.trim().isEmpty       ? null : _version.text.trim(),
-        SopSch.type:          _type,
-        SopSch.category:      _category.text.trim().isEmpty      ? null : _category.text.trim(),
-        SopSch.status:        _status,
-        SopSch.description:   _description.text.trim().isEmpty   ? null : _description.text.trim(),
-        SopSch.tags:          _tags.text.trim().isEmpty          ? null : _tags.text.trim(),
-        SopSch.responsible:   _responsible.text.trim().isEmpty   ? null : _responsible.text.trim(),
-        SopSch.author:        _author.text.trim().isEmpty        ? null : _author.text.trim(),
-        SopSch.lastUpdatedBy: _lastUpdatedBy.text.trim().isEmpty ? null : _lastUpdatedBy.text.trim(),
-        SopSch.revisionNotes: _revisionNotes.text.trim().isEmpty ? null : _revisionNotes.text.trim(),
-        SopSch.context:       widget.sopContext,
-        SopSch.effectiveDate: _effectiveDate?.toIso8601String().substring(0, 10),
-        SopSch.reviewDate:    _reviewDate?.toIso8601String().substring(0, 10),
-        SopSch.lastReviewed:  _lastReviewed?.toIso8601String().substring(0, 10),
-        SopSch.updatedAt:     DateTime.now().toIso8601String(),
+        SopSch.name: _name.text.trim(),
+        SopSch.code: _code.text.trim().isEmpty ? null : _code.text.trim(),
+        SopSch.version: _version.text.trim().isEmpty
+            ? null
+            : _version.text.trim(),
+        SopSch.type: _type,
+        SopSch.category: _category.text.trim().isEmpty
+            ? null
+            : _category.text.trim(),
+        SopSch.status: _status,
+        SopSch.description: _description.text.trim().isEmpty
+            ? null
+            : _description.text.trim(),
+        SopSch.tags: _tags.text.trim().isEmpty ? null : _tags.text.trim(),
+        SopSch.responsible: _responsible.text.trim().isEmpty
+            ? null
+            : _responsible.text.trim(),
+        SopSch.author: _author.text.trim().isEmpty ? null : _author.text.trim(),
+        SopSch.lastUpdatedBy: _lastUpdatedBy.text.trim().isEmpty
+            ? null
+            : _lastUpdatedBy.text.trim(),
+        SopSch.revisionNotes: _revisionNotes.text.trim().isEmpty
+            ? null
+            : _revisionNotes.text.trim(),
+        SopSch.context: widget.sopContext,
+        SopSch.effectiveDate: _effectiveDate?.toIso8601String().substring(
+          0,
+          10,
+        ),
+        SopSch.reviewDate: _reviewDate?.toIso8601String().substring(0, 10),
+        SopSch.lastReviewed: _lastReviewed?.toIso8601String().substring(0, 10),
+        SopSch.updatedAt: DateTime.now().toIso8601String(),
       };
 
       int sopId;
@@ -383,61 +472,108 @@ class _SopDialogState extends State<_SopDialog> {
       }
 
       final storage = Supabase.instance.client.storage.from(SopSch.bucket);
-      final db      = Supabase.instance.client.from(SopSch.table);
+      final db = Supabase.instance.client.from(SopSch.table);
 
       // ── QR code ───────────────────────────────────────────────────────────
       final qrcode = QrRules.build(
-          SupabaseManager.projectRef ?? 'local', 'sops', sopId);
+        SupabaseManager.projectRef ?? 'local',
+        'sops',
+        sopId,
+      );
       await db.update({SopSch.qrcode: qrcode}).eq(SopSch.id, sopId);
 
       // ── PDF slot ──────────────────────────────────────────────────────────
       if (_clearPdf && widget.sop?.hasPdfFile == true) {
         await storage.remove([widget.sop!.filePath!]);
-        await db.update({SopSch.filePath: null, SopSch.fileName: null,
-                         SopSch.fileSize: null, SopSch.fileMime: null})
+        await db
+            .update({
+              SopSch.filePath: null,
+              SopSch.fileName: null,
+              SopSch.fileSize: null,
+              SopSch.fileMime: null,
+            })
             .eq(SopSch.id, sopId);
       } else if (_pdfBytes != null && _pdfName != null) {
-        if (isEdit && widget.sop?.hasPdfFile == true) await storage.remove([widget.sop!.filePath!]);
+        if (isEdit && widget.sop?.hasPdfFile == true)
+          await storage.remove([widget.sop!.filePath!]);
         final path = '$sopId/pdf_$_pdfName';
-        await storage.uploadBinary(path, _pdfBytes!,
-            fileOptions: const FileOptions(contentType: 'application/pdf', upsert: true));
-        await db.update({SopSch.filePath: path, SopSch.fileName: _pdfName,
-                         SopSch.fileSize: _pdfBytes!.length, SopSch.fileMime: 'application/pdf'})
+        await storage.uploadBinary(
+          path,
+          _pdfBytes!,
+          fileOptions: const FileOptions(
+            contentType: 'application/pdf',
+            upsert: true,
+          ),
+        );
+        await db
+            .update({
+              SopSch.filePath: path,
+              SopSch.fileName: _pdfName,
+              SopSch.fileSize: _pdfBytes!.length,
+              SopSch.fileMime: 'application/pdf',
+            })
             .eq(SopSch.id, sopId);
       }
 
       // ── TXT slot ──────────────────────────────────────────────────────────
       if (_clearTxt && widget.sop?.hasTxtFile == true) {
         await storage.remove([widget.sop!.txtFilePath!]);
-        await db.update({SopSch.txtFilePath: null, SopSch.txtFileName: null,
-                         SopSch.txtFileSize: null})
+        await db
+            .update({
+              SopSch.txtFilePath: null,
+              SopSch.txtFileName: null,
+              SopSch.txtFileSize: null,
+            })
             .eq(SopSch.id, sopId);
       } else if (_txtBytes != null && _txtName != null) {
-        if (isEdit && widget.sop?.hasTxtFile == true) await storage.remove([widget.sop!.txtFilePath!]);
+        if (isEdit && widget.sop?.hasTxtFile == true)
+          await storage.remove([widget.sop!.txtFilePath!]);
         final path = '$sopId/txt_$_txtName';
-        await storage.uploadBinary(path, _txtBytes!,
-            fileOptions: const FileOptions(contentType: 'text/plain', upsert: true));
-        await db.update({SopSch.txtFilePath: path, SopSch.txtFileName: _txtName,
-                         SopSch.txtFileSize: _txtBytes!.length})
+        await storage.uploadBinary(
+          path,
+          _txtBytes!,
+          fileOptions: const FileOptions(
+            contentType: 'text/plain',
+            upsert: true,
+          ),
+        );
+        await db
+            .update({
+              SopSch.txtFilePath: path,
+              SopSch.txtFileName: _txtName,
+              SopSch.txtFileSize: _txtBytes!.length,
+            })
             .eq(SopSch.id, sopId);
       }
 
       // ── DOC slot ──────────────────────────────────────────────────────────
       if (_clearDoc && widget.sop?.hasDocFile == true) {
         await storage.remove([widget.sop!.docFilePath!]);
-        await db.update({SopSch.docFilePath: null, SopSch.docFileName: null,
-                         SopSch.docFileSize: null})
+        await db
+            .update({
+              SopSch.docFilePath: null,
+              SopSch.docFileName: null,
+              SopSch.docFileSize: null,
+            })
             .eq(SopSch.id, sopId);
       } else if (_docBytes != null && _docName != null) {
-        if (isEdit && widget.sop?.hasDocFile == true) await storage.remove([widget.sop!.docFilePath!]);
+        if (isEdit && widget.sop?.hasDocFile == true)
+          await storage.remove([widget.sop!.docFilePath!]);
         final path = '$sopId/doc_$_docName';
         final mime = (_docName!.toLowerCase().endsWith('.doc'))
             ? 'application/msword'
             : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        await storage.uploadBinary(path, _docBytes!,
-            fileOptions: FileOptions(contentType: mime, upsert: true));
-        await db.update({SopSch.docFilePath: path, SopSch.docFileName: _docName,
-                         SopSch.docFileSize: _docBytes!.length})
+        await storage.uploadBinary(
+          path,
+          _docBytes!,
+          fileOptions: FileOptions(contentType: mime, upsert: true),
+        );
+        await db
+            .update({
+              SopSch.docFilePath: path,
+              SopSch.docFileName: _docName,
+              SopSch.docFileSize: _docBytes!.length,
+            })
             .eq(SopSch.id, sopId);
       }
 
@@ -465,13 +601,18 @@ class _SopDialogState extends State<_SopDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
                 color: context.appSurface2,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(14),
+                ),
                 border: Border(bottom: BorderSide(color: context.appBorder)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.menu_book_outlined,
-                      size: 18, color: AppDS.accent),
+                  const Icon(
+                    Icons.menu_book_outlined,
+                    size: 18,
+                    color: AppDS.accent,
+                  ),
                   const SizedBox(width: 10),
                   Text(
                     isEdit ? 'Edit SOP' : 'New SOP',
@@ -484,8 +625,11 @@ class _SopDialogState extends State<_SopDialog> {
                   const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context, false),
-                    icon: Icon(Icons.close,
-                        size: 18, color: context.appTextMuted),
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: context.appTextMuted,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -503,121 +647,133 @@ class _SopDialogState extends State<_SopDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Name + Code
-                      Row(children: [
-                        Expanded(
-                          flex: 3,
-                          child: _Field(
-                            label: 'Name *',
-                            controller: _name,
-                            validator: (v) =>
-                                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: _Field(
+                              label: 'Name *',
+                              controller: _name,
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Required'
+                                  : null,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _Field(
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _Field(
                               label: 'Code',
                               controller: _code,
-                              hint: 'SOP-001'),
-                        ),
-                      ]),
+                              hint: 'SOP-001',
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
 
                       // Type + Status + Version
-                      Row(children: [
-                        Expanded(
-                          child: _DropField(
-                            label: 'Type',
-                            value: _type,
-                            options: FacilitySop.types,
-                            labelOf: FacilitySop.typeLabel,
-                            onChanged: (v) =>
-                                setState(() => _type = v ?? 'sop'),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DropField(
+                              label: 'Type',
+                              value: _type,
+                              options: FacilitySop.types,
+                              labelOf: FacilitySop.typeLabel,
+                              onChanged: (v) =>
+                                  setState(() => _type = v ?? 'sop'),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _DropField(
-                            label: 'Status',
-                            value: _status,
-                            options: FacilitySop.statuses,
-                            labelOf: FacilitySop.statusLabel,
-                            onChanged: (v) =>
-                                setState(() => _status = v ?? 'draft'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _DropField(
+                              label: 'Status',
+                              value: _status,
+                              options: FacilitySop.statuses,
+                              labelOf: FacilitySop.statusLabel,
+                              onChanged: (v) =>
+                                  setState(() => _status = v ?? 'draft'),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 90,
-                          child: _Field(
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            width: 90,
+                            child: _Field(
                               label: 'Version',
                               controller: _version,
-                              hint: '1.0'),
-                        ),
-                      ]),
+                              hint: '1.0',
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
 
                       // Category + Responsible
-                      Row(children: [
-                        Expanded(
-                          child: _Field(
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _Field(
                               label: 'Category',
                               controller: _category,
-                              hint: 'Biosafety, Husbandry…'),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _Field(
+                              hint: 'Biosafety, Husbandry…',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _Field(
                               label: 'Responsible',
-                              controller: _responsible),
-                        ),
-                      ]),
+                              controller: _responsible,
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
 
                       // Author + Last Updated By
-                      Row(children: [
-                        Expanded(
-                          child: _Field(
-                              label: 'Author', controller: _author),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _Field(
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _Field(label: 'Author', controller: _author),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _Field(
                               label: 'Last Updated By',
-                              controller: _lastUpdatedBy),
-                        ),
-                      ]),
+                              controller: _lastUpdatedBy,
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
 
                       // Dates
-                      Row(children: [
-                        Expanded(
-                          child: _DateField(
-                            label: 'Effective Date',
-                            value: _effectiveDate,
-                            onPick: (d) =>
-                                setState(() => _effectiveDate = d),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DateField(
+                              label: 'Effective Date',
+                              value: _effectiveDate,
+                              onPick: (d) => setState(() => _effectiveDate = d),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _DateField(
-                            label: 'Review Date',
-                            value: _reviewDate,
-                            onPick: (d) =>
-                                setState(() => _reviewDate = d),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _DateField(
+                              label: 'Review Date',
+                              value: _reviewDate,
+                              onPick: (d) => setState(() => _reviewDate = d),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _DateField(
-                            label: 'Last Reviewed',
-                            value: _lastReviewed,
-                            onPick: (d) =>
-                                setState(() => _lastReviewed = d),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _DateField(
+                              label: 'Last Reviewed',
+                              value: _lastReviewed,
+                              onPick: (d) => setState(() => _lastReviewed = d),
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                       const SizedBox(height: 12),
 
                       // Description
@@ -654,8 +810,7 @@ class _SopDialogState extends State<_SopDialog> {
 
             // Footer
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: context.appBorder)),
               ),
@@ -666,9 +821,12 @@ class _SopDialogState extends State<_SopDialog> {
                     onPressed: _saving
                         ? null
                         : () => Navigator.pop(context, false),
-                    child: Text('Cancel',
-                        style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextSecondary)),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextSecondary,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton(
@@ -677,19 +835,28 @@ class _SopDialogState extends State<_SopDialog> {
                       backgroundColor: AppDS.accent,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: _saving
                         ? const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : Text('Save',
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            'Save',
                             style: GoogleFonts.spaceGrotesk(
-                                fontWeight: FontWeight.w600)),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -704,58 +871,84 @@ class _SopDialogState extends State<_SopDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Attachments',
-            style: GoogleFonts.spaceGrotesk(
-                fontSize: 11, fontWeight: FontWeight.w700,
-                color: context.appTextMuted, letterSpacing: 0.5)),
+        Text(
+          'Attachments',
+          style: GoogleFonts.spaceGrotesk(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: context.appTextMuted,
+            letterSpacing: 0.5,
+          ),
+        ),
         const SizedBox(height: 6),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _buildSlot(
-              label: 'PDF',
-              icon: Icons.picture_as_pdf_outlined,
-              color: AppDS.red,
-              existingName: widget.sop?.hasPdfFile == true && !_clearPdf
-                  ? widget.sop!.fileName ?? 'document.pdf' : null,
-              existingSize: widget.sop?.hasPdfFile == true && !_clearPdf
-                  ? widget.sop!.pdfFileSizeLabel : null,
-              newName:  _pdfName,
-              newBytes: _pdfBytes,
-              onPick:   _pickPdf,
-              onRemoveExisting: () => setState(() => _clearPdf = true),
-              onRemoveNew: () => setState(() { _pdfBytes = null; _pdfName = null; }),
-            )),
+            Expanded(
+              child: _buildSlot(
+                label: 'PDF',
+                icon: Icons.picture_as_pdf_outlined,
+                color: AppDS.red,
+                existingName: widget.sop?.hasPdfFile == true && !_clearPdf
+                    ? widget.sop!.fileName ?? 'document.pdf'
+                    : null,
+                existingSize: widget.sop?.hasPdfFile == true && !_clearPdf
+                    ? widget.sop!.pdfFileSizeLabel
+                    : null,
+                newName: _pdfName,
+                newBytes: _pdfBytes,
+                onPick: _pickPdf,
+                onRemoveExisting: () => setState(() => _clearPdf = true),
+                onRemoveNew: () => setState(() {
+                  _pdfBytes = null;
+                  _pdfName = null;
+                }),
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _buildSlot(
-              label: 'TXT',
-              icon: Icons.text_snippet_outlined,
-              color: AppDS.green,
-              existingName: widget.sop?.hasTxtFile == true && !_clearTxt
-                  ? widget.sop!.txtFileName ?? 'document.txt' : null,
-              existingSize: widget.sop?.hasTxtFile == true && !_clearTxt
-                  ? widget.sop!.txtFileSizeLabel : null,
-              newName:  _txtName,
-              newBytes: _txtBytes,
-              onPick:   _pickTxt,
-              onRemoveExisting: () => setState(() => _clearTxt = true),
-              onRemoveNew: () => setState(() { _txtBytes = null; _txtName = null; }),
-            )),
+            Expanded(
+              child: _buildSlot(
+                label: 'TXT',
+                icon: Icons.text_snippet_outlined,
+                color: AppDS.green,
+                existingName: widget.sop?.hasTxtFile == true && !_clearTxt
+                    ? widget.sop!.txtFileName ?? 'document.txt'
+                    : null,
+                existingSize: widget.sop?.hasTxtFile == true && !_clearTxt
+                    ? widget.sop!.txtFileSizeLabel
+                    : null,
+                newName: _txtName,
+                newBytes: _txtBytes,
+                onPick: _pickTxt,
+                onRemoveExisting: () => setState(() => _clearTxt = true),
+                onRemoveNew: () => setState(() {
+                  _txtBytes = null;
+                  _txtName = null;
+                }),
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _buildSlot(
-              label: 'DOC',
-              icon: Icons.article_outlined,
-              color: const Color(0xFF4A90D9),
-              existingName: widget.sop?.hasDocFile == true && !_clearDoc
-                  ? widget.sop!.docFileName ?? 'document.docx' : null,
-              existingSize: widget.sop?.hasDocFile == true && !_clearDoc
-                  ? widget.sop!.docFileSizeLabel : null,
-              newName:  _docName,
-              newBytes: _docBytes,
-              onPick:   _pickDoc,
-              onRemoveExisting: () => setState(() => _clearDoc = true),
-              onRemoveNew: () => setState(() { _docBytes = null; _docName = null; }),
-            )),
+            Expanded(
+              child: _buildSlot(
+                label: 'DOC',
+                icon: Icons.article_outlined,
+                color: const Color(0xFF4A90D9),
+                existingName: widget.sop?.hasDocFile == true && !_clearDoc
+                    ? widget.sop!.docFileName ?? 'document.docx'
+                    : null,
+                existingSize: widget.sop?.hasDocFile == true && !_clearDoc
+                    ? widget.sop!.docFileSizeLabel
+                    : null,
+                newName: _docName,
+                newBytes: _docBytes,
+                onPick: _pickDoc,
+                onRemoveExisting: () => setState(() => _clearDoc = true),
+                onRemoveNew: () => setState(() {
+                  _docBytes = null;
+                  _docName = null;
+                }),
+              ),
+            ),
           ],
         ),
       ],
@@ -775,27 +968,35 @@ class _SopDialogState extends State<_SopDialog> {
     required VoidCallback onRemoveNew,
   }) {
     final hasExisting = existingName != null;
-    final hasNew      = newName != null;
+    final hasNew = newName != null;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: context.appSurface2,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-            color: (hasExisting || hasNew)
-                ? color.withValues(alpha: 0.35)
-                : context.appBorder2),
+          color: (hasExisting || hasNew)
+              ? color.withValues(alpha: 0.35)
+              : context.appBorder2,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Icon(icon, size: 13, color: color),
-            const SizedBox(width: 5),
-            Text(label,
+          Row(
+            children: [
+              Icon(icon, size: 13, color: color),
+              const SizedBox(width: 5),
+              Text(
+                label,
                 style: GoogleFonts.spaceGrotesk(
-                    fontSize: 11, fontWeight: FontWeight.w700, color: color)),
-          ]),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
           if (hasNew)
             _FileChip(
@@ -810,20 +1011,31 @@ class _SopDialogState extends State<_SopDialog> {
               onRemove: onRemoveExisting,
             )
           else
-            Text('None',
-                style: GoogleFonts.spaceGrotesk(
-                    fontSize: 11, color: context.appTextMuted)),
+            Text(
+              'None',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 11,
+                color: context.appTextMuted,
+              ),
+            ),
           const SizedBox(height: 6),
           OutlinedButton.icon(
             onPressed: onPick,
             icon: const Icon(Icons.upload_file_outlined, size: 13),
-            label: Text(hasExisting || hasNew ? 'Replace' : 'Attach',
-                style: GoogleFonts.spaceGrotesk(fontSize: 11, fontWeight: FontWeight.w600)),
+            label: Text(
+              hasExisting || hasNew ? 'Replace' : 'Attach',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
               foregroundColor: color,
               side: BorderSide(color: color.withValues(alpha: 0.5)),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
@@ -839,7 +1051,7 @@ class _SopDialogState extends State<_SopDialog> {
 // ═════════════════════════════════════════════════════════════════════════════
 class _Badge extends StatelessWidget {
   final String label;
-  final Color  color;
+  final Color color;
   const _Badge({required this.label, required this.color});
 
   @override
@@ -853,18 +1065,19 @@ class _Badge extends StatelessWidget {
     child: Text(
       label,
       style: GoogleFonts.spaceGrotesk(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
-          letterSpacing: 0.2),
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        color: color,
+        letterSpacing: 0.2,
+      ),
     ),
   );
 }
 
 class _MetaItem extends StatelessWidget {
   final IconData icon;
-  final String   text;
-  final Color?   color;
+  final String text;
+  final Color? color;
   const _MetaItem(this.icon, this.text, {this.color});
 
   @override
@@ -875,17 +1088,16 @@ class _MetaItem extends StatelessWidget {
       children: [
         Icon(icon, size: 12, color: c.withValues(alpha: 0.7)),
         const SizedBox(width: 4),
-        Text(text,
-            style: GoogleFonts.spaceGrotesk(fontSize: 12, color: c)),
+        Text(text, style: GoogleFonts.spaceGrotesk(fontSize: 12, color: c)),
       ],
     );
   }
 }
 
 class _ActionBtn extends StatelessWidget {
-  final IconData     icon;
-  final String       label;
-  final Color        color;
+  final IconData icon;
+  final String label;
+  final Color color;
   final VoidCallback onTap;
   const _ActionBtn({
     required this.icon,
@@ -905,17 +1117,19 @@ class _ActionBtn extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 4),
-          Text(label,
-              style: GoogleFonts.spaceGrotesk(
-                  fontSize: 12,
-                  color: color,
-                  fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     ),
   );
 }
-
 
 // ── Filter chip ───────────────────────────────────────────────────────────────
 class _FilterChip extends StatelessWidget {
@@ -923,7 +1137,12 @@ class _FilterChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final Color? color;
-  const _FilterChip({required this.label, required this.selected, required this.onTap, this.color});
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -935,13 +1154,19 @@ class _FilterChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? c.withValues(alpha: 0.18) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? c : AppDS.border, width: selected ? 1.5 : 1),
+          border: Border.all(
+            color: selected ? c : AppDS.border,
+            width: selected ? 1.5 : 1,
+          ),
         ),
-        child: Text(label,
-            style: GoogleFonts.spaceGrotesk(
-                color: selected ? c : AppDS.textSecondary,
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
+        child: Text(
+          label,
+          style: GoogleFonts.spaceGrotesk(
+            color: selected ? c : AppDS.textSecondary,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
@@ -969,10 +1194,11 @@ class _Field extends StatelessWidget {
       Text(
         label,
         style: GoogleFonts.spaceGrotesk(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: context.appTextMuted,
-            letterSpacing: 0.5),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: context.appTextMuted,
+          letterSpacing: 0.5,
+        ),
       ),
       const SizedBox(height: 4),
       TextFormField(
@@ -980,15 +1206,21 @@ class _Field extends StatelessWidget {
         maxLines: maxLines,
         validator: validator,
         style: GoogleFonts.spaceGrotesk(
-            fontSize: 13, color: context.appTextPrimary),
+          fontSize: 13,
+          color: context.appTextPrimary,
+        ),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.spaceGrotesk(
-              fontSize: 12, color: context.appTextMuted),
+            fontSize: 12,
+            color: context.appTextMuted,
+          ),
           filled: true,
           fillColor: context.appSurface2,
           contentPadding: const EdgeInsets.symmetric(
-              horizontal: 10, vertical: 9),
+            horizontal: 10,
+            vertical: 9,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
             borderSide: BorderSide(color: context.appBorder2),
@@ -1016,8 +1248,8 @@ class _Field extends StatelessWidget {
 }
 
 class _DropField extends StatelessWidget {
-  final String   label;
-  final String   value;
+  final String label;
+  final String value;
   final List<String> options;
   final String Function(String?) labelOf;
   final ValueChanged<String?> onChanged;
@@ -1036,10 +1268,11 @@ class _DropField extends StatelessWidget {
       Text(
         label,
         style: GoogleFonts.spaceGrotesk(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: context.appTextMuted,
-            letterSpacing: 0.5),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: context.appTextMuted,
+          letterSpacing: 0.5,
+        ),
       ),
       const SizedBox(height: 4),
       Container(
@@ -1056,16 +1289,18 @@ class _DropField extends StatelessWidget {
             isExpanded: true,
             dropdownColor: context.appSurface2,
             style: GoogleFonts.spaceGrotesk(
-                fontSize: 13, color: context.appTextPrimary),
+              fontSize: 13,
+              color: context.appTextPrimary,
+            ),
             items: options
-                .map((o) => DropdownMenuItem(
-                      value: o,
-                      child: Text(labelOf(o)),
-                    ))
+                .map((o) => DropdownMenuItem(value: o, child: Text(labelOf(o))))
                 .toList(),
             onChanged: onChanged,
-            icon: Icon(Icons.expand_more,
-                size: 16, color: context.appTextMuted),
+            icon: Icon(
+              Icons.expand_more,
+              size: 16,
+              color: context.appTextMuted,
+            ),
           ),
         ),
       ),
@@ -1074,7 +1309,7 @@ class _DropField extends StatelessWidget {
 }
 
 class _DateField extends StatelessWidget {
-  final String   label;
+  final String label;
   final DateTime? value;
   final ValueChanged<DateTime?> onPick;
   const _DateField({
@@ -1090,10 +1325,11 @@ class _DateField extends StatelessWidget {
       Text(
         label,
         style: GoogleFonts.spaceGrotesk(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: context.appTextMuted,
-            letterSpacing: 0.5),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: context.appTextMuted,
+          letterSpacing: 0.5,
+        ),
       ),
       const SizedBox(height: 4),
       InkWell(
@@ -1130,21 +1366,28 @@ class _DateField extends StatelessWidget {
                 child: Text(
                   value != null ? _dateFmt.format(value!) : '—',
                   style: GoogleFonts.spaceGrotesk(
-                      fontSize: 12,
-                      color: value != null
-                          ? context.appTextPrimary
-                          : context.appTextMuted),
+                    fontSize: 12,
+                    color: value != null
+                        ? context.appTextPrimary
+                        : context.appTextMuted,
+                  ),
                 ),
               ),
               if (value != null)
                 GestureDetector(
                   onTap: () => onPick(null),
-                  child: Icon(Icons.clear,
-                      size: 14, color: context.appTextMuted),
+                  child: Icon(
+                    Icons.clear,
+                    size: 14,
+                    color: context.appTextMuted,
+                  ),
                 )
               else
-                Icon(Icons.calendar_today_outlined,
-                    size: 13, color: context.appTextMuted),
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 13,
+                  color: context.appTextMuted,
+                ),
             ],
           ),
         ),
@@ -1154,11 +1397,10 @@ class _DateField extends StatelessWidget {
 }
 
 class _FileChip extends StatelessWidget {
-  final String  name;
+  final String name;
   final String? size;
   final VoidCallback onRemove;
-  const _FileChip(
-      {required this.name, this.size, required this.onRemove});
+  const _FileChip({required this.name, this.size, required this.onRemove});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1170,27 +1412,37 @@ class _FileChip extends StatelessWidget {
     ),
     child: Row(
       children: [
-        Icon(Icons.insert_drive_file_outlined,
-            size: 14, color: context.appTextSecondary),
+        Icon(
+          Icons.insert_drive_file_outlined,
+          size: 14,
+          color: context.appTextSecondary,
+        ),
         const SizedBox(width: 6),
         Flexible(
-          child: Text(name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.jetBrainsMono(
-                  fontSize: 11, color: context.appTextSecondary)),
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 11,
+              color: context.appTextSecondary,
+            ),
+          ),
         ),
         if (size != null) ...[
           const SizedBox(width: 6),
-          Text(size!,
-              style: GoogleFonts.jetBrainsMono(
-                  fontSize: 10, color: context.appTextMuted)),
+          Text(
+            size!,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 10,
+              color: context.appTextMuted,
+            ),
+          ),
         ],
         const SizedBox(width: 8),
         GestureDetector(
           onTap: onRemove,
-          child: Icon(Icons.close,
-              size: 13, color: context.appTextMuted),
+          child: Icon(Icons.close, size: 13, color: context.appTextMuted),
         ),
       ],
     ),
@@ -1199,9 +1451,9 @@ class _FileChip extends StatelessWidget {
 
 class _FileTypeChip extends StatelessWidget {
   final IconData icon;
-  final String   name;
-  final String   size;
-  final Color    color;
+  final String name;
+  final String size;
+  final Color color;
   const _FileTypeChip({
     required this.icon,
     required this.name,
@@ -1222,14 +1474,19 @@ class _FileTypeChip extends StatelessWidget {
       children: [
         Icon(icon, size: 12, color: color),
         const SizedBox(width: 5),
-        Text(name,
-            style: GoogleFonts.jetBrainsMono(
-                fontSize: 10, color: color)),
+        Text(
+          name,
+          style: GoogleFonts.jetBrainsMono(fontSize: 10, color: color),
+        ),
         if (size.isNotEmpty) ...[
           const SizedBox(width: 5),
-          Text(size,
-              style: GoogleFonts.jetBrainsMono(
-                  fontSize: 9, color: color.withValues(alpha: 0.65))),
+          Text(
+            size,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 9,
+              color: color.withValues(alpha: 0.65),
+            ),
+          ),
         ],
       ],
     ),

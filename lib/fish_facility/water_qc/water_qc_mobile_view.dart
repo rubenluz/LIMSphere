@@ -5,7 +5,6 @@
 part of 'water_qc_page.dart';
 
 extension _MobileView on _WaterQcPageState {
-
   // ── Root layout ────────────────────────────────────────────────────────────
 
   Widget _buildMobileLayout() {
@@ -17,43 +16,46 @@ extension _MobileView on _WaterQcPageState {
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-                  ? Center(
-                      child: Text('Error: $_error',
-                          style: GoogleFonts.spaceGrotesk(
-                              color: AppDS.red, fontSize: 13)))
-                  : CustomScrollView(
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: _buildMobileMaintSection(),
-                        ),
-                        SliverToBoxAdapter(
-                          child: _buildMobileAddButton(),
-                        ),
-                        if (_filteredRows.isEmpty)
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Center(
-                                child: Text('No records',
-                                    style: GoogleFonts.spaceGrotesk(
-                                        color: context.appTextMuted,
-                                        fontSize: 13)),
-                              ),
-                            ),
-                          )
-                        else
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-                            sliver: SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (_, i) => _buildMobileQcCard(
-                                    _filteredRows[i], i),
-                                childCount: _filteredRows.length,
+              ? Center(
+                  child: Text(
+                    'Error: $_error',
+                    style: GoogleFonts.spaceGrotesk(
+                      color: AppDS.red,
+                      fontSize: 13,
+                    ),
+                  ),
+                )
+              : CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(child: _buildMobileMaintSection()),
+                    SliverToBoxAdapter(child: _buildMobileAddButton()),
+                    if (_filteredRows.isEmpty)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Center(
+                            child: Text(
+                              'No records',
+                              style: GoogleFonts.spaceGrotesk(
+                                color: context.appTextMuted,
+                                fontSize: 13,
                               ),
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (_, i) => _buildMobileQcCard(_filteredRows[i], i),
+                            childCount: _filteredRows.length,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
         ),
       ],
     );
@@ -71,85 +73,138 @@ extension _MobileView on _WaterQcPageState {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(children: [
-            IconButton(
-              icon: const Icon(Icons.menu_rounded, size: 20),
-              color: context.appTextSecondary,
-              tooltip: 'Menu',
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-            const Icon(Icons.water_drop_outlined,
-                size: 16, color: _pageAccent),
-            const SizedBox(width: 6),
-            Text('Water QC',
-                style: GoogleFonts.spaceGrotesk(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: context.appTextPrimary)),
-            const Spacer(),
-            // Filter toggle with active dot
-            Stack(children: [
+          Row(
+            children: [
               IconButton(
-                icon: Icon(Icons.tune,
-                    size: 18,
-                    color: _showFilters
-                        ? _pageAccent
-                        : context.appTextSecondary),
-                onPressed: () =>
-                    // ignore: invalid_use_of_protected_member
-                    setState(() => _showFilters = !_showFilters),
+                icon: const Icon(Icons.menu_rounded, size: 20),
+                color: context.appTextSecondary,
+                tooltip: 'Menu',
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-              if (_hasActiveFilter)
-                Positioned(
-                  right: 6,
-                  top: 6,
-                  child: Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                        color: _pageAccent, shape: BoxShape.circle),
+              const Icon(
+                Icons.water_drop_outlined,
+                size: 16,
+                color: _pageAccent,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Water QC',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: context.appTextPrimary,
+                ),
+              ),
+              const Spacer(),
+              // Filter toggle with active dot
+              Stack(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.tune,
+                      size: 18,
+                      color: _showFilters
+                          ? _pageAccent
+                          : context.appTextSecondary,
+                    ),
+                    onPressed: () =>
+                        // ignore: invalid_use_of_protected_member
+                        setState(() => _showFilters = !_showFilters),
                   ),
+                  if (_hasActiveFilter)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: _pageAccent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.more_vert,
+                  color: context.appTextSecondary,
+                  size: 20,
                 ),
-            ]),
-            PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert,
-                  color: context.appTextSecondary, size: 20),
-              tooltip: 'More options',
-              offset: const Offset(0, 36),
-              color: context.appSurface2,
-              shape: RoundedRectangleBorder(
+                tooltip: 'More options',
+                offset: const Offset(0, 36),
+                color: context.appSurface2,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
-                  side: BorderSide(color: context.appBorder2)),
-              onSelected: (v) {
-                if (v == 'export') _exportCsv();
-                if (v == 'add') _addRowForDate();
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'export',
-                  child: Row(children: [
-                    Icon(Icons.download_outlined,
-                        size: 16, color: context.appTextSecondary),
-                    const SizedBox(width: 10),
-                    Text('Export CSV',
-                        style: GoogleFonts.spaceGrotesk(
+                  side: BorderSide(color: context.appBorder2),
+                ),
+                onSelected: (v) {
+                  if (v == 'export') _exportCsv();
+                  if (v == 'monitoring') _chooseMonitoredMaintenance();
+                  if (v == 'add') _addRowForDate();
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'export',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.download_outlined,
+                          size: 16,
+                          color: context.appTextSecondary,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Export CSV',
+                          style: GoogleFonts.spaceGrotesk(
                             fontSize: 13,
-                            color: context.appTextPrimary)),
-                  ]),
-                ),
-                PopupMenuItem(
-                  value: 'add',
-                  child: Row(children: [
-                    const Icon(Icons.add, size: 16, color: AppDS.accent),
-                    const SizedBox(width: 10),
-                    Text('Add QC Record',
-                        style: GoogleFonts.spaceGrotesk(
-                            fontSize: 13, color: AppDS.accent)),
-                  ]),
-                ),
-              ],
-            ),
-          ]),
+                            color: context.appTextPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'monitoring',
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.monitor_heart_outlined,
+                          size: 16,
+                          color: _pageAccent,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Monitoring',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 13,
+                            color: context.appTextPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'add',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.add, size: 16, color: AppDS.accent),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Add QC Record',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 13,
+                            color: AppDS.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
           // Search bar
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -160,36 +215,47 @@ extension _MobileView on _WaterQcPageState {
                 // ignore: invalid_use_of_protected_member
                 onChanged: (_) => setState(() {}),
                 style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextPrimary, fontSize: 13),
+                  color: context.appTextPrimary,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Search records…',
                   hintStyle: GoogleFonts.spaceGrotesk(
-                      color: context.appTextMuted, fontSize: 13),
-                  prefixIcon: Icon(Icons.search,
-                      color: context.appTextMuted, size: 16),
+                    color: context.appTextMuted,
+                    fontSize: 13,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: context.appTextMuted,
+                    size: 16,
+                  ),
                   suffixIcon: _searchCtrl.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear,
-                              size: 14, color: context.appTextMuted),
+                          icon: Icon(
+                            Icons.clear,
+                            size: 14,
+                            color: context.appTextMuted,
+                          ),
                           onPressed: () =>
                               // ignore: invalid_use_of_protected_member
-                              setState(() => _searchCtrl.clear()))
+                              setState(() => _searchCtrl.clear()),
+                        )
                       : null,
                   filled: true,
                   fillColor: context.appSurface3,
                   contentPadding: EdgeInsets.zero,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide:
-                          BorderSide(color: context.appBorder)),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: context.appBorder),
+                  ),
                   enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide:
-                          BorderSide(color: context.appBorder)),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: context.appBorder),
+                  ),
                   focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide:
-                          const BorderSide(color: _pageAccent)),
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: _pageAccent),
+                  ),
                 ),
               ),
             ),
@@ -208,19 +274,27 @@ extension _MobileView on _WaterQcPageState {
         border: Border(bottom: BorderSide(color: context.appBorder)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-      child: Row(children: [
-        Text('Show:',
+      child: Row(
+        children: [
+          Text(
+            'Show:',
             style: GoogleFonts.spaceGrotesk(
-                color: context.appTextMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w600)),
-        const SizedBox(width: 10),
-        Wrap(spacing: 6, children: [
-          _filterChip('All', 'all', null),
-          _filterChip('Out of range', 'out_of_range', AppDS.red),
-          _filterChip('Has incidents', 'has_incidents', AppDS.orange),
-        ]),
-      ]),
+              color: context.appTextMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Wrap(
+            spacing: 6,
+            children: [
+              _filterChip('All', 'all', null),
+              _filterChip('Out of range', 'out_of_range', AppDS.red),
+              _filterChip('Has incidents', 'has_incidents', AppDS.orange),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -234,16 +308,24 @@ extension _MobileView on _WaterQcPageState {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header row
-          Row(children: [
-            const Icon(Icons.build_circle_outlined,
-                size: 15, color: _pageAccent),
-            const SizedBox(width: 6),
-            Text('Maintenance',
+          Row(
+            children: [
+              const Icon(
+                Icons.build_circle_outlined,
+                size: 15,
+                color: _pageAccent,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Maintenance',
                 style: GoogleFonts.spaceGrotesk(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: context.appTextPrimary)),
-          ]),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: context.appTextPrimary,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           // Quality limits
           _buildMobileThresholds(),
@@ -256,7 +338,8 @@ extension _MobileView on _WaterQcPageState {
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
             childAspectRatio: 2.1,
-            children: _maintKeys
+            children: _availableMaintKeys
+                .where(_monitoredMaintKeys.contains)
                 .map((k) => _buildMobileMaintCard(k, now))
                 .toList(),
           ),
@@ -276,11 +359,14 @@ extension _MobileView on _WaterQcPageState {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Quality limits',
-              style: GoogleFonts.spaceGrotesk(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: context.appTextMuted)),
+          Text(
+            'Quality limits',
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: context.appTextMuted,
+            ),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -322,8 +408,10 @@ extension _MobileView on _WaterQcPageState {
               return GestureDetector(
                 onTap: () => _editThreshold(key, label, hasMin),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: hasValue
                         ? _pageAccent.withValues(alpha: 0.08)
@@ -335,17 +423,26 @@ extension _MobileView on _WaterQcPageState {
                           : context.appBorder,
                     ),
                   ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text(display,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        display,
                         style: GoogleFonts.spaceGrotesk(
-                            fontSize: 10,
-                            color: hasValue
-                                ? context.appTextPrimary
-                                : context.appTextMuted)),
-                    const SizedBox(width: 4),
-                    Icon(Icons.edit_outlined,
-                        size: 10, color: context.appTextMuted),
-                  ]),
+                          fontSize: 10,
+                          color: hasValue
+                              ? context.appTextPrimary
+                              : context.appTextMuted,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.edit_outlined,
+                        size: 10,
+                        color: context.appTextMuted,
+                      ),
+                    ],
+                  ),
                 ),
               );
             }).toList(),
@@ -400,44 +497,64 @@ extension _MobileView on _WaterQcPageState {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: context.appTextSecondary)),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: context.appTextSecondary,
+                    ),
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: badge.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(badgeStr,
-                      style: GoogleFonts.spaceGrotesk(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: badge)),
+                  child: Text(
+                    badgeStr,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: badge,
+                    ),
+                  ),
                 ),
               ],
             ),
-            Row(children: [
-              Icon(Icons.calendar_today_outlined,
-                  size: 10, color: context.appTextMuted),
-              const SizedBox(width: 4),
-              Text(lastStr,
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 10,
+                  color: context.appTextMuted,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  lastStr,
                   style: GoogleFonts.jetBrainsMono(
-                      fontSize: 10,
-                      color: lastDate != null
-                          ? context.appTextSecondary
-                          : context.appTextMuted)),
-              const Spacer(),
-              Text('$optimalDays d',
+                    fontSize: 10,
+                    color: lastDate != null
+                        ? context.appTextSecondary
+                        : context.appTextMuted,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$optimalDays d',
                   style: GoogleFonts.jetBrainsMono(
-                      fontSize: 10, color: context.appTextMuted)),
-            ]),
+                    fontSize: 10,
+                    color: context.appTextMuted,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -452,8 +569,7 @@ extension _MobileView on _WaterQcPageState {
       nextDate = DateTime.now();
     } else {
       final latestStr = _rows[0]['record_date']?.toString();
-      final latest =
-          latestStr != null ? DateTime.tryParse(latestStr) : null;
+      final latest = latestStr != null ? DateTime.tryParse(latestStr) : null;
       nextDate = (latest ?? DateTime.now()).add(const Duration(days: 1));
     }
     final label = fmtDate(nextDate);
@@ -466,30 +582,35 @@ extension _MobileView on _WaterQcPageState {
           Text(
             '${_filteredRows.length} record${_filteredRows.length == 1 ? '' : 's'}',
             style: GoogleFonts.spaceGrotesk(
-                fontSize: 11, color: context.appTextMuted),
+              fontSize: 11,
+              color: context.appTextMuted,
+            ),
           ),
           InkWell(
             onTap: _addNextRow,
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: _pageAccent.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color: _pageAccent.withValues(alpha: 0.35)),
+                border: Border.all(color: _pageAccent.withValues(alpha: 0.35)),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.add_circle_outline,
-                    size: 14, color: _pageAccent),
-                const SizedBox(width: 6),
-                Text('Add $label',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_circle_outline, size: 14, color: _pageAccent),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Add $label',
                     style: GoogleFonts.spaceGrotesk(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _pageAccent)),
-              ]),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _pageAccent,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -500,10 +621,8 @@ extension _MobileView on _WaterQcPageState {
   // ── QC record card ─────────────────────────────────────────────────────────
 
   Widget _buildMobileQcCard(Map<String, dynamic> row, int i) {
-    final hasIncident =
-        (row['incidents']?.toString().trim() ?? '').isNotEmpty;
-    final hasObs =
-        (row['observations']?.toString().trim() ?? '').isNotEmpty;
+    final hasIncident = (row['incidents']?.toString().trim() ?? '').isNotEmpty;
+    final hasObs = (row['observations']?.toString().trim() ?? '').isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -521,44 +640,60 @@ extension _MobileView on _WaterQcPageState {
         children: [
           // Card header: date + delete
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: context.appSurface2,
               borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(7)),
-            ),
-            child: Row(children: [
-              const Icon(Icons.calendar_today_outlined,
-                  size: 12, color: _pageAccent),
-              const SizedBox(width: 6),
-              Text(row['record_date']?.toString() ?? '—',
-                  style: GoogleFonts.jetBrainsMono(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: context.appTextPrimary)),
-              const Spacer(),
-              if (hasIncident)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: AppDS.red.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text('Incident',
-                      style: GoogleFonts.spaceGrotesk(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: AppDS.red)),
-                ),
-              GestureDetector(
-                onTap: () => _deleteRow(row),
-                child: Icon(Icons.delete_outline,
-                    size: 16, color: context.appTextMuted),
+                top: Radius.circular(7),
               ),
-            ]),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 12,
+                  color: _pageAccent,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  row['record_date']?.toString() ?? '—',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: context.appTextPrimary,
+                  ),
+                ),
+                const Spacer(),
+                if (hasIncident)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: AppDS.red.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Incident',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: AppDS.red,
+                      ),
+                    ),
+                  ),
+                GestureDetector(
+                  onTap: () => _deleteRow(row),
+                  child: Icon(
+                    Icons.delete_outline,
+                    size: 16,
+                    color: context.appTextMuted,
+                  ),
+                ),
+              ],
+            ),
           ),
           // Metrics grid
           Padding(
@@ -570,20 +705,22 @@ extension _MobileView on _WaterQcPageState {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
               child: _buildMobileLabelRow(
-                  Icons.warning_amber_outlined,
-                  AppDS.orange,
-                  'Incident:',
-                  row['incidents'].toString()),
+                Icons.warning_amber_outlined,
+                AppDS.orange,
+                'Incident:',
+                row['incidents'].toString(),
+              ),
             ),
           // Observations (if any)
           if (hasObs)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
               child: _buildMobileLabelRow(
-                  Icons.notes_outlined,
-                  context.appTextMuted,
-                  'Obs:',
-                  row['observations'].toString()),
+                Icons.notes_outlined,
+                context.appTextMuted,
+                'Obs:',
+                row['observations'].toString(),
+              ),
             ),
           const SizedBox(height: 4),
           // Edit button
@@ -600,10 +737,13 @@ extension _MobileView on _WaterQcPageState {
                   border: Border.all(color: context.appBorder),
                 ),
                 child: Center(
-                  child: Text('Edit record',
-                      style: GoogleFonts.spaceGrotesk(
-                          fontSize: 11,
-                          color: context.appTextSecondary)),
+                  child: Text(
+                    'Edit record',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 11,
+                      color: context.appTextSecondary,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -644,8 +784,7 @@ extension _MobileView on _WaterQcPageState {
         }
 
         return Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: outOfRange
                 ? AppDS.red.withValues(alpha: 0.10)
@@ -661,21 +800,27 @@ extension _MobileView on _WaterQcPageState {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(label,
-                  style: GoogleFonts.spaceGrotesk(
-                      fontSize: 9,
-                      color: context.appTextMuted,
-                      fontWeight: FontWeight.w600)),
+              Text(
+                label,
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 9,
+                  color: context.appTextMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 1),
-              Text(display,
-                  style: GoogleFonts.jetBrainsMono(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: outOfRange
-                          ? AppDS.red
-                          : (val == null
-                              ? context.appTextMuted
-                              : context.appTextPrimary))),
+              Text(
+                display,
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: outOfRange
+                      ? AppDS.red
+                      : (val == null
+                            ? context.appTextMuted
+                            : context.appTextPrimary),
+                ),
+              ),
             ],
           ),
         );
@@ -684,22 +829,33 @@ extension _MobileView on _WaterQcPageState {
   }
 
   Widget _buildMobileLabelRow(
-      IconData icon, Color color, String label, String value) {
+    IconData icon,
+    Color color,
+    String label,
+    String value,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 12, color: color),
         const SizedBox(width: 5),
-        Text(label,
-            style: GoogleFonts.spaceGrotesk(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: color)),
+        Text(
+          label,
+          style: GoogleFonts.spaceGrotesk(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
         const SizedBox(width: 4),
         Expanded(
-          child: Text(value,
-              style: GoogleFonts.spaceGrotesk(
-                  fontSize: 11, color: context.appTextSecondary)),
+          child: Text(
+            value,
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 11,
+              color: context.appTextSecondary,
+            ),
+          ),
         ),
       ],
     );
@@ -726,7 +882,7 @@ extension _MobileView on _WaterQcPageState {
 
     final controllers = {
       for (final f in editableFields)
-        f.$1: TextEditingController(text: row[f.$1]?.toString() ?? '')
+        f.$1: TextEditingController(text: row[f.$1]?.toString() ?? ''),
     };
 
     showModalBottomSheet(
@@ -754,30 +910,32 @@ extension _MobileView on _WaterQcPageState {
               ),
             ),
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(children: [
-                const Icon(Icons.edit_outlined,
-                    size: 15, color: _pageAccent),
-                const SizedBox(width: 8),
-                Text(
-                  'Edit — ${row['record_date'] ?? ''}',
-                  style: GoogleFonts.spaceGrotesk(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.edit_outlined, size: 15, color: _pageAccent),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Edit — ${row['record_date'] ?? ''}',
+                    style: GoogleFonts.spaceGrotesk(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: context.appTextPrimary),
-                ),
-              ]),
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                ],
+              ),
             ),
             Divider(height: 1, color: context.appBorder),
             Expanded(
               child: ListView(
                 controller: sc,
                 padding: EdgeInsets.fromLTRB(
-                    16,
-                    12,
-                    16,
-                    MediaQuery.of(ctx).viewInsets.bottom + 16),
+                  16,
+                  12,
+                  16,
+                  MediaQuery.of(ctx).viewInsets.bottom + 16,
+                ),
                 children: [
                   ...editableFields.map((f) {
                     final key = f.$1;
@@ -788,43 +946,54 @@ extension _MobileView on _WaterQcPageState {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(label,
-                              style: GoogleFonts.spaceGrotesk(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: context.appTextMuted)),
+                          Text(
+                            label,
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: context.appTextMuted,
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           TextField(
                             controller: controllers[key],
                             keyboardType: type == 'num'
                                 ? const TextInputType.numberWithOptions(
-                                    decimal: true)
+                                    decimal: true,
+                                  )
                                 : TextInputType.multiline,
                             maxLines: type == 'text' ? 3 : 1,
                             style: GoogleFonts.jetBrainsMono(
-                                fontSize: 13,
-                                color: context.appTextPrimary),
+                              fontSize: 13,
+                              color: context.appTextPrimary,
+                            ),
                             decoration: InputDecoration(
                               isDense: true,
                               filled: true,
                               fillColor: context.appSurface2,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide:
-                                    BorderSide(color: context.appBorder),
+                                borderSide: BorderSide(
+                                  color: context.appBorder,
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide:
-                                    BorderSide(color: context.appBorder),
+                                borderSide: BorderSide(
+                                  color: context.appBorder,
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: const BorderSide(
-                                    color: _pageAccent, width: 1.5),
+                                  color: _pageAccent,
+                                  width: 1.5,
+                                ),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
                             ),
                           ),
                         ],
@@ -835,17 +1004,20 @@ extension _MobileView on _WaterQcPageState {
                   Divider(color: context.appBorder),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Text('Maintenance dates',
-                        style: GoogleFonts.spaceGrotesk(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: context.appTextMuted)),
+                    child: Text(
+                      'Maintenance dates',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: context.appTextMuted,
+                      ),
+                    ),
                   ),
                   ...(_maintKeys.map((k) {
                     final label = _maintLabels[k] ?? k;
                     final val = row[k];
-                    final display = (val != null &&
-                            val.toString().trim().isNotEmpty)
+                    final display =
+                        (val != null && val.toString().trim().isNotEmpty)
                         ? val.toString()
                         : 'Not set';
                     return Padding(
@@ -857,34 +1029,44 @@ extension _MobileView on _WaterQcPageState {
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: context.appSurface2,
                             borderRadius: BorderRadius.circular(8),
-                            border:
-                                Border.all(color: context.appBorder),
+                            border: Border.all(color: context.appBorder),
                           ),
-                          child: Row(children: [
-                            Expanded(
-                              child: Text(label,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  label,
                                   style: GoogleFonts.spaceGrotesk(
-                                      fontSize: 12,
-                                      color: context.appTextSecondary)),
-                            ),
-                            Text(display,
-                                style: GoogleFonts.jetBrainsMono(
                                     fontSize: 12,
-                                    color: val != null &&
-                                            val
-                                                .toString()
-                                                .trim()
-                                                .isNotEmpty
-                                        ? const Color(0xFF15803D)
-                                        : context.appTextMuted)),
-                            const SizedBox(width: 6),
-                            Icon(Icons.edit_calendar_outlined,
-                                size: 14, color: context.appTextMuted),
-                          ]),
+                                    color: context.appTextSecondary,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                display,
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 12,
+                                  color:
+                                      val != null &&
+                                          val.toString().trim().isNotEmpty
+                                      ? const Color(0xFF15803D)
+                                      : context.appTextMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.edit_calendar_outlined,
+                                size: 14,
+                                color: context.appTextMuted,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -897,9 +1079,12 @@ extension _MobileView on _WaterQcPageState {
                       foregroundColor: Colors.white,
                       minimumSize: const Size(double.infinity, 44),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       textStyle: GoogleFonts.spaceGrotesk(
-                          fontSize: 14, fontWeight: FontWeight.w600),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     onPressed: () {
                       Navigator.pop(ctx);
@@ -910,9 +1095,12 @@ extension _MobileView on _WaterQcPageState {
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: Text('Cancel',
-                        style: GoogleFonts.spaceGrotesk(
-                            color: context.appTextMuted)),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextMuted,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -956,7 +1144,7 @@ extension _MobileView on _WaterQcPageState {
         .eq('id', row['id'] as int)
         .then((_) {})
         .catchError((_) {
-      if (mounted) _load();
-    });
+          if (mounted) _load();
+        });
   }
 }

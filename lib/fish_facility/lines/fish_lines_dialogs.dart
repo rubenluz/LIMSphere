@@ -12,14 +12,14 @@ class _AddLineDialog extends StatefulWidget {
 }
 
 class _AddLineDialogState extends State<_AddLineDialog> {
-  final _nameCtrl  = TextEditingController();
+  final _nameCtrl = TextEditingController();
   final _aliasCtrl = TextEditingController();
-  final _geneCtrl  = TextEditingController();
-  final _labCtrl   = TextEditingController();
-  String _type     = 'transgenic';
-  String _status   = 'active';
+  final _geneCtrl = TextEditingController();
+  final _labCtrl = TextEditingController();
+  String _type = 'transgenic';
+  String _status = 'active';
   String _zygosity = 'heterozygous';
-  bool   _saving   = false;
+  bool _saving = false;
   String? _error;
 
   @override
@@ -37,18 +37,27 @@ class _AddLineDialogState extends State<_AddLineDialog> {
       setState(() => _error = 'Line name is required.');
       return;
     }
-    setState(() { _saving = true; _error = null; });
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       final resp = await Supabase.instance.client
           .from('fish_lines')
           .insert({
-            FishSch.lineName:         name,
-            FishSch.lineAlias:        _aliasCtrl.text.isEmpty ? null : _aliasCtrl.text.trim(),
-            FishSch.lineType:         _type,
-            FishSch.lineStatus:       _status,
-            FishSch.lineZygosity:     _zygosity,
-            FishSch.lineAffectedGene: _geneCtrl.text.isEmpty ? null : _geneCtrl.text.trim(),
-            FishSch.lineOriginLab:    _labCtrl.text.isEmpty  ? null : _labCtrl.text.trim(),
+            FishSch.lineName: name,
+            FishSch.lineAlias: _aliasCtrl.text.isEmpty
+                ? null
+                : _aliasCtrl.text.trim(),
+            FishSch.lineType: _type,
+            FishSch.lineStatus: _status,
+            FishSch.lineZygosity: _zygosity,
+            FishSch.lineAffectedGene: _geneCtrl.text.isEmpty
+                ? null
+                : _geneCtrl.text.trim(),
+            FishSch.lineOriginLab: _labCtrl.text.isEmpty
+                ? null
+                : _labCtrl.text.trim(),
           })
           .select()
           .single();
@@ -56,7 +65,10 @@ class _AddLineDialogState extends State<_AddLineDialog> {
       final respWithQr = Map<String, dynamic>.from(resp);
       if (newId != null) {
         final qrcode = QrRules.build(
-            SupabaseManager.projectRef ?? 'local', 'fish_lines', newId);
+          SupabaseManager.projectRef ?? 'local',
+          'fish_lines',
+          newId,
+        );
         await Supabase.instance.client
             .from('fish_lines')
             .update({FishSch.lineQrcode: qrcode})
@@ -64,9 +76,14 @@ class _AddLineDialogState extends State<_AddLineDialog> {
         respWithQr[FishSch.lineQrcode] = qrcode;
       }
       widget.onAdd(FishLine.fromMap(respWithQr));
-      if (mounted) { Navigator.pop(context); }
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
-      setState(() { _saving = false; _error = e.toString(); });
+      setState(() {
+        _saving = false;
+        _error = e.toString();
+      });
     }
   }
 
@@ -76,10 +93,16 @@ class _AddLineDialogState extends State<_AddLineDialog> {
       backgroundColor: AppDS.surface2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppDS.border2)),
-      title: Text('New Fish Line',
+        side: const BorderSide(color: AppDS.border2),
+      ),
+      title: Text(
+        'New Fish Line',
         style: GoogleFonts.spaceGrotesk(
-          fontSize: 16, fontWeight: FontWeight.w700, color: AppDS.textPrimary)),
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: AppDS.textPrimary,
+        ),
+      ),
       content: SizedBox(
         width: 440,
         child: Column(
@@ -93,8 +116,13 @@ class _AddLineDialogState extends State<_AddLineDialog> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppDS.red.withValues(alpha: 0.4)),
                 ),
-                child: Text(_error!,
-                  style: GoogleFonts.spaceGrotesk(color: AppDS.red, fontSize: 12)),
+                child: Text(
+                  _error!,
+                  style: GoogleFonts.spaceGrotesk(
+                    color: AppDS.red,
+                    fontSize: 12,
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
             ],
@@ -106,33 +134,55 @@ class _AddLineDialogState extends State<_AddLineDialog> {
             const SizedBox(height: 8),
             _f('Origin Lab', _labCtrl),
             const SizedBox(height: 8),
-            Row(children: [
-              Expanded(child: _dd('Type', _type,
-                ['WT', 'transgenic', 'mutant', 'CRISPR', 'KO', 'KI'],
-                (v) => setState(() => _type = v ?? _type))),
-              const SizedBox(width: 8),
-              Expanded(child: _dd('Status', _status,
-                ['active', 'archived', 'cryopreserved', 'lost'],
-                (v) => setState(() => _status = v ?? _status))),
-            ]),
+            Row(
+              children: [
+                Expanded(
+                  child: _dd('Type', _type, [
+                    'WT',
+                    'transgenic',
+                    'mutant',
+                    'CRISPR',
+                    'KO',
+                    'KI',
+                  ], (v) => setState(() => _type = v ?? _type)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _dd('Status', _status, [
+                    'active',
+                    'archived',
+                    'cryopreserved',
+                    'lost',
+                  ], (v) => setState(() => _status = v ?? _status)),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
-            _dd('Zygosity', _zygosity,
-              ['homozygous', 'heterozygous', 'unknown'],
-              (v) => setState(() => _zygosity = v ?? _zygosity)),
+            _dd('Zygosity', _zygosity, [
+              'homozygous',
+              'heterozygous',
+              'unknown',
+            ], (v) => setState(() => _zygosity = v ?? _zygosity)),
           ],
         ),
       ),
       actions: [
         OutlinedButton(
           onPressed: _saving ? null : () => Navigator.pop(context),
-          child: const Text('Cancel')),
+          child: const Text('Cancel'),
+        ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppDS.accent, foregroundColor: AppDS.bg),
+            backgroundColor: AppDS.accent,
+            foregroundColor: AppDS.bg,
+          ),
           onPressed: _saving ? null : _submit,
           child: _saving
-              ? const SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('Add Line'),
         ),
       ],
@@ -142,47 +192,74 @@ class _AddLineDialogState extends State<_AddLineDialog> {
   Widget _f(String label, TextEditingController ctrl) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(label, style: GoogleFonts.spaceGrotesk(
-        fontSize: 11, color: AppDS.textMuted, fontWeight: FontWeight.w700)),
+      Text(
+        label,
+        style: GoogleFonts.spaceGrotesk(
+          fontSize: 11,
+          color: AppDS.textMuted,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
       const SizedBox(height: 3),
-      TextField(controller: ctrl,
+      TextField(
+        controller: ctrl,
         style: GoogleFonts.spaceGrotesk(color: AppDS.textPrimary, fontSize: 13),
         decoration: InputDecoration(
           isDense: true,
-          filled: true, fillColor: AppDS.surface3,
+          filled: true,
+          fillColor: AppDS.surface3,
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: const BorderSide(color: AppDS.border)),
+            borderSide: const BorderSide(color: AppDS.border),
+          ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
-        )),
+            borderSide: const BorderSide(color: AppDS.accent, width: 1.5),
+          ),
+        ),
+      ),
     ],
   );
 
-  Widget _dd(String label, String value, List<String> opts, ValueChanged<String?> cb) =>
-    Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: GoogleFonts.spaceGrotesk(
-          fontSize: 11, color: AppDS.textMuted, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 3),
-        DropdownButtonFormField<String>(
-          initialValue: opts.contains(value) ? value : opts.first,
-          dropdownColor: AppDS.surface2,
-          style: GoogleFonts.spaceGrotesk(color: AppDS.textPrimary, fontSize: 13),
-          items: opts.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-          onChanged: cb,
-          decoration: InputDecoration(
-            isDense: true,
-            filled: true, fillColor: AppDS.surface3,
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: AppDS.border)),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: AppDS.accent, width: 1.5)),
-          )),
-      ],
-    );
+  Widget _dd(
+    String label,
+    String value,
+    List<String> opts,
+    ValueChanged<String?> cb,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: GoogleFonts.spaceGrotesk(
+          fontSize: 11,
+          color: AppDS.textMuted,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 3),
+      DropdownButtonFormField<String>(
+        initialValue: opts.contains(value) ? value : opts.first,
+        dropdownColor: AppDS.surface2,
+        style: GoogleFonts.spaceGrotesk(color: AppDS.textPrimary, fontSize: 13),
+        items: opts
+            .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+            .toList(),
+        onChanged: cb,
+        decoration: InputDecoration(
+          isDense: true,
+          filled: true,
+          fillColor: AppDS.surface3,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: AppDS.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: const BorderSide(color: AppDS.accent, width: 1.5),
+          ),
+        ),
+      ),
+    ],
+  );
 }

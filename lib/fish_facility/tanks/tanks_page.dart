@@ -7,12 +7,15 @@
 
 import 'dart:async';
 import 'dart:io';
+
 import '/core/data_cache.dart';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'tanks_connection_model.dart';
 import '../feeding_options.dart';
 import '../shared_widgets.dart';
@@ -122,11 +125,8 @@ class _FishTanksPageState extends State<FishTanksPage> {
   ZebrafishTank? _menuTank;
   Offset _menuOffset = Offset.zero;
 
-  bool _ensureCanEdit() {
-    if (context.canEditModule) return true;
-    context.warnReadOnly();
-    return false;
-  }
+  bool _ensureCanEdit([String action = ModuleAction.edit]) =>
+      context.requireModuleAction(action);
 
   @override
   void initState() {
@@ -300,6 +300,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
   }
 
   Future<void> _deleteStock(ZebrafishTank tank) async {
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
     try {
       await Supabase.instance.client
           .from('fish_stocks')
@@ -414,6 +415,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
   }
 
   Future<void> _exportCsv() async {
+    if (!context.requireModuleAction(ModuleAction.export)) return;
     final allTanks = _racks.entries
         .expand((e) => e.value.map((t) => (rack: e.key, tank: t)))
         .toList();
@@ -460,9 +462,8 @@ class _FishTanksPageState extends State<FishTanksPage> {
       await OpenFilex.open(file.path);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     }
   }
@@ -594,20 +595,23 @@ class _FishTanksPageState extends State<FishTanksPage> {
                         side: BorderSide(color: context.appBorder2),
                       ),
                       onSelected: (v) {
-                        if (!_ensureCanEdit()) return;
+                        final action = v == 'add'
+                            ? ModuleAction.create
+                            : ModuleAction.delete;
+                        if (!_ensureCanEdit(action)) return;
                         if (v == 'add') _showAddRackDialog();
                         if (v == 'delete') _showDeleteRackDialog();
                       },
                       itemBuilder: (_) => [
                         PopupMenuItem(
                           value: 'add',
-                          enabled: context.canEditModule,
+                          enabled: context.canInsertModule,
                           child: Row(
                             children: [
                               Icon(
                                 Icons.add,
                                 size: 16,
-                                color: context.canEditModule
+                                color: context.canInsertModule
                                     ? AppDS.accent
                                     : context.appTextMuted,
                               ),
@@ -616,7 +620,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
                                 'Add Rack',
                                 style: GoogleFonts.spaceGrotesk(
                                   fontSize: 13,
-                                  color: context.canEditModule
+                                  color: context.canInsertModule
                                       ? context.appTextPrimary
                                       : context.appTextMuted,
                                 ),
@@ -626,14 +630,14 @@ class _FishTanksPageState extends State<FishTanksPage> {
                         ),
                         PopupMenuItem(
                           value: 'delete',
-                          enabled: context.canEditModule && _racks.length > 1,
+                          enabled: context.canDeleteModule && _racks.length > 1,
                           child: Row(
                             children: [
                               Icon(
                                 Icons.delete_outline,
                                 size: 16,
                                 color:
-                                    context.canEditModule && _racks.length > 1
+                                    context.canDeleteModule && _racks.length > 1
                                     ? AppDS.red
                                     : context.appTextMuted,
                               ),
@@ -643,7 +647,8 @@ class _FishTanksPageState extends State<FishTanksPage> {
                                 style: GoogleFonts.spaceGrotesk(
                                   fontSize: 13,
                                   color:
-                                      context.canEditModule && _racks.length > 1
+                                      context.canDeleteModule &&
+                                          _racks.length > 1
                                       ? AppDS.red
                                       : context.appTextMuted,
                                 ),
@@ -1647,7 +1652,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
       .toSet();
 
   void _showAddStockDialog(ZebrafishTank tank) {
-    if (!_ensureCanEdit()) return;
+    if (!_ensureCanEdit(ModuleAction.create)) return;
     showDialog(
       context: context,
       builder: (_) => AddStockDialog(
@@ -1705,7 +1710,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
   }
 
   Future<void> _showDuplicateStockDialog(ZebrafishTank tank) async {
-    if (!_ensureCanEdit()) return;
+    if (!_ensureCanEdit(ModuleAction.create)) return;
     Map<String, dynamic>? rawRow;
     try {
       rawRow = await Supabase.instance.client
@@ -1830,7 +1835,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
 
   // ── Add Rack dialog ───────────────────────────────────────────────────────
   void _showAddRackDialog() {
-    if (!_ensureCanEdit()) return;
+    if (!_ensureCanEdit(ModuleAction.create)) return;
     final ctrl = TextEditingController();
     showDialog(
       context: context,
@@ -1906,7 +1911,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
 
   // ── Delete Rack dialog ────────────────────────────────────────────────────
   void _showDeleteRackDialog() {
-    if (!_ensureCanEdit()) return;
+    if (!_ensureCanEdit(ModuleAction.delete)) return;
     if (_racks.length <= 1) return;
     final rackId = _selectedRack;
     final tankCount = (_racks[rackId] ?? []).length;

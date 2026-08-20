@@ -2,14 +2,15 @@
 // activity. Admin-only. Filterable by table, action, and free text search.
 // Expandable rows reveal before/after values for data-change events.
 
-
-
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+
 import '/theme/theme.dart';
+import '/theme/module_permission.dart';
 
 TextStyle _spaceGrotesk({
   TextStyle? textStyle,
@@ -233,12 +234,16 @@ class _AuditLogPageState extends State<AuditLogPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Failed to load audit log: $e'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        backgroundColor: AppDS.surface,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load audit log: $e'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          backgroundColor: AppDS.surface,
+        ),
+      );
     }
   }
 
@@ -247,8 +252,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
     setState(() {
       _filtered = _all.where((e) {
         if (_tableFilter != 'all' && e.table != _tableFilter) return false;
-        if (_actionFilter != 'all' &&
-            e.action.toUpperCase() != _actionFilter) { return false; }
+        if (_actionFilter != 'all' && e.action.toUpperCase() != _actionFilter) {
+          return false;
+        }
         if (q.isEmpty) return true;
         return e.table.toLowerCase().contains(q) ||
             e.action.toLowerCase().contains(q) ||
@@ -265,204 +271,273 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   List<String> get _allActions {
-    final a =
-        _all.map((e) => e.action.toUpperCase()).toSet().toList()..sort();
+    final a = _all.map((e) => e.action.toUpperCase()).toSet().toList()..sort();
     return a;
   }
 
   Future<void> _exportCsv() async {
+    if (!context.requireModuleAction(ModuleAction.export)) return;
     final buf = StringBuffer();
     buf.writeln(
-        'ID,Timestamp,User,Table,Action,RecordID,Notes,OldValues,NewValues,IP');
+      'ID,Timestamp,User,Table,Action,RecordID,Notes,OldValues,NewValues,IP',
+    );
     String esc(String? s) => '"${(s ?? '').replaceAll('"', '""')}"';
     for (final e in _filtered) {
       buf.writeln(
-          '${e.id},${esc(_formatTs(e.timestamp))},${esc(e.userDisplay)},${esc(e.table)},${esc(e.action)},${e.recordId ?? ''},${esc(e.notes)},${esc(e.oldValues)},${esc(e.newValues)},${esc(e.ipAddress)}');
+        '${e.id},${esc(_formatTs(e.timestamp))},${esc(e.userDisplay)},${esc(e.table)},${esc(e.action)},${e.recordId ?? ''},${esc(e.notes)},${esc(e.oldValues)},${esc(e.newValues)},${esc(e.ipAddress)}',
+      );
     }
     try {
-      final dir = await getDownloadsDirectory() ??
+      final dir =
+          await getDownloadsDirectory() ??
           await getApplicationDocumentsDirectory();
       final file = File(
-          '${dir.path}/audit_log_${DateTime.now().millisecondsSinceEpoch}.csv');
+        '${dir.path}/audit_log_${DateTime.now().millisecondsSinceEpoch}.csv',
+      );
       await file.writeAsString(buf.toString());
       await OpenFilex.open(file.path);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Export failed: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
-      // ── Toolbar ──────────────────────────────────────────────────────────
-      Container(
-        height: 56,
-        decoration: BoxDecoration(
-          color: context.appSurface2,
-          border: Border(bottom: BorderSide(color: context.appBorder)),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(children: [
-          if (MediaQuery.of(context).size.width < 700) ...[
-            IconButton(
-              icon: const Icon(Icons.menu_rounded, size: 20),
-              color: context.appTextSecondary,
-              tooltip: 'Menu',
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-          ],
-          Icon(Icons.manage_search_outlined,
-              color: context.appTextMuted, size: 18),
-          const SizedBox(width: 8),
-          Text('Audit Log',
-              style: _spaceGrotesk(
+    return Column(
+      children: [
+        // ── Toolbar ──────────────────────────────────────────────────────────
+        Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: context.appSurface2,
+            border: Border(bottom: BorderSide(color: context.appBorder)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              if (MediaQuery.of(context).size.width < 700) ...[
+                IconButton(
+                  icon: const Icon(Icons.menu_rounded, size: 20),
+                  color: context.appTextSecondary,
+                  tooltip: 'Menu',
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ],
+              Icon(
+                Icons.manage_search_outlined,
+                color: context.appTextMuted,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Audit Log',
+                style: _spaceGrotesk(
                   color: context.appTextPrimary,
                   fontSize: 16,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: SizedBox(
-              height: 36,
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (v) {
-                  _search = v;
-                  _applyFilters();
-                },
-                style: _spaceGrotesk(
-                    color: context.appTextPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: 'Search user, table, action, record ID...',
-                  hintStyle: _spaceGrotesk(
-                      color: context.appTextMuted, fontSize: 13),
-                  prefixIcon:
-                      Icon(Icons.search, color: context.appTextMuted, size: 16),
-                  suffixIcon: _search.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear,
-                              size: 14, color: context.appTextMuted),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            _search = '';
-                            _applyFilters();
-                          })
-                      : null,
-                  filled: true,
-                  fillColor: context.appSurface3,
-                  contentPadding: EdgeInsets.zero,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: context.appBorder)),
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: context.appBorder)),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppDS.accent)),
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Table filter
-          SizedBox(
-            height: 36,
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _tableFilter,
-                dropdownColor: context.appSurface,
-                style: _spaceGrotesk(
-                    color: context.appTextPrimary, fontSize: 13),
-                items: [
-                  DropdownMenuItem(
-                    value: 'all',
-                    child: Text('All Tables',
-                        style: _spaceGrotesk(
-                            color: context.appTextSecondary, fontSize: 13)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: TextField(
+                    controller: _searchCtrl,
+                    onChanged: (v) {
+                      _search = v;
+                      _applyFilters();
+                    },
+                    style: _spaceGrotesk(
+                      color: context.appTextPrimary,
+                      fontSize: 13,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search user, table, action, record ID...',
+                      hintStyle: _spaceGrotesk(
+                        color: context.appTextMuted,
+                        fontSize: 13,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: context.appTextMuted,
+                        size: 16,
+                      ),
+                      suffixIcon: _search.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.clear,
+                                size: 14,
+                                color: context.appTextMuted,
+                              ),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                _search = '';
+                                _applyFilters();
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: context.appSurface3,
+                      contentPadding: EdgeInsets.zero,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: context.appBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: context.appBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppDS.accent),
+                      ),
+                    ),
                   ),
-                  ..._allTables.map((t) => DropdownMenuItem(
-                        value: t,
-                        child: Text(t,
-                            style: _spaceGrotesk(
-                                color: context.appTextPrimary, fontSize: 13)),
-                      )),
-                ],
-                onChanged: (v) {
-                  _tableFilter = v ?? 'all';
-                  _applyFilters();
-                },
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Action filter
-          SizedBox(
-            height: 36,
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _actionFilter,
-                dropdownColor: context.appSurface,
-                style: _spaceGrotesk(
-                    color: context.appTextPrimary, fontSize: 13),
-                items: [
-                  DropdownMenuItem(
-                    value: 'all',
-                    child: Text('All Actions',
-                        style: _spaceGrotesk(
-                            color: context.appTextSecondary, fontSize: 13)),
+              const SizedBox(width: 8),
+              // Table filter
+              SizedBox(
+                height: 36,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _tableFilter,
+                    dropdownColor: context.appSurface,
+                    style: _spaceGrotesk(
+                      color: context.appTextPrimary,
+                      fontSize: 13,
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'all',
+                        child: Text(
+                          'All Tables',
+                          style: _spaceGrotesk(
+                            color: context.appTextSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      ..._allTables.map(
+                        (t) => DropdownMenuItem(
+                          value: t,
+                          child: Text(
+                            t,
+                            style: _spaceGrotesk(
+                              color: context.appTextPrimary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      _tableFilter = v ?? 'all';
+                      _applyFilters();
+                    },
                   ),
-                  ..._allActions.map((a) => DropdownMenuItem(
-                        value: a,
-                        child: Text(a,
-                            style: _spaceGrotesk(
-                                color: _actionColor(a), fontSize: 13)),
-                      )),
-                ],
-                onChanged: (v) {
-                  _actionFilter = v ?? 'all';
-                  _applyFilters();
-                },
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              // Action filter
+              SizedBox(
+                height: 36,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _actionFilter,
+                    dropdownColor: context.appSurface,
+                    style: _spaceGrotesk(
+                      color: context.appTextPrimary,
+                      fontSize: 13,
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'all',
+                        child: Text(
+                          'All Actions',
+                          style: _spaceGrotesk(
+                            color: context.appTextSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      ..._allActions.map(
+                        (a) => DropdownMenuItem(
+                          value: a,
+                          child: Text(
+                            a,
+                            style: _spaceGrotesk(
+                              color: _actionColor(a),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      _actionFilter = v ?? 'all';
+                      _applyFilters();
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Tooltip(
+                message: 'Export CSV',
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.download_outlined,
+                    color: AppDS.textSecondary,
+                    size: 18,
+                  ),
+                  onPressed: _exportCsv,
+                ),
+              ),
+              Tooltip(
+                message: 'Refresh',
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.refresh_outlined,
+                    color: AppDS.textSecondary,
+                    size: 18,
+                  ),
+                  onPressed: _load,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 4),
-          Tooltip(
-            message: 'Export CSV',
-            child: IconButton(
-              icon: const Icon(Icons.download_outlined,
-                  color: AppDS.textSecondary, size: 18),
-              onPressed: _exportCsv,
-            ),
-          ),
-          Tooltip(
-            message: 'Refresh',
-            child: IconButton(
-              icon: const Icon(Icons.refresh_outlined,
-                  color: AppDS.textSecondary, size: 18),
-              onPressed: _load,
-            ),
-          ),
-        ]),
-      ),
+        ),
 
-      // ── Body ─────────────────────────────────────────────────────────────
-      Expanded(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _filtered.isEmpty
-                ? Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.manage_search_outlined,
-                        size: 48, color: AppDS.textMuted),
-                    const SizedBox(height: 12),
-                    Text('No audit entries found',
+        // ── Body ─────────────────────────────────────────────────────────────
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _filtered.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.manage_search_outlined,
+                        size: 48,
+                        color: AppDS.textMuted,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No audit entries found',
                         style: _spaceGrotesk(
-                            color: AppDS.textMuted, fontSize: 15)),
-                  ]))
-                : Column(children: [
+                          color: AppDS.textMuted,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
                     // ── Header row ─────────────────────────────────────────
                     Container(
                       height: 32,
@@ -474,40 +549,37 @@ class _AuditLogPageState extends State<AuditLogPage> {
                         ),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(children: [
-                        const SizedBox(width: 20),
-                        Expanded(
-                            flex: 3, child: _hdr(context, 'TIMESTAMP')),
-                        Expanded(flex: 2, child: _hdr(context, 'USER')),
-                        Expanded(flex: 2, child: _hdr(context, 'TABLE')),
-                        const SizedBox(
-                            width: 90,
-                            child: _HdrLabel('ACTION')),
-                        const SizedBox(
-                            width: 72,
-                            child: _HdrLabel('RECORD')),
-                        Expanded(flex: 3, child: _hdr(context, 'NOTES')),
-                      ]),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 20),
+                          Expanded(flex: 3, child: _hdr(context, 'TIMESTAMP')),
+                          Expanded(flex: 2, child: _hdr(context, 'USER')),
+                          Expanded(flex: 2, child: _hdr(context, 'TABLE')),
+                          const SizedBox(width: 90, child: _HdrLabel('ACTION')),
+                          const SizedBox(width: 72, child: _HdrLabel('RECORD')),
+                          Expanded(flex: 3, child: _hdr(context, 'NOTES')),
+                        ],
+                      ),
                     ),
                     // ── Rows ───────────────────────────────────────────────
                     Expanded(
                       child: ListView.builder(
                         padding: EdgeInsets.zero,
-                        itemCount:
-                            _filtered.length + (_hasMore ? 1 : 0),
+                        itemCount: _filtered.length + (_hasMore ? 1 : 0),
                         itemBuilder: (ctx, i) {
                           if (i == _filtered.length) {
                             return Padding(
                               padding: const EdgeInsets.all(16),
                               child: Center(
                                 child: TextButton.icon(
-                                  icon: const Icon(Icons.expand_more,
-                                      size: 16),
-                                  label: Text('Load more',
-                                      style: _spaceGrotesk(
-                                          fontSize: 13)),
+                                  icon: const Icon(Icons.expand_more, size: 16),
+                                  label: Text(
+                                    'Load more',
+                                    style: _spaceGrotesk(fontSize: 13),
+                                  ),
                                   style: TextButton.styleFrom(
-                                      foregroundColor: AppDS.accent),
+                                    foregroundColor: AppDS.accent,
+                                  ),
                                   onPressed: () {
                                     _limit += 200;
                                     _load();
@@ -537,8 +609,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
                       height: 30,
                       decoration: BoxDecoration(
                         color: context.appSurface2,
-                        border:
-                            Border(top: BorderSide(color: context.appBorder)),
+                        border: Border(
+                          top: BorderSide(color: context.appBorder),
+                        ),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       alignment: Alignment.centerLeft,
@@ -546,20 +619,27 @@ class _AuditLogPageState extends State<AuditLogPage> {
                         '${_filtered.length} entr${_filtered.length == 1 ? 'y' : 'ies'}'
                         '${_search.isNotEmpty || _tableFilter != 'all' || _actionFilter != 'all' ? ' (filtered from ${_all.length})' : ''}',
                         style: _spaceGrotesk(
-                            color: context.appTextMuted, fontSize: 11),
+                          color: context.appTextMuted,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
-                  ]),
-      ),
-    ]);
+                  ],
+                ),
+        ),
+      ],
+    );
   }
 
-  Widget _hdr(BuildContext context, String label) => Text(label,
-      style: _spaceGrotesk(
-          color: context.appTextMuted,
-          fontSize: 10,
-          letterSpacing: 0.8,
-          fontWeight: FontWeight.w600));
+  Widget _hdr(BuildContext context, String label) => Text(
+    label,
+    style: _spaceGrotesk(
+      color: context.appTextMuted,
+      fontSize: 10,
+      letterSpacing: 0.8,
+      fontWeight: FontWeight.w600,
+    ),
+  );
 }
 
 // ── Static header label widget (used in const context) ───────────────────────
@@ -569,12 +649,15 @@ class _HdrLabel extends StatelessWidget {
   const _HdrLabel(this.label);
 
   @override
-  Widget build(BuildContext context) => Text(label,
-      style: _spaceGrotesk(
-          color: context.appTextMuted,
-          fontSize: 10,
-          letterSpacing: 0.8,
-          fontWeight: FontWeight.w600));
+  Widget build(BuildContext context) => Text(
+    label,
+    style: _spaceGrotesk(
+      color: context.appTextMuted,
+      fontSize: 10,
+      letterSpacing: 0.8,
+      fontWeight: FontWeight.w600,
+    ),
+  );
 }
 
 // ── Row widget ────────────────────────────────────────────────────────────────
@@ -595,156 +678,204 @@ class _AuditRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ac = _actionColor(entry.action);
-    final hasDetails = (entry.oldValues?.isNotEmpty ?? false) ||
+    final hasDetails =
+        (entry.oldValues?.isNotEmpty ?? false) ||
         (entry.newValues?.isNotEmpty ?? false);
 
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      InkWell(
-        onTap: hasDetails ? onToggle : null,
-        child: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: isEven
-                ? context.appSurface.withValues(alpha: 0.45)
-                : context.appBg,
-            border: Border(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: hasDetails ? onToggle : null,
+          child: Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: isEven
+                  ? context.appSurface.withValues(alpha: 0.45)
+                  : context.appBg,
+              border: Border(
                 bottom: BorderSide(
-                    color: context.appBorder.withValues(alpha: 0.4))),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(children: [
-            SizedBox(
-              width: 20,
-              child: hasDetails
-                  ? Icon(
-                      isExpanded
-                          ? Icons.expand_less_rounded
-                          : Icons.expand_more_rounded,
-                      size: 14,
-                      color: context.appTextMuted,
-                    )
-                  : const SizedBox(),
-            ),
-            // Timestamp
-            Expanded(
-              flex: 3,
-              child: Text(_formatTs(entry.timestamp),
-                  style: _jetBrainsMono(
-                      color: context.appTextSecondary, fontSize: 11),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            // User
-            Expanded(
-              flex: 2,
-              child: Text(entry.userDisplay,
-                  style: _spaceGrotesk(
-                      color: context.appTextPrimary, fontSize: 12),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            // Table
-            Expanded(
-              flex: 2,
-              child: Text(entry.table,
-                  style: _jetBrainsMono(
-                      color: context.appTextSecondary, fontSize: 11),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            // Action badge
-            SizedBox(
-              width: 90,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: ac.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
+                  color: context.appBorder.withValues(alpha: 0.4),
                 ),
-                child: Text(entry.action.toUpperCase(),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  child: hasDetails
+                      ? Icon(
+                          isExpanded
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                          size: 14,
+                          color: context.appTextMuted,
+                        )
+                      : const SizedBox(),
+                ),
+                // Timestamp
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    _formatTs(entry.timestamp),
+                    style: _jetBrainsMono(
+                      color: context.appTextSecondary,
+                      fontSize: 11,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // User
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    entry.userDisplay,
                     style: _spaceGrotesk(
+                      color: context.appTextPrimary,
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // Table
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    entry.table,
+                    style: _jetBrainsMono(
+                      color: context.appTextSecondary,
+                      fontSize: 11,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // Action badge
+                SizedBox(
+                  width: 90,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: ac.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      entry.action.toUpperCase(),
+                      style: _spaceGrotesk(
                         color: ac,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5),
-                    overflow: TextOverflow.ellipsis),
-              ),
+                        letterSpacing: 0.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                // Record ID
+                SizedBox(
+                  width: 72,
+                  child: entry.recordId != null
+                      ? Text(
+                          '#${entry.recordId}',
+                          style: _jetBrainsMono(
+                            color: context.appTextMuted,
+                            fontSize: 11,
+                          ),
+                        )
+                      : const SizedBox(),
+                ),
+                // Notes
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    entry.notes ?? '',
+                    style: _spaceGrotesk(
+                      color: context.appTextSecondary,
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
-            // Record ID
-            SizedBox(
-              width: 72,
-              child: entry.recordId != null
-                  ? Text('#${entry.recordId}',
-                      style: _jetBrainsMono(
-                          color: context.appTextMuted, fontSize: 11))
-                  : const SizedBox(),
-            ),
-            // Notes
-            Expanded(
-              flex: 3,
-              child: Text(entry.notes ?? '',
-                  style: _spaceGrotesk(
-                      color: context.appTextSecondary, fontSize: 12),
-                  overflow: TextOverflow.ellipsis),
-            ),
-          ]),
-        ),
-      ),
-      // ── Expanded detail: before / after values ────────────────────────
-      if (isExpanded && hasDetails)
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: context.appSurface3,
-            border: Border(
-                bottom: BorderSide(color: context.appBorder)),
           ),
-          padding: const EdgeInsets.fromLTRB(52, 10, 16, 12),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (entry.oldValues?.isNotEmpty ?? false)
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _detailLabel('BEFORE', AppDS.red),
-                      const SizedBox(height: 4),
-                      SelectableText(entry.oldValues!,
-                          style: _jetBrainsMono(
-                              color: AppDS.red.withValues(alpha: 0.85),
-                              fontSize: 11)),
-                    ]),
-              ),
-            if ((entry.oldValues?.isNotEmpty ?? false) &&
-                (entry.newValues?.isNotEmpty ?? false))
-              const SizedBox(width: 20),
-            if (entry.newValues?.isNotEmpty ?? false)
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _detailLabel('AFTER', AppDS.green),
-                      const SizedBox(height: 4),
-                      SelectableText(entry.newValues!,
-                          style: _jetBrainsMono(
-                              color: AppDS.green.withValues(alpha: 0.85),
-                              fontSize: 11)),
-                    ]),
-              ),
-          ]),
         ),
-    ]);
+        // ── Expanded detail: before / after values ────────────────────────
+        if (isExpanded && hasDetails)
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: context.appSurface3,
+              border: Border(bottom: BorderSide(color: context.appBorder)),
+            ),
+            padding: const EdgeInsets.fromLTRB(52, 10, 16, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (entry.oldValues?.isNotEmpty ?? false)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _detailLabel('BEFORE', AppDS.red),
+                        const SizedBox(height: 4),
+                        SelectableText(
+                          entry.oldValues!,
+                          style: _jetBrainsMono(
+                            color: AppDS.red.withValues(alpha: 0.85),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if ((entry.oldValues?.isNotEmpty ?? false) &&
+                    (entry.newValues?.isNotEmpty ?? false))
+                  const SizedBox(width: 20),
+                if (entry.newValues?.isNotEmpty ?? false)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _detailLabel('AFTER', AppDS.green),
+                        const SizedBox(height: 4),
+                        SelectableText(
+                          entry.newValues!,
+                          style: _jetBrainsMono(
+                            color: AppDS.green.withValues(alpha: 0.85),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
   }
 
-  Widget _detailLabel(String text, Color color) => Row(children: [
-        Container(
-          width: 8,
-          height: 8,
-          margin: const EdgeInsets.only(right: 6),
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  Widget _detailLabel(String text, Color color) => Row(
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        margin: const EdgeInsets.only(right: 6),
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      Text(
+        text,
+        style: _spaceGrotesk(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
         ),
-        Text(text,
-            style: _spaceGrotesk(
-                color: color,
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8)),
-      ]);
+      ),
+    ],
+  );
 }

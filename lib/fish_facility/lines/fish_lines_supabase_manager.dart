@@ -9,11 +9,15 @@ class FishLinesSupabaseManager {
   // ── Fish Lines ────────────────────────────────────────────────────────────
 
   Future<List<FishLine>> fetchLines() async {
-    final rows = await SupabaseManager.client
-        .from(FishSch.linesTable)
-        .select()
-        .order(FishSch.lineName) as List<dynamic>;
-    return rows.map((r) => FishLine.fromMap(r as Map<String, dynamic>)).toList();
+    final rows =
+        await SupabaseManager.client
+                .from(FishSch.linesTable)
+                .select()
+                .order(FishSch.lineName)
+            as List<dynamic>;
+    return rows
+        .map((r) => FishLine.fromMap(r as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> upsertLine(FishLine line) async {

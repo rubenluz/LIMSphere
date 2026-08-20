@@ -39,18 +39,29 @@ String _resolvePlaceholders(String content, Map<String, dynamic> data) {
 /// printable dot count so no fractional-pixel scaling is needed in the raster loop.
 /// Height is always derived from [dpi] (300 DPI physical pitch for QL printers).
 Future<ui.Image> _renderLabelToImage(
-    LabelTemplate tpl, Map<String, dynamic> data, int dpi,
-    {bool floorHeight = false, int? printableW}) async {
+  LabelTemplate tpl,
+  Map<String, dynamic> data,
+  int dpi, {
+  bool floorHeight = false,
+  int? printableW,
+}) async {
   final pxPerMm = printableW != null ? printableW / tpl.labelW : dpi / 25.4;
   final w = printableW ?? (tpl.labelW * pxPerMm).ceil();
-  final hPxPerMm = dpi / 25.4;                                       // height always at real DPI
-  final h = floorHeight ? (tpl.labelH * hPxPerMm).floor() : (tpl.labelH * hPxPerMm).ceil();
+  final hPxPerMm = dpi / 25.4; // height always at real DPI
+  final h = floorHeight
+      ? (tpl.labelH * hPxPerMm).floor()
+      : (tpl.labelH * hPxPerMm).ceil();
 
   final recorder = ui.PictureRecorder();
-  final canvas = ui.Canvas(recorder, Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()));
+  final canvas = ui.Canvas(
+    recorder,
+    Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
+  );
 
-  canvas.drawRect(Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
-      ui.Paint()..color = const Color(0xFFFFFFFF));
+  canvas.drawRect(
+    Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
+    ui.Paint()..color = const Color(0xFFFFFFFF),
+  );
 
   if (tpl.topOffsetMm != 0) canvas.translate(0, -(tpl.topOffsetMm * pxPerMm));
 
@@ -59,7 +70,9 @@ Future<ui.Image> _renderLabelToImage(
     final y = f.y * pxPerMm;
     final fw = f.w * pxPerMm;
     final fh = f.h * pxPerMm;
-    final content = f.isPlaceholder ? _resolvePlaceholders(f.content, data) : f.content;
+    final content = f.isPlaceholder
+        ? _resolvePlaceholders(f.content, data)
+        : f.content;
 
     switch (f.type) {
       case LabelFieldType.text:
@@ -86,8 +99,14 @@ Future<ui.Image> _renderLabelToImage(
             data: content,
             version: QrVersions.auto,
             gapless: true,
-            eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF000000)),
-            dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Color(0xFF000000)),
+            eyeStyle: const QrEyeStyle(
+              eyeShape: QrEyeShape.square,
+              color: Color(0xFF000000),
+            ),
+            dataModuleStyle: const QrDataModuleStyle(
+              dataModuleShape: QrDataModuleShape.square,
+              color: Color(0xFF000000),
+            ),
           );
           canvas.save();
           canvas.translate(x, y);
@@ -98,8 +117,10 @@ Future<ui.Image> _renderLabelToImage(
       case LabelFieldType.barcode:
         _drawBarcodeOnCanvas(canvas, Rect.fromLTWH(x, y, fw, fh));
       case LabelFieldType.divider:
-        canvas.drawRect(Rect.fromLTWH(x, y + fh / 2, fw, 1.0),
-            ui.Paint()..color = f.color);
+        canvas.drawRect(
+          Rect.fromLTWH(x, y + fh / 2, fw, 1.0),
+          ui.Paint()..color = f.color,
+        );
       case LabelFieldType.image:
         break;
     }
@@ -111,13 +132,34 @@ Future<ui.Image> _renderLabelToImage(
 
 void _drawBarcodeOnCanvas(ui.Canvas canvas, Rect rect) {
   final paint = ui.Paint()..color = const Color(0xFF000000);
-  final widths = [2.0, 1.0, 3.0, 1.0, 2.0, 1.0, 1.0, 3.0, 2.0, 1.0, 2.0, 1.0, 3.0, 1.0, 2.0];
+  final widths = [
+    2.0,
+    1.0,
+    3.0,
+    1.0,
+    2.0,
+    1.0,
+    1.0,
+    3.0,
+    2.0,
+    1.0,
+    2.0,
+    1.0,
+    3.0,
+    1.0,
+    2.0,
+  ];
   final total = widths.fold(0.0, (a, b) => a + b);
   double x = rect.left;
   bool draw = true;
   for (final w in widths) {
     final barW = w / total * rect.width;
-    if (draw) { canvas.drawRect(Rect.fromLTWH(x, rect.top, barW - 0.5, rect.height), paint); }
+    if (draw) {
+      canvas.drawRect(
+        Rect.fromLTWH(x, rect.top, barW - 0.5, rect.height),
+        paint,
+      );
+    }
     x += barW;
     draw = !draw;
   }
@@ -133,7 +175,11 @@ void _drawBarcodeOnCanvas(ui.Canvas canvas, Rect rect) {
 Future<void> _sendViaUsb(String path, Uint8List data) async {
   if (Platform.isLinux || Platform.isMacOS) {
     final raf = await File(path).open(mode: FileMode.writeOnly);
-    try { await raf.writeFrom(data); } finally { await raf.close(); }
+    try {
+      await raf.writeFrom(data);
+    } finally {
+      await raf.close();
+    }
   } else if (Platform.isWindows) {
     final tmp = File('${Directory.systemTemp.path}\\bluelims_print.prn');
     final ps1 = File('${Directory.systemTemp.path}\\bluelims_print.ps1');
@@ -218,8 +264,16 @@ while ((Get-Date) -lt $deadline) {
     await ps1.writeAsBytes([0xEF, 0xBB, 0xBF, ...psScript.codeUnits]);
     try {
       final r = await Process.run('powershell', [
-        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-        '-File', ps1.path, '-dataFile', tmp.path, '-printerName', path,
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        ps1.path,
+        '-dataFile',
+        tmp.path,
+        '-printerName',
+        path,
       ]);
       final stdout = (r.stdout as String).trim();
       final stderr = (r.stderr as String).trim();
@@ -228,7 +282,9 @@ while ((Get-Date) -lt $deadline) {
       if (stderr.isNotEmpty) debugPrint('[PRINT] PS stderr:\n$stderr');
       if (r.exitCode != 0) {
         final msg = stderr.split('\n').first.trim();
-        throw Exception(msg.isNotEmpty ? msg : 'USB print failed (stdout: $stdout)');
+        throw Exception(
+          msg.isNotEmpty ? msg : 'USB print failed (stdout: $stdout)',
+        );
       }
     } finally {
       await tmp.delete().catchError((_) => tmp);
@@ -258,11 +314,10 @@ Future<_ConnState> _checkUsbPrinterConnection(String path) async {
           "  if (\$p.WorkOffline -eq \$true -or \$p.PrinterStatus -eq 7) { 'driver_only' } "
           "  else { 'ready' } "
           "} else { 'not_found' }";
-      final r = await Process.run(
-        'powershell',
-        ['-Command', script],
-        runInShell: true,
-      );
+      final r = await Process.run('powershell', [
+        '-Command',
+        script,
+      ], runInShell: true);
       final out = r.stdout.toString().trim();
       if (out.contains('ready')) return _ConnState.connected;
       if (out.contains('driver_only')) return _ConnState.driverOnly;
@@ -274,7 +329,10 @@ Future<_ConnState> _checkUsbPrinterConnection(String path) async {
   }
 }
 
-Future<_ConnState> _checkTcpPrinterConnection(String ipAddress, int port) async {
+Future<_ConnState> _checkTcpPrinterConnection(
+  String ipAddress,
+  int port,
+) async {
   try {
     final socket = await Socket.connect(
       ipAddress,
@@ -310,11 +368,18 @@ Future<_ConnState> _checkPrinterConnection(PrinterConfig cfg) async {
 
 /// Routes the print job to the selected driver.
 Future<void> _sendToPrinter(
-    LabelTemplate tpl, List<Map<String, dynamic>> records, PrinterConfig cfg) async {
-  debugPrint('[PRINT] protocol=${cfg.protocol} connection=${cfg.connectionType} '
-      'device="${cfg.deviceName}" usbPath="${cfg.usbPath}" ip=${cfg.ipAddress}');
-  debugPrint('[PRINT] template: ${tpl.labelW}x${tpl.labelH}mm DPI=${tpl.dpi} '
-      'continuous=${cfg.continuousRoll} cutMode=${tpl.cutMode} records=${records.length}');
+  LabelTemplate tpl,
+  List<Map<String, dynamic>> records,
+  PrinterConfig cfg,
+) async {
+  debugPrint(
+    '[PRINT] protocol=${cfg.protocol} connection=${cfg.connectionType} '
+    'device="${cfg.deviceName}" usbPath="${cfg.usbPath}" ip=${cfg.ipAddress}',
+  );
+  debugPrint(
+    '[PRINT] template: ${tpl.labelW}x${tpl.labelH}mm DPI=${tpl.dpi} '
+    'continuous=${cfg.continuousRoll} cutMode=${tpl.cutMode} records=${records.length}',
+  );
 
   if (cfg.protocol == 'brother_ql_legacy') {
     await _printBrotherQl570(tpl, records, cfg);

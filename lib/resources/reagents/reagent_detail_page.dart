@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+
 import '../../backups/backup_service.dart';
 import '../../supabase/supabase_manager.dart';
 import '/theme/theme.dart';
@@ -63,6 +64,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   String _contamination = 'none';
   String? _physicalState;
   String? _storageTemp;
+  int? _roomId;
   int? _locationId;
   DateTime? _expiryDate;
   DateTime? _receivedDate;
@@ -139,7 +141,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
             .from('storage_locations')
             .select(
               'location_id, location_name, location_type, '
-              'location_parent_id, location_sort_order',
+              'location_code, location_parent_id, location_sort_order',
             )
             .order('location_name'),
       ]);
@@ -188,7 +190,24 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
         _contamination = reagent.contamination;
         _physicalState = reagent.physicalState;
         _storageTemp = reagent.storageTemp;
-        _locationId = reagent.locationId;
+        final orderedLocations = _orderLocationsHierarchically(
+          List<Map<String, dynamic>>.from(locRows),
+        );
+        Map<String, dynamic>? selectedLocation;
+        for (final location in orderedLocations) {
+          if ((location['location_id'] as num).toInt() == reagent.locationId) {
+            selectedLocation = location;
+            break;
+          }
+        }
+        if ((selectedLocation?['location_type'] as String?) == null ||
+            (selectedLocation?['location_type'] as String?) == 'room') {
+          _roomId = reagent.locationId;
+          _locationId = null;
+        } else {
+          _roomId = (selectedLocation?['location_parent_id'] as num?)?.toInt();
+          _locationId = reagent.locationId;
+        }
         _expiryDate = reagent.expiryDate;
         _receivedDate = reagent.receivedDate;
         _openedDate = reagent.openedDate;
@@ -196,9 +215,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
 
         setState(() {
           _reagent = reagent;
-          _allLocations = _orderLocationsHierarchically(
-            List<Map<String, dynamic>>.from(locRows),
-          );
+          _allLocations = orderedLocations;
           _loading = false;
         });
       }
@@ -228,13 +245,22 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     }
 
     final rooms =
-        rows.where((r) => (r['location_type'] as String?) == 'room').toList()
+        rows
+            .where(
+              (r) =>
+                  (r['location_type'] as String?) == null ||
+                  (r['location_type'] as String?) == 'room',
+            )
+            .toList()
           ..sort(cmp);
     final roomIds = {for (final r in rooms) (r['location_id'] as num).toInt()};
     final childrenByRoom = <int, List<Map<String, dynamic>>>{};
     final orphans = <Map<String, dynamic>>[];
     for (final r in rows) {
-      if ((r['location_type'] as String?) == 'room') continue;
+      if ((r['location_type'] as String?) == null ||
+          (r['location_type'] as String?) == 'room') {
+        continue;
+      }
       final pid = r['location_parent_id'] != null
           ? (r['location_parent_id'] as num).toInt()
           : null;
@@ -252,13 +278,16 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     final out = <Map<String, dynamic>>[];
     for (var i = 0; i < rooms.length; i++) {
       final room = rooms[i];
-      out.add({...room, '_display': 'R${i + 1} — ${room['location_name']}'});
+      final roomCode = room['location_code']?.toString() ?? 'R${i + 1}';
+      out.add({...room, '_display': '$roomCode — ${room['location_name']}'});
       final kids =
           childrenByRoom[(room['location_id'] as num).toInt()] ?? const [];
       for (var j = 0; j < kids.length; j++) {
+        final locationCode =
+            kids[j]['location_code']?.toString() ?? 'L${i + 1}.${j + 1}';
         out.add({
           ...kids[j],
-          '_display': 'L${i + 1}.${j + 1} — ${kids[j]['location_name']}',
+          '_display': '$locationCode — ${kids[j]['location_name']}',
         });
       }
     }
@@ -268,7 +297,28 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
     return out;
   }
 
+  List<Map<String, dynamic>> get _rooms => _allLocations
+      .where(
+        (location) =>
+            location['location_type'] == null ||
+            location['location_type'] == 'room',
+      )
+      .toList();
+
+  List<Map<String, dynamic>> get _locationsInSelectedRoom {
+    if (_roomId == null) return const [];
+    return _allLocations
+        .where(
+          (location) =>
+              location['location_type'] != null &&
+              location['location_type'] != 'room' &&
+              (location['location_parent_id'] as num?)?.toInt() == _roomId,
+        )
+        .toList();
+  }
+
   Future<void> _save() async {
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
     if (_codeCtrl.text.trim().isEmpty) {
       _snack('Code is required');
       return;
@@ -321,7 +371,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
             ? null
             : _unitCtrl.text.trim(),
         'reagent_storage_temp': _storageTemp,
-        'reagent_location_id': _locationId,
+        'reagent_location_id': _locationId ?? _roomId,
         'reagent_position': _positionCtrl.text.trim().isEmpty
             ? null
             : _positionCtrl.text.trim(),
@@ -378,6 +428,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   }
 
   Future<void> _delete() async {
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -572,8 +623,11 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
 
   Widget _buildBody(BuildContext context, ReagentModel r) {
     final accent = _categoryAccent[r.category] ?? AppDS.accent;
-    final qrData =
-        'bluelims://${SupabaseManager.projectRef ?? 'local'}/reagents/${r.id}';
+    final qrData = QrRules.build(
+      SupabaseManager.projectRef ?? 'local',
+      'reagents',
+      r.id,
+    );
 
     return SingleChildScrollView(
       child: Column(
@@ -1070,8 +1124,8 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
               onChanged: (v) => setState(() => _storageTemp = v),
             ),
             _InlineDropdown<int?>(
-              label: 'Location',
-              value: _locationId,
+              label: 'Room',
+              value: _roomId,
               readOnly: ro,
               items: [
                 DropdownMenuItem<int?>(
@@ -1084,7 +1138,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
                     ),
                   ),
                 ),
-                ..._allLocations.map(
+                ..._rooms.map(
                   (l) => DropdownMenuItem<int?>(
                     value: (l['location_id'] as num).toInt(),
                     child: Text(
@@ -1098,12 +1152,55 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
                   ),
                 ),
               ],
-              onChanged: (v) => setState(() => _locationId = v),
+              onChanged: (v) => setState(() {
+                _roomId = v;
+                _locationId = null;
+                _positionCtrl.clear();
+              }),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _FieldRow(
+          children: [
+            _InlineDropdown<int?>(
+              label: 'Location',
+              value: _locationId,
+              readOnly: ro || _roomId == null,
+              items: [
+                DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text(
+                    _roomId == null ? 'Select a room first' : '/',
+                    style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextMuted,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                ..._locationsInSelectedRoom.map(
+                  (location) => DropdownMenuItem<int?>(
+                    value: (location['location_id'] as num).toInt(),
+                    child: Text(
+                      (location['_display'] as String?) ??
+                          (location['location_name'] as String),
+                      style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextPrimary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: (value) => setState(() {
+                _locationId = value;
+                _positionCtrl.clear();
+              }),
             ),
             _InlineField(
-              label: 'Position',
+              label: 'Exact position',
               controller: _positionCtrl,
-              readOnly: ro,
+              readOnly: ro || _roomId == null,
             ),
           ],
         ),
@@ -1253,7 +1350,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
 
   void _showQr(ReagentModel r) {
     final ref = SupabaseManager.projectRef ?? 'local';
-    final data = 'bluelims://$ref/reagents/${r.id}';
+    final data = QrRules.build(ref, 'reagents', r.id);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

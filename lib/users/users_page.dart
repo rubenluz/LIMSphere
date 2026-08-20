@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '/core/data_cache.dart';
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
@@ -291,6 +292,7 @@ class _UsersPageState extends State<UsersPage> {
   String? _filterStatus;
   String _sortKey = 'user_name';
   bool _sortAsc = true;
+  final Set<int> _deletingUserIds = {};
 
   final _searchCtrl = TextEditingController();
   final _listCtrl = ScrollController();
@@ -442,6 +444,10 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _commit(_User u, String dbCol, dynamic value) async {
+    final action = dbCol == 'user_status' && value == 'active'
+        ? ModuleAction.approve
+        : ModuleAction.edit;
+    if (!context.requireModuleAction(action)) return;
     try {
       await Supabase.instance.client
           .from('users')
@@ -456,6 +462,10 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _commitDropdown(_User u, String key, String val) async {
+    final action = key == 'user_status' && val == 'active'
+        ? ModuleAction.approve
+        : ModuleAction.edit;
+    if (!context.requireModuleAction(action)) return;
     setState(() {
       _applyLocalDrop(u, key, val);
     });
@@ -492,9 +502,85 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _quickAccept(_User u) async {
+    if (!context.requireModuleAction(ModuleAction.approve)) return;
     setState(() => u.status = 'active');
     await _commit(u, 'user_status', 'active');
     _snack('${u.displayName} activated');
+  }
+
+  bool _isCurrentUser(_User u) {
+    final authUser = Supabase.instance.client.auth.currentUser;
+    if (authUser == null) return false;
+    if (u.authUid?.isNotEmpty == true && u.authUid == authUser.id) return true;
+    return u.email.trim().toLowerCase() ==
+        (authUser.email ?? '').trim().toLowerCase();
+  }
+
+  Future<void> _deleteUser(_User u) async {
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
+    if (_isCurrentUser(u)) {
+      _snack('You cannot delete your own account.', isError: true);
+      return;
+    }
+    final superadminCount = _users
+        .where((user) => user.role == 'superadmin')
+        .length;
+    if (u.role == 'superadmin' && superadminCount <= 1) {
+      _snack('The final superadmin cannot be deleted.', isError: true);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.delete_forever_outlined, color: AppDS.red),
+        title: const Text('Delete this user?'),
+        content: Text(
+          'Are you sure you want to delete ${u.displayName} '
+          '(${u.email}) from LIMSphere?\n\n'
+          'This cannot be undone. Historical records that refer to this user '
+          'may prevent the deletion.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.delete_outline, size: 18),
+            label: const Text('Delete user'),
+            style: FilledButton.styleFrom(backgroundColor: AppDS.red),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingUserIds.add(u.id));
+    try {
+      final deleted = await Supabase.instance.client
+          .from('users')
+          .delete()
+          .eq('user_id', u.id)
+          .select('user_id');
+      if ((deleted as List).isEmpty) {
+        throw Exception('The database did not delete the user.');
+      }
+      _users.removeWhere((user) => user.id == u.id);
+      await DataCache.clear('users');
+      if (!mounted) return;
+      _applyFilter();
+      _snack('${u.displayName} was deleted.');
+    } catch (error) {
+      _snack(
+        'Could not delete ${u.displayName}. The user may still be linked to '
+        'existing records. You can set their status to inactive instead.\n$error',
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _deletingUserIds.remove(u.id));
+    }
   }
 
   Future<void> _showMenuPicker(
@@ -587,8 +673,9 @@ class _UsersPageState extends State<UsersPage> {
   void _openDetail(_User u) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => UserDetailPage(userMap: u.toMap(), onSaved: _load),
+      modulePageRoute(
+        context: context,
+        child: UserDetailPage(userMap: u.toMap(), onSaved: _load),
       ),
     );
   }
@@ -726,13 +813,13 @@ class _UsersPageState extends State<UsersPage> {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       child: Scrollbar(
         controller: _listCtrl,
         child: ListView.separated(
           controller: _listCtrl,
           itemCount: _filtered.length,
-          separatorBuilder: (_, index) => const SizedBox(height: 12),
+          separatorBuilder: (_, index) => const SizedBox(height: 6),
           itemBuilder: (_, i) => _buildUserCard(_filtered[i]),
         ),
       ),
@@ -994,171 +1081,198 @@ class _UsersPageState extends State<UsersPage> {
   Widget _buildUserCard(_User u) {
     final roleColor = _roleColor(u.role);
     final isPending = u.status == 'pending';
+    final canManage = context.canEditModule;
+    final isCurrentUser = _isCurrentUser(u);
+    final isDeleting = _deletingUserIds.contains(u.id);
     final borderColor = isPending
         ? AppDS.orange.withValues(alpha: 0.36)
         : context.appBorder;
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appSurface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: context.isDark ? 0.16 : 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+    final affiliation = [
+      if (u.institution?.trim().isNotEmpty == true) u.institution!.trim(),
+      if (u.group?.trim().isNotEmpty == true) u.group!.trim(),
+    ].join('  •  ');
+
+    final avatar = CircleAvatar(
+      radius: 19,
+      backgroundColor: roleColor.withValues(alpha: 0.16),
+      backgroundImage: u.avatarUrl?.trim().isNotEmpty == true
+          ? NetworkImage(u.avatarUrl!.trim())
+          : null,
+      child: u.avatarUrl?.trim().isNotEmpty == true
+          ? null
+          : Text(
+              u.initials,
+              style: _spaceGrotesk(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: roleColor,
+              ),
+            ),
+    );
+    final identity = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          u.displayName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _spaceGrotesk(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: context.appTextPrimary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          u.email,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _jetBrainsMono(
+            fontSize: 10.5,
+            color: context.appTextSecondary,
+          ),
+        ),
+        if (affiliation.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            affiliation,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _spaceGrotesk(fontSize: 10.5, color: context.appTextMuted),
           ),
         ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(18),
+      ],
+    );
+    final badges = Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _headerBadge(
+          u.role,
+          roleColor,
+          icon: Icons.shield_outlined,
+          onTapDown: canManage
+              ? (details) => _showMenuPicker(
+                  u,
+                  'user_role',
+                  _roleOptions.toList(),
+                  details.globalPosition,
+                )
+              : null,
+        ),
+        _headerBadge(
+          u.status,
+          _statusColor(u.status),
+          onTapDown: canManage
+              ? (details) => _showMenuPicker(
+                  u,
+                  'user_status',
+                  _statusOptions.toList(),
+                  details.globalPosition,
+                )
+              : null,
+        ),
+        Tooltip(
+          message: _permissionsTooltip(u),
+          child: _summaryChip('Access', _overviewPermission(u)),
+        ),
+        if (isPending && canManage)
+          TextButton.icon(
+            onPressed: () => _quickAccept(u),
+            icon: const Icon(Icons.check_rounded, size: 14),
+            label: const Text('Activate'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppDS.green,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              textStyle: _spaceGrotesk(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
               ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  roleColor.withValues(alpha: context.isDark ? 0.22 : 0.15),
-                  isPending
-                      ? AppDS.orange.withValues(
-                          alpha: context.isDark ? 0.14 : 0.10,
-                        )
-                      : context.appSurface2,
-                ],
-              ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: roleColor.withValues(alpha: 0.16),
-                  backgroundImage: u.avatarUrl?.trim().isNotEmpty == true
-                      ? NetworkImage(u.avatarUrl!.trim())
-                      : null,
-                  child: u.avatarUrl?.trim().isNotEmpty == true
-                      ? null
-                      : Text(
-                          u.initials,
-                          style: _spaceGrotesk(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: roleColor,
-                          ),
-                        ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        u.displayName,
-                        style: _spaceGrotesk(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: context.appTextPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        u.email,
-                        style: _jetBrainsMono(
-                          fontSize: 11,
-                          color: context.appTextSecondary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (u.institution?.isNotEmpty == true)
-                            _headerBadge(
-                              u.institution!,
-                              context.appTextSecondary,
-                            ),
-                          if (u.group?.isNotEmpty == true)
-                            _headerBadge(u.group!, AppDS.accent),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Tooltip(
-                  message: 'Open full user profile',
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: () => _openDetail(u),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: context.appSurface.withValues(alpha: 0.82),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: context.appBorder),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.launch_rounded,
-                            size: 14,
-                            color: context.appTextSecondary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Profile',
-                            style: _spaceGrotesk(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: context.appTextSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: LayoutBuilder(
-              builder: (ctx, box) {
-                final stacked = box.maxWidth < 760;
-                final identity = _buildIdentityPanel(u);
-                final access = _buildAccessPanel(u);
-                if (stacked) {
-                  return Column(
-                    children: [identity, const SizedBox(height: 12), access],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      ],
+    );
+    final deleteButton = Tooltip(
+      message: isCurrentUser ? 'You cannot delete yourself' : 'Delete user',
+      child: IconButton(
+        onPressed: isCurrentUser || isDeleting ? null : () => _deleteUser(u),
+        visualDensity: VisualDensity.compact,
+        icon: isDeleting
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.delete_outline_rounded, size: 18),
+        color: AppDS.red,
+      ),
+    );
+
+    return Material(
+      color: context.appSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: borderColor),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openDetail(u),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: LayoutBuilder(
+            builder: (_, box) {
+              if (box.maxWidth < 700) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(child: identity),
-                    const SizedBox(width: 12),
-                    Expanded(child: access),
+                    Row(
+                      children: [
+                        avatar,
+                        const SizedBox(width: 10),
+                        Expanded(child: identity),
+                        if (context.canDeleteModule) deleteButton,
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: context.appTextMuted,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Align(alignment: Alignment.centerLeft, child: badges),
                   ],
                 );
-              },
-            ),
+              }
+              return Row(
+                children: [
+                  avatar,
+                  const SizedBox(width: 11),
+                  Expanded(flex: 3, child: identity),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 2, child: badges),
+                  const SizedBox(width: 8),
+                  if (context.canDeleteModule) deleteButton,
+                  Tooltip(
+                    message: 'Open full user profile',
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: context.appTextMuted,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
-        ],
+        ),
       ),
     );
   }
 
+  // Kept as the expanded profile-card implementation for potential reuse.
+  // ignore: unused_element
   Widget _buildIdentityPanel(_User u) {
     final facts = <({String label, String value, bool mono})>[
       (label: 'Email', value: u.email, mono: true),
@@ -1218,6 +1332,8 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
+  // Kept with the expanded identity panel above.
+  // ignore: unused_element
   Widget _buildAccessPanel(_User u) {
     final canManage = context.canEditModule;
     final isAdminLike = u.role == 'superadmin' || u.role == 'admin';

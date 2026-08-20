@@ -6,7 +6,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '../../theme/theme.dart';
 
 class MaintenanceOverviewWidget extends StatefulWidget {
@@ -43,7 +45,8 @@ class _MaintenanceOverviewWidgetState extends State<MaintenanceOverviewWidget> {
     try {
       final data = await Supabase.instance.client
           .from('water_qc_maintenance')
-          .select();
+          .select()
+          .eq('is_monitored', true);
       if (!mounted) return;
       setState(() {
         _items = List<Map<String, dynamic>>.from(data);

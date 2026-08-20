@@ -13,6 +13,7 @@ import 'dart:math' as math;
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,6 +22,7 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 import '/menu/app_nav.dart';
@@ -51,7 +53,16 @@ part 'print/label_print_filters.dart';
 part 'print/label_print_records.dart';
 part 'print/label_quick_print_dialog.dart';
 
-const _kPaperSizes = ['62x30', '62x100', '62x29', '29x62', '29x90', '38x90', '54x29', '23x23'];
+const _kPaperSizes = [
+  '62x30',
+  '62x100',
+  '62x29',
+  '29x62',
+  '29x90',
+  '38x90',
+  '54x29',
+  '23x23',
+];
 
 /// Printer reachability states — finer-grained than a simple bool so we can
 /// distinguish "driver installed but printer offline/not connected" from
@@ -59,7 +70,12 @@ const _kPaperSizes = ['62x30', '62x100', '62x29', '29x62', '29x90', '38x90', '54
 enum _ConnState { checking, connected, driverOnly, unreachable }
 
 /// Drag-and-drop payload: a DB field chip dragged from the fields panel onto the canvas.
-typedef _FieldSpec = ({String key, String label, LabelFieldType type, bool isPlaceholder});
+typedef _FieldSpec = ({
+  String key,
+  String label,
+  LabelFieldType type,
+  bool isPlaceholder,
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data models
@@ -70,13 +86,13 @@ enum LabelFieldType { text, barcode, qrcode, divider, image }
 class LabelField {
   final String id;
   LabelFieldType type;
-  String content;      // static text OR field key like '{strain_code}'
+  String content; // static text OR field key like '{strain_code}'
   double x, y, w, h;
   double fontSize;
   FontWeight fontWeight;
   TextAlign textAlign;
   Color color;
-  bool isPlaceholder;  // true = bound to a real DB field
+  bool isPlaceholder; // true = bound to a real DB field
 
   LabelField({
     required this.id,
@@ -96,7 +112,10 @@ class LabelField {
   LabelField copyWith({
     LabelFieldType? type,
     String? content,
-    double? x, double? y, double? w, double? h,
+    double? x,
+    double? y,
+    double? w,
+    double? h,
     double? fontSize,
     FontWeight? fontWeight,
     TextAlign? textAlign,
@@ -107,7 +126,10 @@ class LabelField {
       id: id,
       type: type ?? this.type,
       content: content ?? this.content,
-      x: x ?? this.x, y: y ?? this.y, w: w ?? this.w, h: h ?? this.h,
+      x: x ?? this.x,
+      y: y ?? this.y,
+      w: w ?? this.w,
+      h: h ?? this.h,
       fontSize: fontSize ?? this.fontSize,
       fontWeight: fontWeight ?? this.fontWeight,
       textAlign: textAlign ?? this.textAlign,
@@ -118,15 +140,25 @@ class LabelField {
 
   // FontWeight index → instance (w100=0 … w900=8)
   static const _kFontWeights = [
-    FontWeight.w100, FontWeight.w200, FontWeight.w300, FontWeight.w400,
-    FontWeight.w500, FontWeight.w600, FontWeight.w700, FontWeight.w800, FontWeight.w900,
+    FontWeight.w100,
+    FontWeight.w200,
+    FontWeight.w300,
+    FontWeight.w400,
+    FontWeight.w500,
+    FontWeight.w600,
+    FontWeight.w700,
+    FontWeight.w800,
+    FontWeight.w900,
   ];
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'type': type.name,
     'content': content,
-    'x': x, 'y': y, 'w': w, 'h': h,
+    'x': x,
+    'y': y,
+    'w': w,
+    'h': h,
     'fontSize': fontSize,
     'fontWeight': _kFontWeights.indexOf(fontWeight).clamp(0, 8),
     'textAlign': textAlign.index,
@@ -136,16 +168,23 @@ class LabelField {
 
   factory LabelField.fromJson(Map<String, dynamic> j) => LabelField(
     id: j['id'] as String,
-    type: LabelFieldType.values.firstWhere((e) => e.name == j['type'],
-        orElse: () => LabelFieldType.text),
+    type: LabelFieldType.values.firstWhere(
+      (e) => e.name == j['type'],
+      orElse: () => LabelFieldType.text,
+    ),
     content: j['content'] as String? ?? '',
     x: (j['x'] as num).toDouble(),
     y: (j['y'] as num).toDouble(),
     w: (j['w'] as num).toDouble(),
     h: (j['h'] as num).toDouble(),
     fontSize: (j['fontSize'] as num).toDouble(),
-    fontWeight: LabelField._kFontWeights[((j['fontWeight'] as int?) ?? 3).clamp(0, 8)],
-    textAlign: TextAlign.values[((j['textAlign'] as int?) ?? 0).clamp(0, TextAlign.values.length - 1)],
+    fontWeight:
+        LabelField._kFontWeights[((j['fontWeight'] as int?) ?? 3).clamp(0, 8)],
+    textAlign:
+        TextAlign.values[((j['textAlign'] as int?) ?? 0).clamp(
+          0,
+          TextAlign.values.length - 1,
+        )],
     color: Color((j['color'] as int?) ?? 0xFF000000),
     isPlaceholder: j['isPlaceholder'] as bool? ?? false,
   );
@@ -154,18 +193,19 @@ class LabelField {
 class LabelTemplate {
   String id;
   String name;
-  String category;     // 'Strains' | 'Reagents' | 'Equipment' | 'Samples' | 'General'
-  double labelW;       // mm
-  double labelH;       // mm
+  String
+  category; // 'Strains' | 'Reagents' | 'Equipment' | 'Samples' | 'General'
+  double labelW; // mm
+  double labelH; // mm
   List<LabelField> fields;
   // Per-template print settings
-  String paperSize;    // '62x30' | '62x100' etc.
-  int dpi;             // 300 | 600
-  String cutMode;      // 'none' | 'between' | 'end'
+  String paperSize; // '62x30' | '62x100' etc.
+  int dpi; // 300 | 600
+  String cutMode; // 'none' | 'between' | 'end'
   bool halfCut;
-  bool rotate;         // 90°
+  bool rotate; // 90°
   int copies;
-  double topOffsetMm;  // shift content up by this many mm to compensate for printer top feed
+  double topOffsetMm; // shift content up by this many mm to compensate for printer top feed
 
   LabelTemplate({
     required this.id,
@@ -184,10 +224,18 @@ class LabelTemplate {
   }) : fields = fields ?? [];
 
   LabelTemplate clone() => LabelTemplate(
-    id: id, name: name, category: category, labelW: labelW, labelH: labelH,
+    id: id,
+    name: name,
+    category: category,
+    labelW: labelW,
+    labelH: labelH,
     fields: fields.map((f) => f.copyWith()).toList(),
-    paperSize: paperSize, dpi: dpi, cutMode: cutMode,
-    halfCut: halfCut, rotate: rotate, copies: copies,
+    paperSize: paperSize,
+    dpi: dpi,
+    cutMode: cutMode,
+    halfCut: halfCut,
+    rotate: rotate,
+    copies: copies,
     topOffsetMm: topOffsetMm,
   );
 
@@ -212,7 +260,8 @@ class LabelTemplate {
     final rawFields = row['tpl_fields'] as List<dynamic>? ?? [];
     // Migrate from old bool tpl_auto_cut if tpl_cut_mode not yet stored.
     final cutModeRaw = row['tpl_cut_mode'] as String?;
-    final cutMode = cutModeRaw ??
+    final cutMode =
+        cutModeRaw ??
         ((row['tpl_auto_cut'] as bool? ?? true) ? 'between' : 'none');
     return LabelTemplate(
       id: row['tpl_id'] as String,
@@ -236,12 +285,12 @@ class LabelTemplate {
 }
 
 class PrinterConfig {
-  String protocol;         // 'zpl' | 'brother_ql' | 'brother_ql_legacy'
-  String connectionType;   // 'usb' | 'wifi' | 'bluetooth'
+  String protocol; // 'zpl' | 'brother_ql' | 'brother_ql_legacy'
+  String connectionType; // 'usb' | 'wifi' | 'bluetooth'
   String deviceName;
   String ipAddress;
-  String usbPath;          // '/dev/usb/lp0' on Linux/macOS, printer name on Windows
-  bool   continuousRoll;   // true = continuous roll, false = die-cut pre-sized
+  String usbPath; // '/dev/usb/lp0' on Linux/macOS, printer name on Windows
+  bool continuousRoll; // true = continuous roll, false = die-cut pre-sized
 
   PrinterConfig({
     this.protocol = 'zpl',
@@ -258,16 +307,16 @@ class PrinterConfig {
 class PrinterProfile {
   String id;
   String name;
-  String protocol;         // 'zpl' | 'brother_ql' | 'brother_ql_legacy'
-  String connectionType;   // 'usb' | 'wifi' | 'bluetooth'
+  String protocol; // 'zpl' | 'brother_ql' | 'brother_ql_legacy'
+  String connectionType; // 'usb' | 'wifi' | 'bluetooth'
   String deviceName;
   String ipAddress;
   String usbPath;
-  int    dpi;              // 300 | 600
-  String cutMode;          // 'none' | 'between' | 'end'
-  bool   halfCut;
-  bool   continuousRoll;   // true = continuous roll, false = die-cut pre-sized
-  double topOffsetMm;      // shift content up by this many mm to compensate for printer top feed
+  int dpi; // 300 | 600
+  String cutMode; // 'none' | 'between' | 'end'
+  bool halfCut;
+  bool continuousRoll; // true = continuous roll, false = die-cut pre-sized
+  double topOffsetMm; // shift content up by this many mm to compensate for printer top feed
 
   PrinterProfile({
     String? id,
@@ -286,42 +335,55 @@ class PrinterProfile {
 
   /// Returns a bare PrinterConfig for driver routing.
   PrinterConfig toPrinterConfig() => PrinterConfig(
-    protocol: protocol, connectionType: connectionType,
-    deviceName: deviceName, ipAddress: ipAddress, usbPath: usbPath,
+    protocol: protocol,
+    connectionType: connectionType,
+    deviceName: deviceName,
+    ipAddress: ipAddress,
+    usbPath: usbPath,
     continuousRoll: continuousRoll,
   );
 
   /// Stamps this profile's quality settings onto a template clone for printing.
   LabelTemplate applyTo(LabelTemplate tpl) {
     final c = tpl.clone();
-    c.dpi = dpi; c.cutMode = cutMode; c.halfCut = halfCut;
+    c.dpi = dpi;
+    c.cutMode = cutMode;
+    c.halfCut = halfCut;
     c.topOffsetMm = topOffsetMm;
     return c;
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id, 'name': name, 'protocol': protocol,
-    'connectionType': connectionType, 'deviceName': deviceName,
-    'ipAddress': ipAddress, 'usbPath': usbPath,
-    'dpi': dpi, 'cutMode': cutMode, 'halfCut': halfCut,
-    'continuousRoll': continuousRoll, 'topOffsetMm': topOffsetMm,
+    'id': id,
+    'name': name,
+    'protocol': protocol,
+    'connectionType': connectionType,
+    'deviceName': deviceName,
+    'ipAddress': ipAddress,
+    'usbPath': usbPath,
+    'dpi': dpi,
+    'cutMode': cutMode,
+    'halfCut': halfCut,
+    'continuousRoll': continuousRoll,
+    'topOffsetMm': topOffsetMm,
   };
 
   factory PrinterProfile.fromJson(Map<String, dynamic> j) => PrinterProfile(
-    id:             j['id']             as String?,
-    name:           j['name']           as String? ?? 'Printer',
-    protocol:       j['protocol']       as String? ?? 'zpl',
+    id: j['id'] as String?,
+    name: j['name'] as String? ?? 'Printer',
+    protocol: j['protocol'] as String? ?? 'zpl',
     connectionType: j['connectionType'] as String? ?? 'usb',
-    deviceName:     j['deviceName']     as String? ?? 'Zebra ZD421',
-    ipAddress:      j['ipAddress']      as String? ?? '192.168.1.100',
-    usbPath:        j['usbPath']        as String? ?? '',
-    dpi:            j['dpi']            as int?    ?? 300,
+    deviceName: j['deviceName'] as String? ?? 'Zebra ZD421',
+    ipAddress: j['ipAddress'] as String? ?? '192.168.1.100',
+    usbPath: j['usbPath'] as String? ?? '',
+    dpi: j['dpi'] as int? ?? 300,
     // Migrate from old autoCut bool if cutMode not yet stored.
-    cutMode:        j['cutMode'] as String? ??
-                    ((j['autoCut'] as bool? ?? true) ? 'between' : 'none'),
-    halfCut:        j['halfCut']        as bool?   ?? false,
-    continuousRoll: j['continuousRoll'] as bool?   ?? true,
-    topOffsetMm:    (j['topOffsetMm']   as num?)?.toDouble() ?? 0.0,
+    cutMode:
+        j['cutMode'] as String? ??
+        ((j['autoCut'] as bool? ?? true) ? 'between' : 'none'),
+    halfCut: j['halfCut'] as bool? ?? false,
+    continuousRoll: j['continuousRoll'] as bool? ?? true,
+    topOffsetMm: (j['topOffsetMm'] as num?)?.toDouble() ?? 0.0,
   );
 }
 
@@ -331,58 +393,58 @@ class PrinterProfile {
 
 const _kFieldsByCategory = <String, List<({String key, String label})>>{
   'Strains': [
-    (key: '{__qr__}',               label: 'QR Code'),
-    (key: '{strain_code}',          label: 'Strain Code'),
-    (key: '{strain_status}',        label: 'Status'),
-    (key: '{strain_species}',       label: 'Species'),
-    (key: '{strain_genus}',         label: 'Genus'),
-    (key: '{strain_medium}',        label: 'Medium'),
-    (key: '{strain_room}',          label: 'Room'),
+    (key: '{__qr__}', label: 'QR Code'),
+    (key: '{strain_code}', label: 'Strain Code'),
+    (key: '{strain_status}', label: 'Status'),
+    (key: '{strain_species}', label: 'Species'),
+    (key: '{strain_genus}', label: 'Genus'),
+    (key: '{strain_medium}', label: 'Medium'),
+    (key: '{strain_room}', label: 'Room'),
     (key: '{strain_next_transfer}', label: 'Next Transfer'),
-    (key: '{s_island}',             label: 'Island (Origin)'),
-    (key: '{s_country}',            label: 'Country'),
+    (key: '{s_island}', label: 'Island (Origin)'),
+    (key: '{s_country}', label: 'Country'),
   ],
   'Reagents': [
-    (key: '{__qr__}',                label: 'QR Code'),
-    (key: '{reagent_code}',          label: 'Reagent Code'),
-    (key: '{reagent_name}',          label: 'Name'),
-    (key: '{reagent_lot}',           label: 'Lot Number'),
-    (key: '{reagent_expiry}',        label: 'Expiry Date'),
-    (key: '{reagent_supplier}',      label: 'Supplier'),
-    (key: '{reagent_location}',      label: 'Storage Location'),
+    (key: '{__qr__}', label: 'QR Code'),
+    (key: '{reagent_code}', label: 'Reagent Code'),
+    (key: '{reagent_name}', label: 'Name'),
+    (key: '{reagent_lot}', label: 'Lot Number'),
+    (key: '{reagent_expiry}', label: 'Expiry Date'),
+    (key: '{reagent_supplier}', label: 'Supplier'),
+    (key: '{reagent_location}', label: 'Storage Location'),
     (key: '{reagent_concentration}', label: 'Concentration'),
   ],
   'Equipment': [
-    (key: '{__qr__}',              label: 'QR Code'),
-    (key: '{eq_code}',             label: 'Equipment Code'),
-    (key: '{eq_name}',             label: 'Name'),
-    (key: '{eq_serial}',           label: 'Serial Number'),
-    (key: '{eq_location}',         label: 'Location'),
-    (key: '{eq_calibration_due}',  label: 'Calibration Due'),
-    (key: '{eq_status}',           label: 'Status'),
+    (key: '{__qr__}', label: 'QR Code'),
+    (key: '{eq_code}', label: 'Equipment Code'),
+    (key: '{eq_name}', label: 'Name'),
+    (key: '{eq_serial}', label: 'Serial Number'),
+    (key: '{eq_location}', label: 'Location'),
+    (key: '{eq_calibration_due}', label: 'Calibration Due'),
+    (key: '{eq_status}', label: 'Status'),
   ],
   'Samples': [
-    (key: '{sample_code}',    label: 'Sample Code'),
-    (key: '{sample_type}',    label: 'Sample Type'),
-    (key: '{sample_date}',    label: 'Collection Date'),
-    (key: '{sample_origin}',  label: 'Origin'),
+    (key: '{sample_code}', label: 'Sample Code'),
+    (key: '{sample_type}', label: 'Sample Type'),
+    (key: '{sample_date}', label: 'Collection Date'),
+    (key: '{sample_origin}', label: 'Origin'),
     (key: '{sample_storage}', label: 'Storage'),
-    (key: '{sample_status}',  label: 'Status'),
+    (key: '{sample_status}', label: 'Status'),
   ],
   'Stocks': [
-    (key: '{fish_stocks_tank_id}',      label: 'Tank ID'),
-    (key: '{fish_stocks_line}',         label: 'Line'),
-    (key: '{fish_stocks_males}',        label: 'Males'),
-    (key: '{fish_stocks_females}',      label: 'Females'),
-    (key: '{fish_stocks_juveniles}',    label: 'Juveniles'),
-    (key: '{fish_stocks_status}',       label: 'Status'),
-    (key: '{fish_stocks_responsible}',  label: 'Responsible'),
+    (key: '{fish_stocks_tank_id}', label: 'Tank ID'),
+    (key: '{fish_stocks_line}', label: 'Line'),
+    (key: '{fish_stocks_males}', label: 'Males'),
+    (key: '{fish_stocks_females}', label: 'Females'),
+    (key: '{fish_stocks_juveniles}', label: 'Juveniles'),
+    (key: '{fish_stocks_status}', label: 'Status'),
+    (key: '{fish_stocks_responsible}', label: 'Responsible'),
     (key: '{fish_stocks_arrival_date}', label: 'Arrival Date'),
   ],
   'General': [
-    (key: '{code}',  label: 'Code'),
-    (key: '{name}',  label: 'Name'),
-    (key: '{date}',  label: 'Date'),
+    (key: '{code}', label: 'Code'),
+    (key: '{name}', label: 'Name'),
+    (key: '{date}', label: 'Date'),
     (key: '{notes}', label: 'Notes'),
   ],
 };
@@ -397,7 +459,10 @@ List<({String key, String label})> _fieldsForCategory(String category) =>
 const _kAllColsByCategory = <String, List<String>>{
   'Strains': [
     '__qr__', 'strain_code', 'strain_status', 'strain_origin',
-    'strain_situation', 'strain_toxins', 'strain_public', 'strain_private_collection',
+    'strain_situation',
+    'strain_toxins',
+    'strain_public',
+    'strain_private_collection',
     'strain_type_strain', 'strain_last_checked', 'strain_biosafety_level',
     'strain_access_conditions', 'strain_other_codes',
     'strain_empire', 'strain_kingdom', 'strain_phylum', 'strain_class',
@@ -408,7 +473,9 @@ const _kAllColsByCategory = <String, List<String>>{
     'strain_morphology', 'strain_cell_shape', 'strain_cell_size_um',
     'strain_motility', 'strain_pigments', 'strain_colonial_morphology',
     'strain_herbarium_code', 'strain_herbarium_name', 'strain_herbarium_status',
-    'strain_herbarium_date', 'strain_herbarium_method', 'strain_herbarium_notes',
+    'strain_herbarium_date',
+    'strain_herbarium_method',
+    'strain_herbarium_notes',
     'strain_last_transfer', 'strain_periodicity', 'strain_next_transfer',
     'strain_medium', 'strain_medium_salinity', 'strain_light_cycle',
     'strain_light_intensity_umol', 'strain_temperature_c', 'strain_co2_pct',
@@ -428,42 +495,108 @@ const _kAllColsByCategory = <String, List<String>>{
     'sample_substrate', 'sample_observations',
   ],
   'Reagents': [
-    '__qr__', 'reagent_code', 'reagent_name', 'reagent_brand', 'reagent_reference',
-    'reagent_cas_number', 'reagent_category', 'reagent_subcategory',
-    'reagent_physical_state', 'reagent_formula',
-    'reagent_unit', 'reagent_package_size', 'reagent_container_count',
-    'reagent_container_min', 'reagent_remaining_amount',
-    'reagent_concentration', 'reagent_purity',
-    'reagent_solvent', 'reagent_storage_temp', 'reagent_position',
-    'reagent_lot_number', 'reagent_expiry_date', 'reagent_received_date',
-    'reagent_opened_date', 'reagent_supplier', 'reagent_supplier_contact',
-    'reagent_price_eur', 'reagent_hazard', 'reagent_sds_link',
-    'reagent_project', 'reagent_responsible', 'reagent_notes',
-    'reagent_contamination', 'reagent_contamination_notes', 'reagent_contamination_date',
+    '__qr__',
+    'reagent_code',
+    'reagent_name',
+    'reagent_brand',
+    'reagent_reference',
+    'reagent_cas_number',
+    'reagent_category',
+    'reagent_subcategory',
+    'reagent_physical_state',
+    'reagent_formula',
+    'reagent_unit',
+    'reagent_package_size',
+    'reagent_container_count',
+    'reagent_container_min',
+    'reagent_remaining_amount',
+    'reagent_concentration',
+    'reagent_purity',
+    'reagent_solvent',
+    'reagent_storage_temp',
+    'reagent_position',
+    'reagent_lot_number',
+    'reagent_expiry_date',
+    'reagent_received_date',
+    'reagent_opened_date',
+    'reagent_supplier',
+    'reagent_supplier_contact',
+    'reagent_price_eur',
+    'reagent_hazard',
+    'reagent_sds_link',
+    'reagent_project',
+    'reagent_responsible',
+    'reagent_notes',
+    'reagent_contamination',
+    'reagent_contamination_notes',
+    'reagent_contamination_date',
   ],
   'Equipment': [
-    '__qr__', 'equipment_name', 'equipment_type', 'equipment_brand',
-    'equipment_model', 'equipment_serial_number', 'equipment_patrimony_number',
-    'equipment_room', 'equipment_status', 'equipment_purchase_date',
-    'equipment_warranty_until', 'equipment_last_calibration',
-    'equipment_next_calibration', 'equipment_calibration_interval_days',
-    'equipment_last_maintenance', 'equipment_next_maintenance',
-    'equipment_maintenance_interval_days', 'equipment_responsible',
-    'equipment_manual_link', 'equipment_supplier', 'equipment_supplier_contact',
-    'equipment_price_eur', 'equipment_notes',
+    '__qr__',
+    'equipment_name',
+    'equipment_type',
+    'equipment_brand',
+    'equipment_model',
+    'equipment_serial_number',
+    'equipment_patrimony_number',
+    'equipment_room',
+    'equipment_status',
+    'equipment_purchase_date',
+    'equipment_warranty_until',
+    'equipment_last_calibration',
+    'equipment_next_calibration',
+    'equipment_calibration_interval_days',
+    'equipment_last_maintenance',
+    'equipment_next_maintenance',
+    'equipment_maintenance_interval_days',
+    'equipment_responsible',
+    'equipment_manual_link',
+    'equipment_supplier',
+    'equipment_supplier_contact',
+    'equipment_price_eur',
+    'equipment_notes',
   ],
   'Samples': [
-    '__qr__', 'sample_code', 'sample_rebeca', 'sample_ccpi', 'sample_permit',
-    'sample_other_code', 'sample_date', 'sample_collector', 'sample_responsible',
-    'sample_country', 'sample_archipelago', 'sample_island', 'sample_region',
-    'sample_municipality', 'sample_parish', 'sample_local', 'sample_gps',
-    'sample_latitude', 'sample_longitude', 'sample_altitude_m',
-    'sample_habitat_type', 'sample_habitat_1', 'sample_habitat_2',
-    'sample_habitat_3', 'sample_substrate', 'sample_method',
-    'sample_temperature', 'sample_ph', 'sample_conductivity', 'sample_oxygen',
-    'sample_salinity', 'sample_radiation', 'sample_turbidity', 'sample_depth_m',
-    'sample_bloom', 'sample_associated_organisms', 'sample_preservation',
-    'sample_transport_time_h', 'sample_project', 'sample_observations',
+    '__qr__',
+    'sample_code',
+    'sample_rebeca',
+    'sample_ccpi',
+    'sample_permit',
+    'sample_other_code',
+    'sample_date',
+    'sample_collector',
+    'sample_responsible',
+    'sample_country',
+    'sample_archipelago',
+    'sample_island',
+    'sample_region',
+    'sample_municipality',
+    'sample_parish',
+    'sample_local',
+    'sample_gps',
+    'sample_latitude',
+    'sample_longitude',
+    'sample_altitude_m',
+    'sample_habitat_type',
+    'sample_habitat_1',
+    'sample_habitat_2',
+    'sample_habitat_3',
+    'sample_substrate',
+    'sample_method',
+    'sample_temperature',
+    'sample_ph',
+    'sample_conductivity',
+    'sample_oxygen',
+    'sample_salinity',
+    'sample_radiation',
+    'sample_turbidity',
+    'sample_depth_m',
+    'sample_bloom',
+    'sample_associated_organisms',
+    'sample_preservation',
+    'sample_transport_time_h',
+    'sample_project',
+    'sample_observations',
   ],
   'Stocks': [
     '__qr__',
@@ -473,10 +606,14 @@ const _kAllColsByCategory = <String, List<String>>{
     'fish_stocks_volume_l', 'fish_stocks_line', 'fish_stocks_males',
     'fish_stocks_females', 'fish_stocks_juveniles', 'fish_stocks_mortality',
     'fish_stocks_arrival_date', 'fish_stocks_origin', 'fish_stocks_responsible',
-    'fish_stocks_status', 'fish_stocks_sentinel_status', 'fish_stocks_light_cycle',
+    'fish_stocks_status',
+    'fish_stocks_sentinel_status',
+    'fish_stocks_light_cycle',
     'fish_stocks_temperature_c', 'fish_stocks_conductivity', 'fish_stocks_ph',
     'fish_stocks_last_tank_cleaning', 'fish_stocks_cleaning_interval_days',
-    'fish_stocks_food_type', 'fish_stocks_food_source', 'fish_stocks_food_amount',
+    'fish_stocks_food_type',
+    'fish_stocks_food_source',
+    'fish_stocks_food_amount',
     'fish_stocks_feeding_schedule', 'fish_stocks_last_health_check',
     'fish_stocks_health_status', 'fish_stocks_treatment',
     'fish_stocks_last_breeding', 'fish_stocks_cross_id',
@@ -485,15 +622,17 @@ const _kAllColsByCategory = <String, List<String>>{
     // Fish line (via fish_stocks_line_id FK)
     'fish_line_name', 'fish_line_alias', 'fish_line_type', 'fish_line_status',
     'fish_line_date_birth', 'fish_line_date_received', 'fish_line_source',
-    'fish_line_mutation_type', 'fish_line_mutation_description', 'fish_line_transgene',
+    'fish_line_mutation_type',
+    'fish_line_mutation_description',
+    'fish_line_transgene',
   ],
 };
 
 /// Returns the `select` string for Supabase — includes FK joins where needed.
 String _selectForCategory(String category) => switch (category) {
-  'Stocks'  => '*, fish_lines!fish_stocks_line_id(*)',
+  'Stocks' => '*, fish_lines!fish_stocks_line_id(*)',
   'Strains' => '*, samples!strain_sample_code(*)',
-  _         => '*',
+  _ => '*',
 };
 
 /// Flattens one level of nested Maps (joined tables) into the top-level row.
@@ -516,10 +655,20 @@ List<String> _allColsForCategory(String category) =>
 ///      'equipment_qrcode' → 'QR Code'
 String _colLabel(String col) {
   if (col == '__qr__') return 'QR Code';
-  const prefixes = ['fish_stocks_', 'fish_line_', 'equipment_', 'reagent_', 'sample_', 'strain_'];
+  const prefixes = [
+    'fish_stocks_',
+    'fish_line_',
+    'equipment_',
+    'reagent_',
+    'sample_',
+    'strain_',
+  ];
   String base = col;
   for (final p in prefixes) {
-    if (col.startsWith(p)) { base = col.substring(p.length); break; }
+    if (col.startsWith(p)) {
+      base = col.substring(p.length);
+      break;
+    }
   }
   if (base == 'qrcode') return 'QR Code';
   return base
@@ -530,57 +679,75 @@ String _colLabel(String col) {
 }
 
 /// Returns the placeholder key that a QR code field should encode.
-/// All categories use the computed bluelims:// deep-link injected as __qr__.
+/// All categories use the computed limsphere:// deep-link injected as __qr__.
 String _qrKeyForCategory(String category) => '{__qr__}';
 
 Map<String, dynamic> _sampleDataFor(String category) => switch (category) {
   'Strains' => {
-    '__qr__': 'bluelims://demo/strains/1',
-    'strain_code': 'STR-2024-001', 'strain_status': 'Active',
-    'strain_species': 'Penicillium chrysogenum', 'strain_genus': 'Penicillium',
-    'strain_medium': 'PDA', 'strain_room': 'Lab 1',
-    'strain_next_transfer': '2025-04-01', 's_island': 'Gran Canaria', 's_country': 'Spain',
+    '__qr__': 'limsphere://demo/strains/1',
+    'strain_code': 'STR-2024-001',
+    'strain_status': 'Active',
+    'strain_species': 'Penicillium chrysogenum',
+    'strain_genus': 'Penicillium',
+    'strain_medium': 'PDA',
+    'strain_room': 'Lab 1',
+    'strain_next_transfer': '2025-04-01',
+    's_island': 'Gran Canaria',
+    's_country': 'Spain',
   },
   'Reagents' => {
-    '__qr__': 'bluelims://demo/reagents/42',
-    'reagent_code': 'REA-042', 'reagent_name': 'Luria-Bertani Broth',
-    'reagent_lot': 'LOT-8821', 'reagent_expiry': '2026-01-15',
-    'reagent_supplier': 'Sigma-Aldrich', 'reagent_location': 'Fridge 3',
+    '__qr__': 'limsphere://demo/reagents/42',
+    'reagent_code': 'REA-042',
+    'reagent_name': 'Luria-Bertani Broth',
+    'reagent_lot': 'LOT-8821',
+    'reagent_expiry': '2026-01-15',
+    'reagent_supplier': 'Sigma-Aldrich',
+    'reagent_location': 'Fridge 3',
     'reagent_concentration': '25 g/L',
   },
   'Equipment' => {
-    '__qr__': 'bluelims://demo/machines/24',
-    'eq_code': 'EQ-0024', 'eq_name': 'Centrifuge 5424',
-    'eq_serial': 'SN-4821922', 'eq_location': 'Lab 2 — Bench B',
-    'eq_calibration_due': '2025-12-31', 'eq_status': 'Operational',
+    '__qr__': 'limsphere://demo/machines/24',
+    'eq_code': 'EQ-0024',
+    'eq_name': 'Centrifuge 5424',
+    'eq_serial': 'SN-4821922',
+    'eq_location': 'Lab 2 — Bench B',
+    'eq_calibration_due': '2025-12-31',
+    'eq_status': 'Operational',
   },
   'Samples' => {
-    '__qr__': 'bluelims://demo/samples/1',
-    'sample_code': 'SMP-2024-007', 'sample_type': 'Seawater',
-    'sample_date': '2024-03-15', 'sample_origin': 'Tenerife, ES',
-    'sample_storage': '-80°C Freezer', 'sample_status': 'In processing',
+    '__qr__': 'limsphere://demo/samples/1',
+    'sample_code': 'SMP-2024-007',
+    'sample_type': 'Seawater',
+    'sample_date': '2024-03-15',
+    'sample_origin': 'Tenerife, ES',
+    'sample_storage': '-80°C Freezer',
+    'sample_status': 'In processing',
   },
   'Stocks' => {
-    '__qr__': 'bluelims://demo/fish_stocks/42',
-    'fish_stocks_tank_id': 'TK-042', 'fish_stocks_line': 'AB Wildtype',
-    'fish_stocks_males': '5', 'fish_stocks_females': '5',
-    'fish_stocks_juveniles': '20', 'fish_stocks_status': 'Active',
-    'fish_stocks_responsible': 'Dr. Smith', 'fish_stocks_arrival_date': '2024-01-15',
+    '__qr__': 'limsphere://demo/fish_stocks/42',
+    'fish_stocks_tank_id': 'TK-042',
+    'fish_stocks_line': 'AB Wildtype',
+    'fish_stocks_males': '5',
+    'fish_stocks_females': '5',
+    'fish_stocks_juveniles': '20',
+    'fish_stocks_status': 'Active',
+    'fish_stocks_responsible': 'Dr. Smith',
+    'fish_stocks_arrival_date': '2024-01-15',
   },
   _ => {'code': 'ITEM-001', 'name': 'Sample Item', 'date': '2024-01-01'},
 };
 
 String _tableForEntity(String entityType) => switch (entityType) {
-  'Strains'   => 'strains',
-  'Samples'   => 'samples',
-  'Stocks'    => 'fish_stocks',
-  'Reagents'  => 'reagents',
+  'Strains' => 'strains',
+  'Samples' => 'samples',
+  'Stocks' => 'fish_stocks',
+  'Reagents' => 'reagents',
   'Equipment' => 'equipment',
-  _           => 'strains',
+  _ => 'strains',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// QR injection helpers — compute bluelims:// URLs for categories without a
+// QR injection helpers — compute limsphere:// URLs for categories without a
 // dedicated qrcode DB column (Samples, Stocks, General).
 // Categories that store qrcode in the DB (Strains/Reagents/Equipment) are
 // left untouched; their existing DB value is already canonical.
@@ -589,24 +756,24 @@ String _tableForEntity(String entityType) => switch (entityType) {
 String _projectRef() => SupabaseManager.projectRef ?? 'local';
 
 String _qrTypeForCategory(String category) => switch (category) {
-  'Strains'   => 'strains',
-  'Reagents'  => 'reagents',
+  'Strains' => 'strains',
+  'Reagents' => 'reagents',
   'Equipment' => 'machines',
-  'Samples'   => 'samples',
-  'Stocks'    => 'fish_stocks',
-  _           => '',
+  'Samples' => 'samples',
+  'Stocks' => 'fish_stocks',
+  _ => '',
 };
 
 String _idColForCategory(String category) => switch (category) {
-  'Strains'   => 'strain_id',
-  'Reagents'  => 'reagent_id',
+  'Strains' => 'strain_id',
+  'Reagents' => 'reagent_id',
   'Equipment' => 'equipment_id',
-  'Samples'   => 'sample_id',
-  'Stocks'    => 'fish_stocks_id',
-  _           => 'id',
+  'Samples' => 'sample_id',
+  'Stocks' => 'fish_stocks_id',
+  _ => 'id',
 };
 
-/// Injects `__qr__` (bluelims:// deep-link URL) into every row for the given
+/// Injects `__qr__` (limsphere:// deep-link URL) into every row for the given
 /// category using its primary-key column. Works for all categories.
 void _injectQr(List<Map<String, dynamic>> rows, String category) {
   final type = _qrTypeForCategory(category);
@@ -652,7 +819,10 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
     _templates = [];
     _activeTemplate = null;
     _loadAndInit();
-    _pingTimer = Timer.periodic(const Duration(seconds: 30), (_) => _checkConnection());
+    _pingTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _checkConnection(),
+    );
   }
 
   @override
@@ -671,56 +841,62 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
 
   Future<void> _loadTemplates() async {
     try {
-      final rows = await Supabase.instance.client
-          .from('label_templates')
-          .select()
-          .order('tpl_created_at') as List<dynamic>;
+      final rows =
+          await Supabase.instance.client
+                  .from('label_templates')
+                  .select()
+                  .order('tpl_created_at')
+              as List<dynamic>;
       if (!mounted) return;
       setState(() {
         _templates.clear();
         for (final row in rows) {
-          try { _templates.add(LabelTemplate.fromDb(row as Map<String, dynamic>)); }
-          catch (_) {}
+          try {
+            _templates.add(LabelTemplate.fromDb(row as Map<String, dynamic>));
+          } catch (_) {}
         }
-        _activeTemplate ??= _templates.firstWhereOrNull((t) => t.category == widget.entityType)
-            ?? _templates.firstOrNull;
+        _activeTemplate ??=
+            _templates.firstWhereOrNull(
+              (t) => t.category == widget.entityType,
+            ) ??
+            _templates.firstOrNull;
       });
     } catch (_) {}
   }
 
-  Future<void> _saveTemplate(LabelTemplate tpl) async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+  Future<void> _saveTemplate(
+    LabelTemplate tpl, {
+    String action = ModuleAction.edit,
+  }) async {
+    if (!context.requireModuleAction(action)) return;
     try {
       await Supabase.instance.client.from('label_templates').upsert(tpl.toDb());
     } catch (_) {}
   }
 
   void _duplicateTemplate(LabelTemplate tpl) {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.create)) return;
     // Generate a unique name: "Name_duplicate1", "Name_duplicate2", …
     final existingNames = _templates.map((t) => t.name).toSet();
     String newName;
     int n = 1;
-    do { newName = '${tpl.name}_duplicate$n'; n++; } while (existingNames.contains(newName));
+    do {
+      newName = '${tpl.name}_duplicate$n';
+      n++;
+    } while (existingNames.contains(newName));
 
     final copy = tpl.clone()
-      ..id   = 'tpl_${DateTime.now().millisecondsSinceEpoch}'
+      ..id = 'tpl_${DateTime.now().millisecondsSinceEpoch}'
       ..name = newName;
-    setState(() { _templates.add(copy); _activeTemplate = copy; });
-    _saveTemplate(copy);
+    setState(() {
+      _templates.add(copy);
+      _activeTemplate = copy;
+    });
+    _saveTemplate(copy, action: ModuleAction.create);
   }
 
   Future<void> _deleteTemplate(LabelTemplate tpl) async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
     try {
       await Supabase.instance.client
           .from('label_templates')
@@ -730,10 +906,7 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   }
 
   void _openStarters() {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.create)) return;
     showDialog(
       context: context,
       builder: (_) => _StartersDialog(
@@ -742,7 +915,7 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
             _templates.add(tpl);
             _activeTemplate = tpl;
           });
-          _saveTemplate(tpl);
+          _saveTemplate(tpl, action: ModuleAction.create);
         },
       ),
     );
@@ -752,23 +925,36 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getStringList('printer_profiles_v2') ?? [];
-      List<PrinterProfile> loaded = raw.map((s) {
-        try { return PrinterProfile.fromJson(jsonDecode(s) as Map<String, dynamic>); }
-        catch (_) { return null; }
-      }).whereType<PrinterProfile>().toList();
+      List<PrinterProfile> loaded = raw
+          .map((s) {
+            try {
+              return PrinterProfile.fromJson(
+                jsonDecode(s) as Map<String, dynamic>,
+              );
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<PrinterProfile>()
+          .toList();
 
       // Migrate legacy single-printer keys → one profile
       if (loaded.isEmpty) {
         final proto = prefs.getString('printer_protocol');
         if (proto != null) {
-          loaded = [PrinterProfile(
-            name:           prefs.getString('printer_deviceName') ?? 'Printer',
-            protocol:       proto,
-            connectionType: prefs.getString('printer_connectionType') ?? 'usb',
-            deviceName:     prefs.getString('printer_deviceName') ?? 'Zebra ZD421',
-            ipAddress:      prefs.getString('printer_ipAddress') ?? '192.168.1.100',
-            usbPath:        prefs.getString('printer_usbPath') ?? '',
-          )];
+          loaded = [
+            PrinterProfile(
+              name: prefs.getString('printer_deviceName') ?? 'Printer',
+              protocol: proto,
+              connectionType:
+                  prefs.getString('printer_connectionType') ?? 'usb',
+              deviceName:
+                  prefs.getString('printer_deviceName') ?? 'Zebra ZD421',
+              ipAddress:
+                  prefs.getString('printer_ipAddress') ?? '192.168.1.100',
+              usbPath: prefs.getString('printer_usbPath') ?? '',
+            ),
+          ];
         }
       }
 
@@ -778,8 +964,9 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
         _profiles
           ..clear()
           ..addAll(loaded);
-        _activeProfile = _profiles.firstWhereOrNull((p) => p.id == activeId)
-            ?? _profiles.firstOrNull;
+        _activeProfile =
+            _profiles.firstWhereOrNull((p) => p.id == activeId) ??
+            _profiles.firstOrNull;
       });
     } catch (_) {}
   }
@@ -787,8 +974,10 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   Future<void> _saveProfiles() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('printer_profiles_v2',
-          _profiles.map((p) => jsonEncode(p.toJson())).toList());
+      await prefs.setStringList(
+        'printer_profiles_v2',
+        _profiles.map((p) => jsonEncode(p.toJson())).toList(),
+      );
       if (_activeProfile != null) {
         await prefs.setString('printer_active_profile_id', _activeProfile!.id);
       }
@@ -804,36 +993,55 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   }
 
   Future<void> _showNewTemplateDialog() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.create)) return;
     final nameCtrl = TextEditingController(text: 'New Template');
     String selectedCategory = widget.entityType;
     String selectedPaperSize = '62x29';
-    const categories = ['Strains', 'Samples', 'Reagents', 'Equipment', 'Stocks', 'General'];
+    const categories = [
+      'Strains',
+      'Samples',
+      'Reagents',
+      'Equipment',
+      'Stocks',
+      'General',
+    ];
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
           backgroundColor: ctx.appSurface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(children: [
-            const Icon(Icons.add_box_outlined, size: 18, color: AppDS.accent),
-            const SizedBox(width: 8),
-            Text('New Template',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: ctx.appTextPrimary)),
-          ]),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.add_box_outlined, size: 18, color: AppDS.accent),
+              const SizedBox(width: 8),
+              Text(
+                'New Template',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: ctx.appTextPrimary,
+                ),
+              ),
+            ],
+          ),
           content: SizedBox(
             width: 340,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Template Name',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                        color: ctx.appTextSecondary)),
+                Text(
+                  'Template Name',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: ctx.appTextSecondary,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: nameCtrl,
@@ -844,22 +1052,32 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
                     filled: true,
                     fillColor: ctx.appBg,
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: ctx.appBorder)),
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: ctx.appBorder),
+                    ),
                     enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: ctx.appBorder)),
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: ctx.appBorder),
+                    ),
                     focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppDS.accent)),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppDS.accent),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 9,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('Category',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                        color: ctx.appTextSecondary)),
+                Text(
+                  'Category',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: ctx.appTextSecondary,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
@@ -869,27 +1087,41 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
                     return GestureDetector(
                       onTap: () => setS(() => selectedCategory = cat),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: sel ? AppDS.accent.withValues(alpha: 0.15) : ctx.appBg,
+                          color: sel
+                              ? AppDS.accent.withValues(alpha: 0.15)
+                              : ctx.appBg,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                              color: sel ? AppDS.accent : ctx.appBorder,
-                              width: sel ? 1.5 : 1),
+                            color: sel ? AppDS.accent : ctx.appBorder,
+                            width: sel ? 1.5 : 1,
+                          ),
                         ),
-                        child: Text(cat,
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: sel ? AppDS.accent : ctx.appTextPrimary)),
+                        child: Text(
+                          cat,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: sel ? AppDS.accent : ctx.appTextPrimary,
+                          ),
+                        ),
                       ),
                     );
                   }).toList(),
                 ),
                 const SizedBox(height: 16),
-                Text('Label Size',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                        color: ctx.appTextSecondary)),
+                Text(
+                  'Label Size',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: ctx.appTextSecondary,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
@@ -899,19 +1131,28 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
                     return GestureDetector(
                       onTap: () => setS(() => selectedPaperSize = size),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: sel ? AppDS.accent.withValues(alpha: 0.15) : ctx.appBg,
+                          color: sel
+                              ? AppDS.accent.withValues(alpha: 0.15)
+                              : ctx.appBg,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                              color: sel ? AppDS.accent : ctx.appBorder,
-                              width: sel ? 1.5 : 1),
+                            color: sel ? AppDS.accent : ctx.appBorder,
+                            width: sel ? 1.5 : 1,
+                          ),
                         ),
-                        child: Text('${size.replaceAll('x', '×')} mm',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: sel ? AppDS.accent : ctx.appTextPrimary)),
+                        child: Text(
+                          '${size.replaceAll('x', '×')} mm',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: sel ? AppDS.accent : ctx.appTextPrimary,
+                          ),
+                        ),
                       ),
                     );
                   }).toList(),
@@ -922,14 +1163,19 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Cancel',
-                  style: TextStyle(fontSize: 13, color: ctx.appTextSecondary)),
+              child: Text(
+                'Cancel',
+                style: TextStyle(fontSize: 13, color: ctx.appTextSecondary),
+              ),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                  backgroundColor: AppDS.accent,
-                  foregroundColor: AppDS.bg,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                backgroundColor: AppDS.accent,
+                foregroundColor: AppDS.bg,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('Create', style: TextStyle(fontSize: 13)),
             ),
@@ -939,32 +1185,36 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
     );
 
     if (confirmed != true || !mounted) return;
-    final name = nameCtrl.text.trim().isEmpty ? 'New Template' : nameCtrl.text.trim();
+    final name = nameCtrl.text.trim().isEmpty
+        ? 'New Template'
+        : nameCtrl.text.trim();
     final sizeParts = selectedPaperSize.split('x');
     final labelW = double.tryParse(sizeParts[0]) ?? 62;
     final labelH = double.tryParse(sizeParts[1]) ?? 30;
-    _openBuilder(LabelTemplate(
-      id: 'tpl_${DateTime.now().millisecondsSinceEpoch}',
-      name: name,
-      category: selectedCategory,
-      paperSize: selectedPaperSize,
-      labelW: labelW,
-      labelH: labelH,
-    ));
+    _openBuilder(
+      LabelTemplate(
+        id: 'tpl_${DateTime.now().millisecondsSinceEpoch}',
+        name: name,
+        category: selectedCategory,
+        paperSize: selectedPaperSize,
+        labelW: labelW,
+        labelH: labelH,
+      ),
+    );
   }
 
   void _openBuilder([LabelTemplate? template]) {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
-    final tpl = template ?? LabelTemplate(
-      id: 'tpl_${DateTime.now().millisecondsSinceEpoch}',
-      name: 'New Template',
-      category: widget.entityType,
-      labelW: 62,
-      labelH: 30,
-    );
+    final action = template == null ? ModuleAction.create : ModuleAction.edit;
+    if (!context.requireModuleAction(action)) return;
+    final tpl =
+        template ??
+        LabelTemplate(
+          id: 'tpl_${DateTime.now().millisecondsSinceEpoch}',
+          name: 'New Template',
+          category: widget.entityType,
+          labelW: 62,
+          labelH: 30,
+        );
     if (!mounted) return;
     Navigator.push(
       context,
@@ -980,15 +1230,18 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
             _checkConnection();
           },
           onSave: (saved) async {
-            if (!context.canEditModule) {
-              context.warnReadOnly();
-              return;
-            }
-            await Supabase.instance.client.from('label_templates').upsert(saved.toDb());
+            if (!context.requireModuleAction(action)) return;
+            await Supabase.instance.client
+                .from('label_templates')
+                .upsert(saved.toDb());
             if (!mounted) return;
             setState(() {
               final i = _templates.indexWhere((x) => x.id == saved.id);
-              if (i >= 0) { _templates[i] = saved; } else { _templates.add(saved); }
+              if (i >= 0) {
+                _templates[i] = saved;
+              } else {
+                _templates.add(saved);
+              }
               _activeTemplate = saved;
             });
           },
@@ -998,8 +1251,8 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
   }
 
   void _openSettings() {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
+    if (!context.moduleAccess.canMutate) {
+      context.warnPermissionDenied(ModuleAction.edit);
       return;
     }
     Navigator.push(
@@ -1014,8 +1267,9 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
               _profiles
                 ..clear()
                 ..addAll(profiles);
-              _activeProfile = _profiles.firstWhereOrNull((p) => p.id == activeId)
-                  ?? _profiles.firstOrNull;
+              _activeProfile =
+                  _profiles.firstWhereOrNull((p) => p.id == activeId) ??
+                  _profiles.firstOrNull;
             });
             _saveProfiles();
             _checkConnection();
@@ -1041,60 +1295,95 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
       ),
       child: Scaffold(
         appBar: AppBar(
-          leading: MediaQuery.of(context).size.width < 700 ? IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            color: context.appTextSecondary,
-            tooltip: 'Menu',
-            onPressed: openAppDrawer,
-          ) : null,
-          title: Row(children: [
-            const Icon(Icons.print_rounded, size: 18, color: AppDS.accent),
-            const SizedBox(width: 10),
-            const Text('Label Printing',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(width: 12),
-            // Profile switcher
-            if (_profiles.isNotEmpty)
-              _ProfileSwitcherChip(
-                profiles: _profiles,
-                activeProfile: _activeProfile,
-                onSelect: (p) {
-                  setState(() => _activeProfile = p);
-                  _saveProfiles();
-                  _checkConnection();
-                },
+          leading: MediaQuery.of(context).size.width < 700
+              ? IconButton(
+                  icon: const Icon(Icons.menu_rounded),
+                  color: context.appTextSecondary,
+                  tooltip: 'Menu',
+                  onPressed: openAppDrawer,
+                )
+              : null,
+          title: Row(
+            children: [
+              const Icon(Icons.print_rounded, size: 18, color: AppDS.accent),
+              const SizedBox(width: 10),
+              const Text(
+                'Label Printing',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
-            const SizedBox(width: 10),
-            // 3-dot connection indicator
-            GestureDetector(
-              onTap: _checkConnection,
-              child: Tooltip(
-                message: switch (_connState) {
-                  _ConnState.checking    => 'Checking printer…',
-                  _ConnState.connected   => 'Connected',
-                  _ConnState.driverOnly  => 'Driver installed — printer offline',
-                  _ConnState.unreachable => 'Printer not found — tap to retry',
-                },
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  _ConnDot(AppDS.green,              lit: _connState == _ConnState.connected),
-                  const SizedBox(width: 4),
-                  _ConnDot(const Color(0xFFF59E0B),  lit: _connState == _ConnState.driverOnly),
-                  const SizedBox(width: 4),
-                  _ConnDot(AppDS.red,                lit: _connState == _ConnState.unreachable),
-                ]),
+              const SizedBox(width: 12),
+              // Profile switcher
+              if (_profiles.isNotEmpty)
+                _ProfileSwitcherChip(
+                  profiles: _profiles,
+                  activeProfile: _activeProfile,
+                  onSelect: (p) {
+                    setState(() => _activeProfile = p);
+                    _saveProfiles();
+                    _checkConnection();
+                  },
+                ),
+              const SizedBox(width: 10),
+              // 3-dot connection indicator
+              GestureDetector(
+                onTap: _checkConnection,
+                child: Tooltip(
+                  message: switch (_connState) {
+                    _ConnState.checking => 'Checking printer…',
+                    _ConnState.connected => 'Connected',
+                    _ConnState.driverOnly =>
+                      'Driver installed — printer offline',
+                    _ConnState.unreachable =>
+                      'Printer not found — tap to retry',
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _ConnDot(
+                        AppDS.green,
+                        lit: _connState == _ConnState.connected,
+                      ),
+                      const SizedBox(width: 4),
+                      _ConnDot(
+                        const Color(0xFFF59E0B),
+                        lit: _connState == _ConnState.driverOnly,
+                      ),
+                      const SizedBox(width: 4),
+                      _ConnDot(
+                        AppDS.red,
+                        lit: _connState == _ConnState.unreachable,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
           actions: [
             IconButton(
-              icon: Icon(Icons.settings_outlined, size: 20, color: context.appTextSecondary),
+              icon: Icon(
+                Icons.settings_outlined,
+                size: 20,
+                color: context.appTextSecondary,
+              ),
               tooltip: 'Printer settings',
-              onPressed: context.canEditModule ? _openSettings : context.warnReadOnly,
+              onPressed: context.canEditModule
+                  ? _openSettings
+                  : context.warnReadOnly,
             ),
             TextButton.icon(
-              icon: Icon(Icons.library_books_outlined, size: 16, color: context.appTextSecondary),
-              label: Text('Starters', style: TextStyle(fontSize: 12, color: context.appTextSecondary)),
-              onPressed: context.canEditModule ? _openStarters : context.warnReadOnly,
+              icon: Icon(
+                Icons.library_books_outlined,
+                size: 16,
+                color: context.appTextSecondary,
+              ),
+              label: Text(
+                'Starters',
+                style: TextStyle(fontSize: 12, color: context.appTextSecondary),
+              ),
+              onPressed: context.canEditModule
+                  ? _openStarters
+                  : context.warnReadOnly,
             ),
             Padding(
               padding: const EdgeInsets.only(right: 8, left: 4),
@@ -1102,13 +1391,23 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
                 style: FilledButton.styleFrom(
                   backgroundColor: AppDS.accent,
                   foregroundColor: const Color(0xFF0F172A),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 0,
+                  ),
                   minimumSize: const Size(0, 36),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                onPressed: context.canEditModule ? _showNewTemplateDialog : context.warnReadOnly,
+                onPressed: context.canEditModule
+                    ? _showNewTemplateDialog
+                    : context.warnReadOnly,
                 icon: const Icon(Icons.add, size: 16),
-                label: const Text('New Template', style: TextStyle(fontSize: 13)),
+                label: const Text(
+                  'New Template',
+                  style: TextStyle(fontSize: 13),
+                ),
               ),
             ),
           ],
@@ -1138,7 +1437,9 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
             }
             setState(() {
               _templates.removeWhere((x) => x.id == t.id);
-              if (_activeTemplate?.id == t.id) _activeTemplate = _templates.firstOrNull;
+              if (_activeTemplate?.id == t.id) {
+                _activeTemplate = _templates.firstOrNull;
+              }
             });
             _deleteTemplate(t);
           },
@@ -1163,8 +1464,10 @@ class _BuilderPage extends StatelessWidget {
   final PrinterProfile? activeProfile;
   final void Function(PrinterProfile) onProfileChanged;
   const _BuilderPage({
-    required this.template, required this.onSave,
-    required this.profiles, required this.activeProfile,
+    required this.template,
+    required this.onSave,
+    required this.profiles,
+    required this.activeProfile,
     required this.onProfileChanged,
   });
 
@@ -1195,7 +1498,8 @@ class _PrinterSettingsPage extends StatefulWidget {
     required this.activeProfileId,
     required this.onChanged,
   });
-  @override State<_PrinterSettingsPage> createState() => _PrinterSettingsPageState();
+  @override
+  State<_PrinterSettingsPage> createState() => _PrinterSettingsPageState();
 }
 
 class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
@@ -1212,17 +1516,20 @@ class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
   void _notify() => widget.onChanged(List.of(_profiles), _activeId);
 
   void _openDetect() {
+    if (!context.requireModuleAction(ModuleAction.create)) return;
     showDialog(
       context: context,
       builder: (_) => _InstalledPrintersDialog(
         onSelect: (info) {
           final profile = PrinterProfile(
-            name:           info.matchedModel ?? info.name,
-            protocol:       info.protocol,
-            connectionType: info.protocol == 'brother_ql_legacy' ? 'usb' : info.connectionType,
-            deviceName:     info.matchedModel ?? info.name,
-            ipAddress:      info.ipAddress ?? '192.168.1.100',
-            usbPath:        info.connectionType == 'usb' ? info.name : '',
+            name: info.matchedModel ?? info.name,
+            protocol: info.protocol,
+            connectionType: info.protocol == 'brother_ql_legacy'
+                ? 'usb'
+                : info.connectionType,
+            deviceName: info.matchedModel ?? info.name,
+            ipAddress: info.ipAddress ?? '192.168.1.100',
+            usbPath: info.connectionType == 'usb' ? info.name : '',
           );
           setState(() {
             _profiles.add(profile);
@@ -1248,12 +1555,16 @@ class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Row(children: [
-          Icon(Icons.print_outlined, size: 16, color: AppDS.accent),
-          SizedBox(width: 8),
-          Text('Printer Profiles',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        ]),
+        title: const Row(
+          children: [
+            Icon(Icons.print_outlined, size: 16, color: AppDS.accent),
+            SizedBox(width: 8),
+            Text(
+              'Printer Profiles',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.manage_search_rounded, size: 20),
@@ -1266,18 +1577,24 @@ class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
               style: FilledButton.styleFrom(
                 backgroundColor: AppDS.accent,
                 foregroundColor: const Color(0xFF0F172A),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 0,
+                ),
                 minimumSize: const Size(0, 36),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onPressed: () {
+                if (!context.requireModuleAction(ModuleAction.create)) return;
                 final profile = PrinterProfile();
                 setState(() {
                   _profiles.add(profile);
                   _activeId ??= profile.id;
                 });
                 _notify();
-                _openEditDialog(profile);
+                _openEditDialog(profile, action: ModuleAction.create);
               },
               icon: const Icon(Icons.add_rounded, size: 16),
               label: const Text('Add Profile', style: TextStyle(fontSize: 13)),
@@ -1288,9 +1605,17 @@ class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
       body: _ProfileListTab(
         profiles: _profiles,
         activeId: _activeId,
-        onSetActive: (id) { setState(() => _activeId = id); _notify(); },
-        onEdit: (p) => _openEditDialog(p),
+        onSetActive: (id) {
+          if (!context.requireModuleAction(ModuleAction.edit)) return;
+          setState(() => _activeId = id);
+          _notify();
+        },
+        onEdit: (p) {
+          if (!context.requireModuleAction(ModuleAction.edit)) return;
+          _openEditDialog(p);
+        },
         onDelete: (p) {
+          if (!context.requireModuleAction(ModuleAction.delete)) return;
           setState(() {
             _profiles.removeWhere((x) => x.id == p.id);
             if (_activeId == p.id) _activeId = _profiles.firstOrNull?.id;
@@ -1301,7 +1626,11 @@ class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
     );
   }
 
-  void _openEditDialog(PrinterProfile profile) {
+  void _openEditDialog(
+    PrinterProfile profile, {
+    String action = ModuleAction.edit,
+  }) {
+    if (!context.requireModuleAction(action)) return;
     showDialog(
       context: context,
       builder: (_) => _ProfileEditDialog(

@@ -6,12 +6,15 @@
 // "+" row at top of list inserts the next date (most recent + 1 day) automatically.
 
 import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
 import '/theme/grid_widgets.dart';
@@ -109,6 +112,8 @@ class _WaterQcPageState extends State<WaterQcPage> {
   List<Map<String, dynamic>> _rows = [];
   // key → {lastDone: DateTime?, optimalDays: int}
   final Map<String, Map<String, dynamic>> _maint = {};
+  final Set<String> _monitoredMaintKeys = {..._maintKeys};
+  List<String> _availableMaintKeys = [..._maintKeys];
   bool _loading = true;
   String? _error;
 
@@ -195,8 +200,21 @@ class _WaterQcPageState extends State<WaterQcPage> {
       final rows = List<Map<String, dynamic>>.from(results[0] as List);
       final maint = List<Map<String, dynamic>>.from(results[1] as List);
       final thresholds = List<Map<String, dynamic>>.from(results[2] as List);
+      final availableMaintKeys = <String>[..._maintKeys];
+      final monitoredMaintKeys = <String>{..._maintKeys};
+      for (final item in maint) {
+        final key = item['key']?.toString();
+        if (key == null || key.isEmpty) continue;
+        if (!availableMaintKeys.contains(key)) availableMaintKeys.add(key);
+        if (item['is_monitored'] == false) {
+          monitoredMaintKeys.remove(key);
+        } else {
+          monitoredMaintKeys.add(key);
+        }
+      }
       setState(() {
         _rows = rows;
+        _maint.clear();
         for (final m in maint) {
           final key = m['key'] as String;
           final ld = m['last_done_date'];
@@ -205,6 +223,10 @@ class _WaterQcPageState extends State<WaterQcPage> {
             'optimalDays': (m['optimal_days'] as num?)?.toInt() ?? 30,
           };
         }
+        _availableMaintKeys = availableMaintKeys;
+        _monitoredMaintKeys
+          ..clear()
+          ..addAll(monitoredMaintKeys);
         for (final t in thresholds) {
           final key = t['key'] as String;
           _thresholds[key] = {
@@ -234,10 +256,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
   // ── Add row for a picked date ──────────────────────────────────────────────
 
   Future<void> _addRowForDate() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.create)) return;
     final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -265,10 +284,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
   // ── Add next row ───────────────────────────────────────────────────────────
 
   Future<void> _addNextRow() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.create)) return;
     DateTime nextDate;
     if (_rows.isEmpty) {
       nextDate = DateTime.now();
@@ -396,10 +412,6 @@ class _WaterQcPageState extends State<WaterQcPage> {
   // ── Maintenance cell (date picker) in main table ───────────────────────────
 
   Future<void> _pickMaintDate(Map<String, dynamic> row, String col) async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
     final val = row[col]?.toString().trim();
     final current = (val != null && val.isNotEmpty)
         ? DateTime.tryParse(val)
@@ -676,10 +688,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
   // ── Delete row ─────────────────────────────────────────────────────────────
 
   Future<void> _deleteRow(Map<String, dynamic> row) async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -730,6 +739,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
   // ── CSV export ─────────────────────────────────────────────────────────────
 
   Future<void> _exportCsv() async {
+    if (!context.requireModuleAction(ModuleAction.export)) return;
     final buf = StringBuffer();
     buf.writeln(
       'Date,pH,Conductivity,Temperature (°C),NO3- (mg/L),NO2- (mg/L),'
@@ -793,8 +803,139 @@ class _WaterQcPageState extends State<WaterQcPage> {
 
   // ── Maintenance summary ────────────────────────────────────────────────────
 
+  Future<void> _chooseMonitoredMaintenance() async {
+    final canEdit = context.canEditModule;
+    final draft = <String>{..._monitoredMaintKeys};
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: context.appSurface,
+          title: Row(
+            children: [
+              const Icon(Icons.monitor_heart_outlined, color: _pageAccent),
+              const SizedBox(width: 10),
+              Text(
+                'Maintenance monitoring',
+                style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 430,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Choose which items appear in the Water QC and dashboard '
+                  'maintenance overviews.',
+                  style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 360),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: _availableMaintKeys.map((key) {
+                      final enabled = draft.contains(key);
+                      return SwitchListTile.adaptive(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: enabled,
+                        activeTrackColor: _pageAccent,
+                        title: Text(
+                          _maintLabels[key] ?? key,
+                          style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          enabled
+                              ? 'Shown in overviews'
+                              : 'Hidden from overviews',
+                          style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextMuted,
+                            fontSize: 10.5,
+                          ),
+                        ),
+                        onChanged: canEdit
+                            ? (value) => setDialogState(() {
+                                if (value) {
+                                  draft.add(key);
+                                } else {
+                                  draft.remove(key);
+                                }
+                              })
+                            : null,
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(canEdit ? 'Cancel' : 'Close'),
+            ),
+            if (canEdit)
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(draft),
+                child: const Text('Save'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
+
+    try {
+      final payload = _availableMaintKeys.map((key) {
+        final item = _maint[key];
+        return {
+          'key': key,
+          'last_done_date': item?['lastDone'] is DateTime
+              ? fmtDate(item!['lastDone'] as DateTime)
+              : null,
+          'optimal_days': item?['optimalDays'] ?? 30,
+          'is_monitored': result.contains(key),
+        };
+      }).toList();
+      await Supabase.instance.client
+          .from('water_qc_maintenance')
+          .upsert(payload, onConflict: 'key');
+      if (!mounted) return;
+      setState(() {
+        _monitoredMaintKeys
+          ..clear()
+          ..addAll(result);
+      });
+      _snack('Maintenance monitoring updated.');
+    } catch (error) {
+      _snack(
+        'Could not save monitoring choices. Apply the Water QC monitoring '
+        'migration first.\n$error',
+        error: true,
+      );
+    }
+  }
+
   Widget _buildMaintSummary() {
     final now = DateTime.now();
+    final monitoredKeys = _availableMaintKeys
+        .where(_monitoredMaintKeys.contains)
+        .toList();
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       decoration: BoxDecoration(
@@ -863,9 +1004,9 @@ class _WaterQcPageState extends State<WaterQcPage> {
             ),
           ),
           Divider(height: 1, color: context.appBorder),
-          for (int i = 0; i < _maintKeys.length; i++) ...[
-            _buildMaintRow(_maintKeys[i], now),
-            if (i < _maintKeys.length - 1)
+          for (int i = 0; i < monitoredKeys.length; i++) ...[
+            _buildMaintRow(monitoredKeys[i], now),
+            if (i < monitoredKeys.length - 1)
               Divider(
                 height: 1,
                 indent: 12,
@@ -873,6 +1014,17 @@ class _WaterQcPageState extends State<WaterQcPage> {
                 color: context.appBorder,
               ),
           ],
+          if (monitoredKeys.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Text(
+                'No maintenance items are currently monitored.',
+                style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ),
           const SizedBox(height: 6),
         ],
       ),
@@ -1171,373 +1323,429 @@ class _WaterQcPageState extends State<WaterQcPage> {
   Widget build(BuildContext context) {
     if (MediaQuery.of(context).size.width < 600) return _buildMobileLayout();
 
-    final tableWidth = _cols.fold(0.0, (s, c) => s + c.$3) + 36;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final displayCols = _columnsForWidth(constraints.maxWidth - 32);
+        final tableWidth =
+            displayCols.fold(0.0, (sum, column) => sum + column.$3) + 36;
 
-    return Column(
-      children: [
-        // ── Toolbar ──────────────────────────────────────────────────────────
-        Container(
-          height: 56,
-          decoration: BoxDecoration(
-            color: context.appSurface2,
-            border: Border(bottom: BorderSide(color: context.appBorder)),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              if (MediaQuery.of(context).size.width < 700) ...[
-                IconButton(
-                  icon: const Icon(Icons.menu_rounded, size: 20),
-                  color: context.appTextSecondary,
-                  tooltip: 'Menu',
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-              ],
-              const Icon(
-                Icons.water_drop_outlined,
-                size: 18,
-                color: _pageAccent,
+        return Column(
+          children: [
+            // ── Toolbar ──────────────────────────────────────────────────────────
+            Container(
+              height: 56,
+              decoration: BoxDecoration(
+                color: context.appSurface2,
+                border: Border(bottom: BorderSide(color: context.appBorder)),
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Water QC',
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: context.appTextPrimary,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (_) => setState(() {}),
-                    style: GoogleFonts.spaceGrotesk(
-                      color: context.appTextPrimary,
-                      fontSize: 13,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Search by date, observations…',
-                      hintStyle: GoogleFonts.spaceGrotesk(
-                        color: context.appTextMuted,
-                        fontSize: 13,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: context.appTextMuted,
-                        size: 16,
-                      ),
-                      suffixIcon: _searchCtrl.text.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(
-                                Icons.clear,
-                                size: 14,
-                                color: context.appTextMuted,
-                              ),
-                              onPressed: () =>
-                                  setState(() => _searchCtrl.clear()),
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: context.appSurface3,
-                      contentPadding: EdgeInsets.zero,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: context.appBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: context.appBorder),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: _pageAccent),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (MediaQuery.of(context).size.width < 700)
-                PopupMenuButton<String>(
-                  icon: Icon(
-                    Icons.more_vert,
-                    color: context.appTextSecondary,
-                    size: 20,
-                  ),
-                  tooltip: 'More options',
-                  offset: const Offset(0, 36),
-                  color: context.appSurface2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    side: BorderSide(color: context.appBorder2),
-                  ),
-                  onSelected: (v) {
-                    if (v == 'filter') {
-                      setState(() => _showFilters = !_showFilters);
-                    }
-                    if (v == 'export') _exportCsv();
-                    if (v == 'add') _addRowForDate();
-                  },
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'filter',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.tune,
-                            size: 16,
-                            color: _showFilters
-                                ? _pageAccent
-                                : context.appTextSecondary,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            _showFilters ? 'Hide Filters' : 'Show Filters',
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 13,
-                              color: context.appTextPrimary,
-                            ),
-                          ),
-                          if (_hasActiveFilter) ...[
-                            const Spacer(),
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
-                                color: _pageAccent,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'export',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.download_outlined,
-                            size: 16,
-                            color: context.appTextSecondary,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Export CSV',
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 13,
-                              color: context.appTextPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'add',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.add, size: 16, color: AppDS.accent),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Add QC Record',
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 13,
-                              color: AppDS.accent,
-                            ),
-                          ),
-                        ],
-                      ),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  if (MediaQuery.of(context).size.width < 700) ...[
+                    IconButton(
+                      icon: const Icon(Icons.menu_rounded, size: 20),
+                      color: context.appTextSecondary,
+                      tooltip: 'Menu',
+                      onPressed: () => Scaffold.of(context).openDrawer(),
                     ),
                   ],
-                )
-              else ...[
-                const SizedBox(width: 4),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    '${_filteredRows.length} record${_filteredRows.length == 1 ? '' : 's'}',
+                  const Icon(
+                    Icons.water_drop_outlined,
+                    size: 18,
+                    color: _pageAccent,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Water QC',
                     style: GoogleFonts.spaceGrotesk(
-                      fontSize: 12,
-                      color: context.appTextMuted,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: context.appTextPrimary,
                     ),
                   ),
-                ),
-                Tooltip(
-                  message: _showFilters ? 'Hide filters' : 'Show filters',
-                  child: Stack(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.tune,
-                          color: _showFilters
-                              ? _pageAccent
-                              : context.appTextSecondary,
-                          size: 18,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SizedBox(
+                      height: 36,
+                      child: TextField(
+                        controller: _searchCtrl,
+                        onChanged: (_) => setState(() {}),
+                        style: GoogleFonts.spaceGrotesk(
+                          color: context.appTextPrimary,
+                          fontSize: 13,
                         ),
-                        onPressed: () =>
-                            setState(() => _showFilters = !_showFilters),
-                      ),
-                      if (_hasActiveFilter)
-                        Positioned(
-                          right: 6,
-                          top: 6,
-                          child: Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              color: _pageAccent,
-                              shape: BoxShape.circle,
-                            ),
+                        decoration: InputDecoration(
+                          hintText: 'Search by date, observations…',
+                          hintStyle: GoogleFonts.spaceGrotesk(
+                            color: context.appTextMuted,
+                            fontSize: 13,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: context.appTextMuted,
+                            size: 16,
+                          ),
+                          suffixIcon: _searchCtrl.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
+                                    size: 14,
+                                    color: context.appTextMuted,
+                                  ),
+                                  onPressed: () =>
+                                      setState(() => _searchCtrl.clear()),
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: context.appSurface3,
+                          contentPadding: EdgeInsets.zero,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: context.appBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: context.appBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: _pageAccent),
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                Tooltip(
-                  message: 'Export CSV',
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.download_outlined,
-                      size: 18,
-                      color: context.appTextSecondary,
-                    ),
-                    onPressed: _exportCsv,
-                  ),
-                ),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppDS.accent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 0,
-                    ),
-                    minimumSize: const Size(0, 36),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
-                  ),
-                  onPressed: _addRowForDate,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add QC record'),
-                ),
-              ],
-            ],
-          ),
-        ),
-        // ── Filter panel ─────────────────────────────────────────────────────
-        if (_showFilters)
-          Container(
-            decoration: BoxDecoration(
-              color: context.appSurface,
-              border: Border(bottom: BorderSide(color: context.appBorder)),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                Text(
-                  'Show:',
-                  style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                _filterChip('All', 'all', null),
-                const SizedBox(width: 6),
-                _filterChip('Out of range', 'out_of_range', AppDS.red),
-                const SizedBox(width: 6),
-                _filterChip('Has incidents', 'has_incidents', AppDS.orange),
-              ],
-            ),
-          ),
-
-        // ── Maintenance summary ───────────────────────────────────────────────
-        if (!_loading && _error == null) _buildMaintSummary(),
-
-        // ── Table ─────────────────────────────────────────────────────────────
-        Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-              ? Center(
-                  child: Text(
-                    'Error loading data: $_error',
-                    style: GoogleFonts.spaceGrotesk(
-                      color: AppDS.red,
-                      fontSize: 13,
+                      ),
                     ),
                   ),
-                )
-              : Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: context.appSurface,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: context.appBorder),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.04,
-                                      ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
+                  if (MediaQuery.of(context).size.width < 700)
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert,
+                        color: context.appTextSecondary,
+                        size: 20,
+                      ),
+                      tooltip: 'More options',
+                      offset: const Offset(0, 36),
+                      color: context.appSurface2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: context.appBorder2),
+                      ),
+                      onSelected: (v) {
+                        if (v == 'filter') {
+                          setState(() => _showFilters = !_showFilters);
+                        }
+                        if (v == 'export') _exportCsv();
+                        if (v == 'monitoring') _chooseMonitoredMaintenance();
+                        if (v == 'add') _addRowForDate();
+                      },
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'filter',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.tune,
+                                size: 16,
+                                color: _showFilters
+                                    ? _pageAccent
+                                    : context.appTextSecondary,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                _showFilters ? 'Hide Filters' : 'Show Filters',
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 13,
+                                  color: context.appTextPrimary,
                                 ),
-                                clipBehavior: Clip.antiAlias,
-                                child: NotificationListener<ScrollNotification>(
-                                  onNotification: (n) {
-                                    if (n is ScrollUpdateNotification) {
-                                      if (n.metrics.axis == Axis.horizontal) {
-                                        _hOffset.value = _horizCtrl.hasClients
-                                            ? _horizCtrl.offset
-                                            : 0;
-                                      } else {
-                                        _vOffset.value = _vertCtrl.hasClients
-                                            ? _vertCtrl.offset
-                                            : 0;
-                                      }
-                                    }
-                                    return false;
-                                  },
-                                  child: SingleChildScrollView(
-                                    controller: _horizCtrl,
-                                    scrollDirection: Axis.horizontal,
-                                    child: SizedBox(
-                                      width: tableWidth,
-                                      child: Column(
-                                        children: [
-                                          // Sticky header
-                                          Container(
-                                            height: AppDS.tableHeaderH,
-                                            color: context.appHeaderBg,
-                                            child: Row(
-                                              children: [
-                                                const SizedBox(width: 36),
-                                                ..._cols.map(
-                                                  (c) => SizedBox(
-                                                    width: c.$3,
-                                                    child: Padding(
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 6,
-                                                          ),
-                                                      child: Text(
-                                                        c.$2,
-                                                        style:
-                                                            GoogleFonts.spaceGrotesk(
+                              ),
+                              if (_hasActiveFilter) ...[
+                                const Spacer(),
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: const BoxDecoration(
+                                    color: _pageAccent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'export',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.download_outlined,
+                                size: 16,
+                                color: context.appTextSecondary,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Export CSV',
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 13,
+                                  color: context.appTextPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'monitoring',
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.monitor_heart_outlined,
+                                size: 16,
+                                color: _pageAccent,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Monitoring',
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 13,
+                                  color: context.appTextPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'add',
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.add,
+                                size: 16,
+                                color: AppDS.accent,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Add QC Record',
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 13,
+                                  color: AppDS.accent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  else ...[
+                    const SizedBox(width: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        '${_filteredRows.length} record${_filteredRows.length == 1 ? '' : 's'}',
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 12,
+                          color: context.appTextMuted,
+                        ),
+                      ),
+                    ),
+                    Tooltip(
+                      message: _showFilters ? 'Hide filters' : 'Show filters',
+                      child: Stack(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.tune,
+                              color: _showFilters
+                                  ? _pageAccent
+                                  : context.appTextSecondary,
+                              size: 18,
+                            ),
+                            onPressed: () =>
+                                setState(() => _showFilters = !_showFilters),
+                          ),
+                          if (_hasActiveFilter)
+                            Positioned(
+                              right: 6,
+                              top: 6,
+                              child: Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                  color: _pageAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Tooltip(
+                      message: 'Export CSV',
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.download_outlined,
+                          size: 18,
+                          color: context.appTextSecondary,
+                        ),
+                        onPressed: _exportCsv,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _chooseMonitoredMaintenance,
+                      icon: const Icon(Icons.monitor_heart_outlined, size: 16),
+                      label: Text(
+                        'Monitoring ${_monitoredMaintKeys.length}/${_availableMaintKeys.length}',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _pageAccent,
+                        side: BorderSide(
+                          color: _pageAccent.withValues(alpha: 0.5),
+                        ),
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(horizontal: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        textStyle: GoogleFonts.spaceGrotesk(fontSize: 12),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppDS.accent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 0,
+                        ),
+                        minimumSize: const Size(0, 36),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        textStyle: GoogleFonts.spaceGrotesk(fontSize: 13),
+                      ),
+                      onPressed: _addRowForDate,
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add QC record'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // ── Filter panel ─────────────────────────────────────────────────────
+            if (_showFilters)
+              Container(
+                decoration: BoxDecoration(
+                  color: context.appSurface,
+                  border: Border(bottom: BorderSide(color: context.appBorder)),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      'Show:',
+                      style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _filterChip('All', 'all', null),
+                    const SizedBox(width: 6),
+                    _filterChip('Out of range', 'out_of_range', AppDS.red),
+                    const SizedBox(width: 6),
+                    _filterChip('Has incidents', 'has_incidents', AppDS.orange),
+                  ],
+                ),
+              ),
+
+            // ── Maintenance summary ───────────────────────────────────────────────
+            if (!_loading && _error == null) _buildMaintSummary(),
+
+            // ── Table ─────────────────────────────────────────────────────────────
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(
+                      child: Text(
+                        'Error loading data: $_error',
+                        style: GoogleFonts.spaceGrotesk(
+                          color: AppDS.red,
+                          fontSize: 13,
+                        ),
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: context.appSurface,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: context.appBorder,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.04,
+                                          ),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: NotificationListener<ScrollNotification>(
+                                      onNotification: (n) {
+                                        if (n is ScrollUpdateNotification) {
+                                          if (n.metrics.axis ==
+                                              Axis.horizontal) {
+                                            _hOffset.value =
+                                                _horizCtrl.hasClients
+                                                ? _horizCtrl.offset
+                                                : 0;
+                                          } else {
+                                            _vOffset.value =
+                                                _vertCtrl.hasClients
+                                                ? _vertCtrl.offset
+                                                : 0;
+                                          }
+                                        }
+                                        return false;
+                                      },
+                                      child: SingleChildScrollView(
+                                        controller: _horizCtrl,
+                                        scrollDirection: Axis.horizontal,
+                                        child: SizedBox(
+                                          width: tableWidth,
+                                          child: Column(
+                                            children: [
+                                              // Sticky header
+                                              Container(
+                                                height: AppDS.tableHeaderH,
+                                                color: context.appHeaderBg,
+                                                child: Row(
+                                                  children: [
+                                                    const SizedBox(width: 36),
+                                                    ...displayCols.map(
+                                                      (c) => SizedBox(
+                                                        width: c.$3,
+                                                        child: Padding(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 6,
+                                                              ),
+                                                          child: Text(
+                                                            c.$2,
+                                                            style: GoogleFonts.spaceGrotesk(
                                                               fontSize: 11,
                                                               fontWeight:
                                                                   FontWeight
@@ -1545,87 +1753,113 @@ class _WaterQcPageState extends State<WaterQcPage> {
                                                               color: context
                                                                   .appHeaderText,
                                                             ),
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                        ),
                                                       ),
                                                     ),
-                                                  ),
+                                                  ],
                                                 ),
-                                              ],
-                                            ),
+                                              ),
+                                              Container(
+                                                height: 1,
+                                                color: context.appBorder,
+                                              ),
+                                              // Rows
+                                              Expanded(
+                                                child: ListView.builder(
+                                                  controller: _vertCtrl,
+                                                  // +1 for the "add next" row at index 0
+                                                  itemCount:
+                                                      _filteredRows.length + 1,
+                                                  itemExtent: AppDS.tableRowH,
+                                                  itemBuilder: (_, i) {
+                                                    if (i == 0) {
+                                                      return _buildAddNextRow();
+                                                    }
+                                                    final fr = _filteredRows;
+                                                    return _buildRow(
+                                                      fr[i - 1],
+                                                      i - 1,
+                                                      displayCols,
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          Container(
-                                            height: 1,
-                                            color: context.appBorder,
-                                          ),
-                                          // Rows
-                                          Expanded(
-                                            child: ListView.builder(
-                                              controller: _vertCtrl,
-                                              // +1 for the "add next" row at index 0
-                                              itemCount:
-                                                  _filteredRows.length + 1,
-                                              itemExtent: AppDS.tableRowH,
-                                              itemBuilder: (_, i) {
-                                                if (i == 0) {
-                                                  return _buildAddNextRow();
-                                                }
-                                                final fr = _filteredRows;
-                                                return _buildRow(
-                                                  fr[i - 1],
-                                                  i - 1,
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
+                                const SizedBox(width: 4),
+                                AppVerticalThumb(
+                                  contentLength:
+                                      (_filteredRows.length + 1) *
+                                      AppDS.tableRowH,
+                                  topPadding: AppDS.tableHeaderH,
+                                  offset: _vOffset,
+                                  onScrollTo: (y) {
+                                    if (_vertCtrl.hasClients) {
+                                      _vertCtrl.jumpTo(
+                                        y.clamp(
+                                          0.0,
+                                          _vertCtrl.position.maxScrollExtent,
+                                        ),
+                                      );
+                                    }
+                                    _vOffset.value = y;
+                                  },
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            AppVerticalThumb(
-                              contentLength:
-                                  (_filteredRows.length + 1) * AppDS.tableRowH,
-                              topPadding: AppDS.tableHeaderH,
-                              offset: _vOffset,
-                              onScrollTo: (y) {
-                                if (_vertCtrl.hasClients) {
-                                  _vertCtrl.jumpTo(
-                                    y.clamp(
-                                      0.0,
-                                      _vertCtrl.position.maxScrollExtent,
-                                    ),
-                                  );
-                                }
-                                _vOffset.value = y;
-                              },
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 4),
+                          AppHorizontalThumb(
+                            contentWidth: tableWidth,
+                            offset: _hOffset,
+                            onScrollTo: (x) {
+                              if (_horizCtrl.hasClients) {
+                                _horizCtrl.jumpTo(
+                                  x.clamp(
+                                    0.0,
+                                    _horizCtrl.position.maxScrollExtent,
+                                  ),
+                                );
+                              }
+                              _hOffset.value = x;
+                            },
+                          ),
+                          const SizedBox(height: 4),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      AppHorizontalThumb(
-                        contentWidth: tableWidth,
-                        offset: _hOffset,
-                        onScrollTo: (x) {
-                          if (_horizCtrl.hasClients) {
-                            _horizCtrl.jumpTo(
-                              x.clamp(0.0, _horizCtrl.position.maxScrollExtent),
-                            );
-                          }
-                          _hOffset.value = x;
-                        },
-                      ),
-                      const SizedBox(height: 4),
-                    ],
-                  ),
-                ),
-        ),
-      ],
+                    ),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  List<(String, String, double, String)> _columnsForWidth(
+    double availableWidth,
+  ) {
+    final fixedWidth =
+        36 +
+        _cols
+            .where((column) => column.$1 != 'observations')
+            .fold(0.0, (sum, column) => sum + column.$3);
+    final observationsWidth = math.max(160.0, availableWidth - fixedWidth);
+    return _cols
+        .map(
+          (column) => column.$1 == 'observations'
+              ? (column.$1, column.$2, observationsWidth, column.$4)
+              : column,
+        )
+        .toList();
   }
 
   // ── "Add next" row at top of list ─────────────────────────────────────────
@@ -1688,7 +1922,11 @@ class _WaterQcPageState extends State<WaterQcPage> {
 
   // ── Row builder ────────────────────────────────────────────────────────────
 
-  Widget _buildRow(Map<String, dynamic> row, int i) {
+  Widget _buildRow(
+    Map<String, dynamic> row,
+    int i,
+    List<(String, String, double, String)> columns,
+  ) {
     final bg = i.isEven ? context.appSurface : context.appSurface2;
     return Container(
       decoration: BoxDecoration(
@@ -1708,7 +1946,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
               onPressed: () => _deleteRow(row),
             ),
           ),
-          ..._cols.map((c) => _buildCell(row, c)),
+          ...columns.map((c) => _buildCell(row, c)),
         ],
       ),
     );

@@ -6,8 +6,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../samples/sample_detail_page.dart';
 import '../../backups/backup_service.dart';
 import '/theme/module_permission.dart';
@@ -24,6 +27,23 @@ part 'strain_detail_widgets.dart';
 class _DS {
   static const Color accent = Color(0xFF3B82F6);
 }
+
+const _fileReferenceKeys = {
+  'strain_abs_related_files',
+  'strain_mta_file',
+  'strain_external_links',
+};
+
+const _sequenceReferenceKeys = {
+  'strain_genbank_16s_its',
+  'strain_gca_accession',
+  'strain_genbank_18s',
+  'strain_genbank_its2',
+  'strain_genbank_rbcl',
+  'strain_genbank_tufa',
+  'strain_genbank_cox1',
+  'strain_sequence_literature_ids',
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Field group definitions
@@ -546,7 +566,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
         'strains',
         int.parse(widget.strainId.toString()),
       );
-      if (!QrRules.isValid(_data['strain_qrcode']?.toString() ?? '')) {
+      if (_data['strain_qrcode']?.toString() != expectedQr) {
         _data['strain_qrcode'] = expectedQr;
         _ctrl['strain_qrcode']?.text = expectedQr;
         Supabase.instance.client
@@ -565,10 +585,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
 
   Future<void> _save() async {
     if (!_editMode) return;
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.edit)) return;
     setState(() => _saving = true);
     try {
       final update = <String, dynamic>{};
@@ -602,10 +619,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
   }
 
   Future<void> _delete() async {
-    if (!context.canEditModule) {
-      context.warnReadOnly();
-      return;
-    }
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
     final code = _data['strain_code'] ?? widget.strainId.toString();
     final confirm = await showDialog<bool>(
       context: context,
@@ -846,6 +860,9 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
                   context,
                   type: 'strains',
                   prefillTitle: _data['strain_code']?.toString() ?? '',
+                  entityType: 'strains',
+                  entityId: widget.strainId,
+                  entityLabel: _data['strain_code']?.toString(),
                 );
               }
             },
@@ -1085,6 +1102,9 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
               context,
               type: 'strains',
               prefillTitle: _data['strain_code']?.toString() ?? '',
+              entityType: 'strains',
+              entityId: widget.strainId,
+              entityLabel: _data['strain_code']?.toString(),
             ),
           ),
           if (_editMode)
@@ -1501,6 +1521,90 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
     );
   }
 
+  List<String> _referenceItems(String raw) => raw
+      .split(RegExp(r'[\n;,]+'))
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList();
+
+  Uri? _referenceUri(String key, String value) {
+    final parsed = Uri.tryParse(value);
+    if (parsed != null &&
+        (parsed.scheme == 'http' || parsed.scheme == 'https')) {
+      return parsed;
+    }
+    final encoded = Uri.encodeComponent(value);
+    if (key == 'strain_gca_accession') {
+      return Uri.parse(
+        'https://www.ncbi.nlm.nih.gov/datasets/genome/$encoded/',
+      );
+    }
+    if (key.startsWith('strain_genbank_')) {
+      return Uri.parse('https://www.ncbi.nlm.nih.gov/nuccore/$encoded');
+    }
+    if (key == 'strain_sequence_literature_ids') {
+      return Uri.parse('https://pubmed.ncbi.nlm.nih.gov/?term=$encoded');
+    }
+    return null;
+  }
+
+  Future<void> _openReference(String key, String value) async {
+    final uri = _referenceUri(key, value);
+    if (uri != null) {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened) _snack('Could not open $value');
+      return;
+    }
+    final path = value.startsWith('file://')
+        ? Uri.parse(value).toFilePath()
+        : value;
+    final result = await OpenFilex.open(path);
+    if (result.type != ResultType.done) {
+      _snack(result.message.isEmpty ? 'Could not open $value' : result.message);
+    }
+  }
+
+  Future<void> _showReferences(String key, String raw) async {
+    final items = _referenceItems(raw);
+    if (items.isEmpty) return;
+    if (items.length == 1) {
+      await _openReference(key, items.single);
+      return;
+    }
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.appSurface,
+      builder: (sheetContext) => SafeArea(
+        child: ListView.separated(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: items.length,
+          separatorBuilder: (_, _) =>
+              Divider(height: 1, color: context.appBorder),
+          itemBuilder: (_, index) => ListTile(
+            leading: Icon(
+              _sequenceReferenceKeys.contains(key)
+                  ? Icons.biotech_outlined
+                  : Icons.insert_drive_file_outlined,
+              color: _DS.accent,
+            ),
+            title: Text(
+              items[index],
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              _openReference(key, items[index]);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildField(_Field f) {
     final ctrl = _ctrl[f.key] ??= TextEditingController(
       text: _data[f.key]?.toString() ?? '',
@@ -1524,6 +1628,29 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
             onPressed: ctrl.text.isEmpty
                 ? null
                 : () => _showQrDialog(ctrl.text),
+          ),
+        );
+      }
+      if (_fileReferenceKeys.contains(f.key) ||
+          _sequenceReferenceKeys.contains(f.key)) {
+        return _buildReadOnlyField(
+          label: f.label,
+          value: ctrl.text,
+          lines: f.lines,
+          trailing: IconButton(
+            icon: Icon(
+              _sequenceReferenceKeys.contains(f.key)
+                  ? Icons.biotech_outlined
+                  : Icons.open_in_new_rounded,
+              size: 18,
+              color: _DS.accent,
+            ),
+            tooltip: _sequenceReferenceKeys.contains(f.key)
+                ? 'Open sequence reference'
+                : 'Open file or link',
+            onPressed: ctrl.text.trim().isEmpty
+                ? null
+                : () => _showReferences(f.key, ctrl.text),
           ),
         );
       }

@@ -5,13 +5,16 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+
 import '/theme/module_permission.dart';
 import '/theme/theme.dart';
 import '/core/fish_db_schema.dart';
 import '/core/sop_db_schema.dart';
+import '/supabase/supabase_manager.dart';
 import '../../resources/machines/machine_detail_page.dart';
 import '../../resources/reagents/reagent_detail_page.dart';
 import '../../resources/locations/location_detail_page.dart';
+import '../../resources/locations/room_detail_page.dart';
 import '../../culture_collection/strains/strain_detail_page.dart';
 import '../../culture_collection/samples/sample_detail_page.dart';
 import '../../fish_facility/lines/fish_lines_detail_page.dart';
@@ -22,9 +25,12 @@ import '../../users/user_detail_page.dart';
 import '../../sops/sop_model.dart';
 import '../../sops/doc_viewer_page.dart';
 import 'qr_code_rules.dart';
+import 'qr_record_lookup.dart';
+import 'qr_scan_result_page.dart';
 
 /// QR scanner page — mobile only.
-/// Parses `bluelims://<projectRef>/<type>/<id>` and opens the matching detail page.
+/// Parses `limsphere://<projectCode>/<category>/<uniqueId>` and opens the
+/// matching detail page.
 class QrScannerPage extends StatefulWidget {
   const QrScannerPage({super.key});
 
@@ -53,20 +59,41 @@ class _QrScannerPageState extends State<QrScannerPage> {
   Future<void> _handleQr(String raw) async {
     final payload = QrRules.parse(raw);
     if (payload == null) {
-      _showError('Not a valid LIMS Sphere QR code.');
+      await _rejectScan('Not a valid LIMS Sphere QR code.');
+      return;
+    }
+    final currentProject = SupabaseManager.projectRef ?? 'local';
+    if (!QrRules.belongsToProject(payload, currentProject)) {
+      await _rejectScan(
+        'This QR code belongs to project ${payload.projectCode}, not $currentProject.',
+      );
       return;
     }
 
-    setState(() { _handled = true; _fetching = true; });
+    setState(() {
+      _handled = true;
+      _fetching = true;
+    });
     _ctrl.stop();
 
     Widget page;
     try {
-      page = await _resolveRoute(payload);
+      final record = await lookupQrRecord(payload);
+      page = ResolvedModulePermission(
+        moduleId: record.spec.moduleId,
+        child: QrScanResultPage(
+          record: record,
+          openRecord: () => _resolveRoute(payload),
+          scanAgainPage: const QrScannerPage(),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       _showError('Could not load record: $e');
-      setState(() { _handled = false; _fetching = false; });
+      setState(() {
+        _handled = false;
+        _fetching = false;
+      });
       _ctrl.start();
       return;
     }
@@ -77,12 +104,77 @@ class _QrScannerPageState extends State<QrScannerPage> {
 
   Future<Widget> _resolveRoute(QrPayload payload) => resolveQrRoute(payload);
 
+  Future<void> _rejectScan(String message) async {
+    if (!mounted) return;
+    setState(() => _handled = true);
+    await _ctrl.stop();
+    if (!mounted) return;
+    _showError(message);
+    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    if (!mounted) return;
+    setState(() => _handled = false);
+    await _ctrl.start();
+  }
+
+  Future<void> _enterQrLink() async {
+    if (_handled) return;
+    setState(() => _handled = true);
+    await _ctrl.stop();
+    if (!mounted) return;
+
+    final controller = TextEditingController();
+    final raw = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Look up QR link'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            labelText: 'LIMSphere link',
+            hintText: 'limsphere://project/category/id',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (value) {
+            final trimmed = value.trim();
+            if (trimmed.isNotEmpty) Navigator.pop(dialogContext, trimmed);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (value.isNotEmpty) Navigator.pop(dialogContext, value);
+            },
+            child: const Text('Look up'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted) return;
+    setState(() => _handled = false);
+    if (raw == null) {
+      await _ctrl.start();
+      return;
+    }
+    await _handleQr(raw);
+  }
+
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: AppDS.red,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppDS.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -95,9 +187,17 @@ class _QrScannerPageState extends State<QrScannerPage> {
         title: const Text(
           'Scan QR Code',
           style: TextStyle(
-              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.keyboard_outlined, color: Colors.white70),
+            tooltip: 'Enter QR link',
+            onPressed: _enterQrLink,
+          ),
           IconButton(
             icon: const Icon(Icons.flash_on_outlined, color: Colors.white70),
             tooltip: 'Toggle flash',
@@ -105,59 +205,64 @@ class _QrScannerPageState extends State<QrScannerPage> {
           ),
         ],
       ),
-      body: Stack(children: [
-        MobileScanner(controller: _ctrl, onDetect: _onDetect),
+      body: Stack(
+        children: [
+          MobileScanner(controller: _ctrl, onDetect: _onDetect),
 
-        // Scan-area overlay
-        Center(
-          child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(
-              border: Border.all(color: AppDS.accent, width: 3),
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-
-        // Corner accents (cosmetic)
-        Center(
-          child: SizedBox(
-            width: 250,
-            height: 250,
-            child: CustomPaint(painter: _CornerPainter()),
-          ),
-        ),
-
-        // Hint label
-        Positioned(
-          bottom: 60,
-          left: 0,
-          right: 0,
-          child: Center(
+          // Scan-area overlay
+          Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              width: 250,
+              height: 250,
               decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Align QR code within the frame',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+                border: Border.all(color: AppDS.accent, width: 3),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
-        ),
 
-        // Loading overlay while fetching record
-        if (_fetching)
-          Container(
-            color: Colors.black54,
-            child: const Center(
-              child: CircularProgressIndicator(color: AppDS.accent),
+          // Corner accents (cosmetic)
+          Center(
+            child: SizedBox(
+              width: 250,
+              height: 250,
+              child: CustomPaint(painter: _CornerPainter()),
             ),
           ),
-      ]),
+
+          // Hint label
+          Positioned(
+            bottom: 60,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Align QR code within the frame',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+              ),
+            ),
+          ),
+
+          // Loading overlay while fetching record
+          if (_fetching)
+            Container(
+              color: Colors.black54,
+              child: const Center(
+                child: CircularProgressIndicator(color: AppDS.accent),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -171,13 +276,19 @@ class _CornerPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     const len = 28.0;
-    const r   = 12.0;
+    const r = 12.0;
 
     void corner(double x, double y, double dx, double dy) {
       canvas.drawLine(
-          Offset(x + dx * r, y), Offset(x + dx * (r + len), y), paint);
+        Offset(x + dx * r, y),
+        Offset(x + dx * (r + len), y),
+        paint,
+      );
       canvas.drawLine(
-          Offset(x, y + dy * r), Offset(x, y + dy * (r + len)), paint);
+        Offset(x, y + dy * r),
+        Offset(x, y + dy * (r + len)),
+        paint,
+      );
     }
 
     corner(0, 0, 1, 1);
@@ -192,6 +303,9 @@ class _CornerPainter extends CustomPainter {
 
 /// Top-level — shared by [QrScannerPage] and the MenuPage deep-link handler.
 Future<Widget> resolveQrRoute(QrPayload payload) async {
+  // Confirm the target still exists (and apply user-record access checks)
+  // before constructing any detail route, including external deep links.
+  await lookupQrRecord(payload);
   switch (payload.type) {
     case 'machines':
       return ResolvedModulePermission(
@@ -206,9 +320,18 @@ Future<Widget> resolveQrRoute(QrPayload payload) async {
       );
 
     case 'locations':
+      final row = await Supabase.instance.client
+          .from('storage_locations')
+          .select('location_type')
+          .eq('location_id', payload.id)
+          .single();
+      final isRoom =
+          row['location_type'] == null || row['location_type'] == 'room';
       return ResolvedModulePermission(
         moduleId: 'locations',
-        child: LocationDetailPage(locationId: payload.id),
+        child: isRoom
+            ? RoomDetailPage(locationId: payload.id)
+            : LocationDetailPage(locationId: payload.id),
       );
 
     case 'strains':
@@ -231,7 +354,9 @@ Future<Widget> resolveQrRoute(QrPayload payload) async {
           .single();
       return ResolvedModulePermission(
         moduleId: 'fish_lines',
-        child: FishLineDetailPage(fishLine: FishLine.fromMap(Map<String, dynamic>.from(row))),
+        child: FishLineDetailPage(
+          fishLine: FishLine.fromMap(Map<String, dynamic>.from(row)),
+        ),
       );
 
     case 'fish_stocks':
@@ -242,11 +367,14 @@ Future<Widget> resolveQrRoute(QrPayload payload) async {
           .single();
       return ResolvedModulePermission(
         moduleId: 'fish_stock',
-        child: TankDetailPage(tank: ZebrafishTank.fromMap(Map<String, dynamic>.from(row))),
+        child: TankDetailPage(
+          tank: ZebrafishTank.fromMap(Map<String, dynamic>.from(row)),
+        ),
       );
 
     case 'users':
-      final viewerEmail = Supabase.instance.client.auth.currentSession?.user.email ??
+      final viewerEmail =
+          Supabase.instance.client.auth.currentSession?.user.email ??
           Supabase.instance.client.auth.currentUser?.email ??
           '';
       if (viewerEmail.isEmpty) {
@@ -259,7 +387,8 @@ Future<Widget> resolveQrRoute(QrPayload payload) async {
           .maybeSingle();
       final viewerRole = viewer?['user_role'] as String? ?? '';
       final viewerId = viewer?['user_id'] as int?;
-      final canOpenUser = viewerId == payload.id ||
+      final canOpenUser =
+          viewerId == payload.id ||
           viewerRole == 'admin' ||
           viewerRole == 'superadmin';
       if (!canOpenUser) {
@@ -300,7 +429,12 @@ Future<Widget> resolveQrRoute(QrPayload payload) async {
       final bytes = await Supabase.instance.client.storage
           .from(SopSch.bucket)
           .download(filePath);
-      return DocViewerPage(bytes: bytes, title: sop.name, fileName: fileName, viewMode: mode);
+      return DocViewerPage(
+        bytes: bytes,
+        title: sop.name,
+        fileName: fileName,
+        viewMode: mode,
+      );
 
     default:
       throw StateError('unhandled type: ${payload.type}');

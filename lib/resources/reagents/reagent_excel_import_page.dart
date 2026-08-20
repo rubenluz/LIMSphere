@@ -3,6 +3,7 @@
 // Steps: 0=pick file  1=map columns  2=preview  3=importing  4=done
 
 import 'dart:convert';
+
 import 'package:archive/archive.dart';
 import 'package:csv/csv.dart' show CsvDecoder;
 import 'package:file_picker/file_picker.dart';
@@ -10,7 +11,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:xml/xml.dart';
+
 import '/theme/theme.dart';
+import '/theme/module_permission.dart';
 import '../../backups/backup_service.dart';
 
 // ── Reagent DB fields for mapping dropdowns ────────────────────────────────
@@ -382,14 +385,14 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv', 'xlsx', 'xls'],
-      withData: true,
     );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null) return;
+    if (result.isEmpty) return;
+    final file = result.first;
+    final bytes = await file.readAsBytes();
 
-    final ext = (file.extension ?? '').toLowerCase();
+    final ext = file.name.contains('.')
+        ? file.name.split('.').last.toLowerCase()
+        : '';
     List<List<dynamic>> rows;
     try {
       rows = (ext == 'xlsx' || ext == 'xls')
@@ -434,6 +437,8 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
 
   // ── Step 2 → 3: import ─────────────────────────────────────────────────
   Future<void> _runImport() async {
+    if (!context.requireModuleAction(ModuleAction.create)) return;
+    if (!context.requireModuleAction(ModuleAction.bulkUpdate)) return;
     setState(() => _step = 3);
     final sb = StringBuffer();
     final db = Supabase.instance.client;
@@ -443,12 +448,14 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
     try {
       final locRows = await db
           .from('storage_locations')
-          .select('location_id, location_name');
-      _locationCache = {
-        for (final r in (locRows as List))
-          (r['location_name'] as String).toLowerCase():
-              (r['location_id'] as num).toInt(),
-      };
+          .select('location_id, location_name, location_code');
+      _locationCache = {};
+      for (final r in (locRows as List)) {
+        final id = (r['location_id'] as num).toInt();
+        _locationCache[(r['location_name'] as String).toLowerCase()] = id;
+        final code = r['location_code']?.toString().trim().toLowerCase();
+        if (code != null && code.isNotEmpty) _locationCache[code] = id;
+      }
 
       for (final record in _parsed) {
         final name = record['reagent_name'];

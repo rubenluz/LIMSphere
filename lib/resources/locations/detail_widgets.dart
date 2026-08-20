@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '/theme/theme.dart';
 
 class DetailSection extends StatelessWidget {
@@ -32,48 +33,52 @@ class DetailSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: context.appBorder),
       ),
-      child: Column(children: [
-        InkWell(
-          onTap: onToggle,
-          borderRadius: BorderRadius.vertical(
-            top: const Radius.circular(10),
-            bottom: Radius.circular(expanded ? 0 : 10),
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-            decoration: BoxDecoration(
-              color: context.appSurface2,
-              borderRadius: BorderRadius.vertical(
-                top: const Radius.circular(10),
-                bottom: Radius.circular(expanded ? 0 : 10),
-              ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.vertical(
+              top: const Radius.circular(10),
+              bottom: Radius.circular(expanded ? 0 : 10),
             ),
-            child: Row(children: [
-              Icon(icon, size: 14, color: AppDS.accent),
-              const SizedBox(width: 8),
-              Text(title,
-                  style: GoogleFonts.spaceGrotesk(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              decoration: BoxDecoration(
+                color: context.appSurface2,
+                borderRadius: BorderRadius.vertical(
+                  top: const Radius.circular(10),
+                  bottom: Radius.circular(expanded ? 0 : 10),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, size: 14, color: AppDS.accent),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: GoogleFonts.spaceGrotesk(
                       color: context.appTextSecondary,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8)),
-              const Spacer(),
-              Icon(
-                expanded ? Icons.expand_less : Icons.expand_more,
-                size: 18,
-                color: context.appTextMuted,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: context.appTextMuted,
+                  ),
+                ],
               ),
-            ]),
+            ),
           ),
-        ),
-        if (expanded) ...[
-          Divider(height: 1, color: context.appBorder),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: child,
-          ),
+          if (expanded) ...[
+            Divider(height: 1, color: context.appBorder),
+            Padding(padding: const EdgeInsets.all(14), child: child),
+          ],
         ],
-      ]),
+      ),
     );
   }
 }
@@ -85,10 +90,11 @@ class DetailFieldRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: children
-          .expand((w) => [Expanded(child: w), const SizedBox(width: 10)])
-          .toList()
-        ..removeLast(),
+      children:
+          children
+              .expand((w) => [Expanded(child: w), const SizedBox(width: 10)])
+              .toList()
+            ..removeLast(),
     );
   }
 }
@@ -117,26 +123,35 @@ class DetailInlineField extends StatelessWidget {
       keyboardType: keyboardType,
       readOnly: readOnly,
       style: GoogleFonts.spaceGrotesk(
-          color: readOnly ? context.appTextSecondary : context.appTextPrimary,
-          fontSize: 13),
+        color: readOnly ? context.appTextSecondary : context.appTextPrimary,
+        fontSize: 13,
+      ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.spaceGrotesk(
-            color: context.appTextSecondary, fontSize: 11),
+          color: context.appTextSecondary,
+          fontSize: 11,
+        ),
         filled: true,
         fillColor: readOnly ? context.appSurface2 : context.appSurface3,
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.appBorder)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.appBorder)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-                color: readOnly ? context.appBorder : AppDS.accent)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: readOnly ? context.appBorder : AppDS.accent,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
       ),
     );
   }
@@ -164,17 +179,20 @@ class DetailInlineDropdown<T> extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.spaceGrotesk(
-            color: context.appTextSecondary, fontSize: 11),
+          color: context.appTextSecondary,
+          fontSize: 11,
+        ),
         filled: true,
         fillColor: readOnly ? context.appSurface2 : context.appSurface3,
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.appBorder)),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.appBorder)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: context.appBorder),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
@@ -182,8 +200,9 @@ class DetailInlineDropdown<T> extends StatelessWidget {
           isExpanded: true,
           dropdownColor: context.appSurface,
           style: GoogleFonts.spaceGrotesk(
-              color: readOnly ? context.appTextSecondary : context.appTextPrimary,
-              fontSize: 13),
+            color: readOnly ? context.appTextSecondary : context.appTextPrimary,
+            fontSize: 13,
+          ),
           items: items,
           onChanged: readOnly ? null : onChanged,
           disabledHint: _disabledHint(context),
@@ -200,7 +219,9 @@ class DetailInlineDropdown<T> extends StatelessWidget {
     if (match.isEmpty) return null;
     return DefaultTextStyle.merge(
       style: GoogleFonts.spaceGrotesk(
-          color: context.appTextSecondary, fontSize: 13),
+        color: context.appTextSecondary,
+        fontSize: 13,
+      ),
       child: match.first.child,
     );
   }
@@ -256,14 +277,15 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
     if (matches.isEmpty) return KeyEventResult.ignored;
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      setState(() =>
-          _selectedIndex = (_selectedIndex + 1) % matches.length);
+      setState(() => _selectedIndex = (_selectedIndex + 1) % matches.length);
       _overlay?.markNeedsBuild();
       return KeyEventResult.handled;
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      setState(() => _selectedIndex =
-          (_selectedIndex - 1 + matches.length) % matches.length);
+      setState(
+        () => _selectedIndex =
+            (_selectedIndex - 1 + matches.length) % matches.length,
+      );
       _overlay?.markNeedsBuild();
       return KeyEventResult.handled;
     }
@@ -306,11 +328,8 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
     setState(() => _entries = parsed);
   }
 
-  static List<String> _parse(String raw) => raw
-      .split(';')
-      .map((s) => s.trim())
-      .where((s) => s.isNotEmpty)
-      .toList();
+  static List<String> _parse(String raw) =>
+      raw.split(';').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
 
   static bool _listEq(List<String> a, List<String> b) {
     if (a.length != b.length) return false;
@@ -367,11 +386,14 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
       return !_entries.contains(email);
     });
     if (_query.isEmpty) return users.take(8).toList();
-    return users.where((u) {
-      final name  = (u['user_name']  as String?)?.toLowerCase() ?? '';
-      final email = (u['user_email'] as String?)?.toLowerCase() ?? '';
-      return name.contains(_query) || email.contains(_query);
-    }).take(8).toList();
+    return users
+        .where((u) {
+          final name = (u['user_name'] as String?)?.toLowerCase() ?? '';
+          final email = (u['user_email'] as String?)?.toLowerCase() ?? '';
+          return name.contains(_query) || email.contains(_query);
+        })
+        .take(8)
+        .toList();
   }
 
   void _showOverlay() {
@@ -416,8 +438,7 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
                   final u = _matches[i];
                   final selected = i == _selectedIndex;
                   return InkWell(
-                    onTap: () =>
-                        _addEntry((u['user_email'] as String?) ?? ''),
+                    onTap: () => _addEntry((u['user_email'] as String?) ?? ''),
                     onHover: (hovered) {
                       if (hovered && _selectedIndex != i) {
                         setState(() => _selectedIndex = i);
@@ -429,37 +450,44 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
                           ? AppDS.accent.withValues(alpha: 0.15)
                           : null,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      child: Row(children: [
-                        Icon(Icons.person_outline,
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline,
                             size: 14,
-                            color: selected
-                                ? AppDS.accent
-                                : ctx.appTextMuted),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                (u['user_name'] as String?) ??
-                                    (u['user_email'] as String? ?? ''),
-                                style: GoogleFonts.spaceGrotesk(
+                            color: selected ? AppDS.accent : ctx.appTextMuted,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  (u['user_name'] as String?) ??
+                                      (u['user_email'] as String? ?? ''),
+                                  style: GoogleFonts.spaceGrotesk(
                                     color: selected
                                         ? AppDS.accent
                                         : ctx.appTextPrimary,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w500),
-                              ),
-                              Text(
-                                (u['user_email'] as String?) ?? '',
-                                style: GoogleFonts.jetBrainsMono(
-                                    color: ctx.appTextMuted, fontSize: 10),
-                              ),
-                            ],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  (u['user_email'] as String?) ?? '',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    color: ctx.appTextMuted,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -488,11 +516,13 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
   @override
   Widget build(BuildContext context) {
     final chips = _entries
-        .map((e) => ResponsibleChip(
-              raw: e,
-              user: _matchedUser(e),
-              onRemove: widget.readOnly ? null : () => _removeEntry(e),
-            ))
+        .map(
+          (e) => ResponsibleChip(
+            raw: e,
+            user: _matchedUser(e),
+            onRemove: widget.readOnly ? null : () => _removeEntry(e),
+          ),
+        )
         .toList();
 
     if (widget.readOnly) {
@@ -500,22 +530,32 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
         decoration: InputDecoration(
           labelText: widget.label,
           labelStyle: GoogleFonts.spaceGrotesk(
-              color: context.appTextSecondary, fontSize: 11),
+            color: context.appTextSecondary,
+            fontSize: 11,
+          ),
           filled: true,
           fillColor: context.appSurface2,
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: context.appBorder)),
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: context.appBorder),
+          ),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: context.appBorder)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: context.appBorder),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 8,
+          ),
         ),
         child: chips.isEmpty
-            ? Text('—',
+            ? Text(
+                '—',
                 style: GoogleFonts.spaceGrotesk(
-                    color: context.appTextMuted, fontSize: 13))
+                  color: context.appTextMuted,
+                  fontSize: 13,
+                ),
+              )
             : Wrap(spacing: 6, runSpacing: 6, children: chips),
       );
     }
@@ -529,20 +569,27 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
           decoration: InputDecoration(
             labelText: widget.label,
             labelStyle: GoogleFonts.spaceGrotesk(
-                color: context.appTextSecondary, fontSize: 11),
+              color: context.appTextSecondary,
+              fontSize: 11,
+            ),
             filled: true,
             fillColor: context.appSurface3,
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: context.appBorder)),
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: context.appBorder),
+            ),
             enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: context.appBorder)),
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: context.appBorder),
+            ),
             focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppDS.accent)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppDS.accent),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 6,
+            ),
           ),
           child: Wrap(
             spacing: 6,
@@ -566,7 +613,9 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
                     controller: _inputCtrl,
                     focusNode: _focus,
                     style: GoogleFonts.spaceGrotesk(
-                        color: context.appTextPrimary, fontSize: 13),
+                      color: context.appTextPrimary,
+                      fontSize: 13,
+                    ),
                     decoration: InputDecoration(
                       isDense: true,
                       border: InputBorder.none,
@@ -574,17 +623,19 @@ class _DetailResponsibleFieldState extends State<DetailResponsibleField> {
                           ? 'Type @ to mention a user'
                           : 'Add…',
                       hintStyle: GoogleFonts.spaceGrotesk(
-                          color: context.appTextMuted, fontSize: 12),
+                        color: context.appTextMuted,
+                        fontSize: 12,
+                      ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 6),
                     ),
                     onSubmitted: (v) {
                       // Prefer top match if query is active; otherwise free text.
                       if (_query.isNotEmpty && _matches.isNotEmpty) {
                         _addEntry(
-                            (_matches.first['user_email'] as String?) ?? v);
+                          (_matches.first['user_email'] as String?) ?? v,
+                        );
                       } else {
-                        final stripped =
-                            v.startsWith('@') ? v.substring(1) : v;
+                        final stripped = v.startsWith('@') ? v.substring(1) : v;
                         _addEntry(stripped);
                       }
                     },
@@ -636,12 +687,14 @@ class DetailResponsibleChips extends StatelessWidget {
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: entries
-          .map((e) => ResponsibleChip(
-                raw: e,
-                user: _match(e),
-                onRemove: null,
-                compact: compact,
-              ))
+          .map(
+            (e) => ResponsibleChip(
+              raw: e,
+              user: _match(e),
+              onRemove: null,
+              compact: compact,
+            ),
+          )
           .toList(),
     );
   }
@@ -691,8 +744,8 @@ class ResponsibleChip extends StatelessWidget {
     final matched = user != null;
     final displayText = matched
         ? ((user!['user_name'] as String?)?.trim().isNotEmpty == true
-            ? user!['user_name'] as String
-            : (user!['user_email'] as String? ?? raw))
+              ? user!['user_name'] as String
+              : (user!['user_email'] as String? ?? raw))
         : raw;
     final color = matched
         ? _userColor((user!['user_email'] as String?) ?? raw)
@@ -713,29 +766,37 @@ class ResponsibleChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: color.withValues(alpha: 0.35)),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(matched ? Icons.person_outline : Icons.help_outline,
-                size: compact ? 11 : 12, color: color),
-            const SizedBox(width: 4),
-            Text(displayText,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                matched ? Icons.person_outline : Icons.help_outline,
+                size: compact ? 11 : 12,
+                color: color,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                displayText,
                 style: GoogleFonts.spaceGrotesk(
-                    color: color,
-                    fontSize: compact ? 11 : 12,
-                    fontWeight:
-                        matched ? FontWeight.w600 : FontWeight.normal)),
-            if (onRemove != null) ...[
-              const SizedBox(width: 2),
-              InkWell(
-                onTap: onRemove,
-                borderRadius: BorderRadius.circular(10),
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: Icon(Icons.close, size: 12, color: color),
+                  color: color,
+                  fontSize: compact ? 11 : 12,
+                  fontWeight: matched ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
-            ] else if (!compact)
-              const SizedBox(width: 4),
-          ]),
+              if (onRemove != null) ...[
+                const SizedBox(width: 2),
+                InkWell(
+                  onTap: onRemove,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Icon(Icons.close, size: 12, color: color),
+                  ),
+                ),
+              ] else if (!compact)
+                const SizedBox(width: 4),
+            ],
+          ),
         ),
       ),
     );
@@ -747,32 +808,43 @@ class ResponsibleChip extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: ctx.appSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Row(children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: AppDS.accent.withValues(alpha: 0.2),
-            child: const Icon(Icons.person_outline,
-                size: 16, color: AppDS.accent),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              (u['user_name'] as String?) ??
-                  (u['user_email'] as String? ?? 'User'),
-              style: GoogleFonts.spaceGrotesk(
-                  color: ctx.appTextPrimary, fontWeight: FontWeight.w600),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppDS.accent.withValues(alpha: 0.2),
+              child: const Icon(
+                Icons.person_outline,
+                size: 16,
+                color: AppDS.accent,
+              ),
             ),
-          ),
-        ]),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                (u['user_name'] as String?) ??
+                    (u['user_email'] as String? ?? 'User'),
+                style: GoogleFonts.spaceGrotesk(
+                  color: ctx.appTextPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _infoRow(ctx, Icons.email_outlined,     u['user_email']       as String?),
-            _infoRow(ctx, Icons.phone_outlined,     u['user_phone']       as String?),
-            _infoRow(ctx, Icons.business_outlined,  u['user_institution'] as String?),
-            _infoRow(ctx, Icons.groups_outlined,    u['user_group']       as String?),
-            _infoRow(ctx, Icons.badge_outlined,     u['user_role']        as String?),
+            _infoRow(ctx, Icons.email_outlined, u['user_email'] as String?),
+            _infoRow(ctx, Icons.phone_outlined, u['user_phone'] as String?),
+            _infoRow(
+              ctx,
+              Icons.business_outlined,
+              u['user_institution'] as String?,
+            ),
+            _infoRow(ctx, Icons.groups_outlined, u['user_group'] as String?),
+            _infoRow(ctx, Icons.badge_outlined, u['user_role'] as String?),
           ],
         ),
         actions: [
@@ -782,20 +854,26 @@ class ResponsibleChip extends StatelessWidget {
                 final email = u['user_email'] as String;
                 await Clipboard.setData(ClipboardData(text: email));
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                    content: Text('Email copied',
-                        style: GoogleFonts.spaceGrotesk(color: Colors.white)),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: AppDS.surface,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ));
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Email copied',
+                        style: GoogleFonts.spaceGrotesk(color: Colors.white),
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: AppDS.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  );
                 }
               },
               icon: Icon(Icons.copy, size: 14, color: ctx.appTextSecondary),
-              label: Text('Copy email',
-                  style: GoogleFonts.spaceGrotesk(
-                      color: ctx.appTextSecondary)),
+              label: Text(
+                'Copy email',
+                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary),
+              ),
             ),
             TextButton.icon(
               onPressed: () async {
@@ -804,16 +882,23 @@ class ResponsibleChip extends StatelessWidget {
                   await launchUrl(uri);
                 }
               },
-              icon: const Icon(Icons.send_outlined,
-                  size: 14, color: AppDS.accent),
-              label: Text('Send email',
-                  style: GoogleFonts.spaceGrotesk(color: AppDS.accent)),
+              icon: const Icon(
+                Icons.send_outlined,
+                size: 14,
+                color: AppDS.accent,
+              ),
+              label: Text(
+                'Send email',
+                style: GoogleFonts.spaceGrotesk(color: AppDS.accent),
+              ),
             ),
           ],
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Close',
-                style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary)),
+            child: Text(
+              'Close',
+              style: GoogleFonts.spaceGrotesk(color: ctx.appTextSecondary),
+            ),
           ),
         ],
       ),
@@ -824,27 +909,34 @@ class ResponsibleChip extends StatelessWidget {
     if (value == null || value.trim().isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(children: [
-        Icon(icon, size: 14, color: context.appTextMuted),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(value,
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: context.appTextMuted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              value,
               style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextPrimary, fontSize: 13)),
-        ),
-      ]),
+                color: context.appTextPrimary,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
-
 }
 
 void detailSnack(BuildContext context, String msg) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(msg, style: const TextStyle(color: Colors.white)),
-    behavior: SnackBarBehavior.floating,
-    backgroundColor: AppDS.surface,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-  ));
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(msg, style: const TextStyle(color: Colors.white)),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppDS.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ),
+  );
 }
 
 String detailFmtDate(DateTime d) =>
@@ -853,9 +945,10 @@ String detailFmtDate(DateTime d) =>
 // Strip any leading R#/L#.# prefix from a stored name so the derived code
 // isn't duplicated when prepended at display time.
 String stripLocationCodePrefix(String name) {
-  final match = RegExp(r'^[RL]\d+(?:\.\d+)?\s*(?:[-·]\s*)?',
-          caseSensitive: false)
-      .firstMatch(name.trim());
+  final match = RegExp(
+    r'^[RL]\d+(?:\.\d+)?\s*(?:[-·]\s*)?',
+    caseSensitive: false,
+  ).firstMatch(name.trim());
   if (match == null) return name.trim();
   return name.trim().substring(match.end).trim();
 }
