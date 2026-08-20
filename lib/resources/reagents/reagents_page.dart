@@ -24,6 +24,7 @@ import '/theme/theme.dart';
 import '../../backups/backup_service.dart';
 import '../../camera/qr_scanner/qr_code_rules.dart';
 import 'reagent_model.dart';
+import 'reagent_code_allocator.dart';
 import 'reagent_detail_page.dart';
 import 'reagent_excel_import_page.dart';
 import '../../requests/requests_page.dart';
@@ -124,6 +125,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
   Map<String, dynamic>? _editingCell;
   final _editController = TextEditingController();
   final _editFocus = FocusNode();
+  bool _selectionMode = false;
+  bool _deletingSelected = false;
+  final Set<int> _selectedIds = {};
 
   final _horizCtrl = ScrollController();
   final _vertCtrl = ScrollController();
@@ -386,16 +390,166 @@ class _ReagentsPageState extends State<ReagentsPage> {
   }
 
   String _nextCode() {
-    final re = RegExp(r'^BR(\d+)$', caseSensitive: false);
-    int highest = 0;
-    for (final r in _all) {
-      final m = re.firstMatch(r.code ?? '');
-      if (m != null) {
-        final n = int.tryParse(m.group(1)!) ?? 0;
-        if (n > highest) highest = n;
+    return ReagentCodeAllocator(_all.map((r) => r.code)).next();
+  }
+
+  void _enterSelectionMode() {
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
+    _cancelEdit();
+    setState(() {
+      _selectionMode = true;
+      _selectedIds.clear();
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  void _toggleSelected(int id) {
+    setState(() {
+      if (!_selectedIds.add(id)) _selectedIds.remove(id);
+    });
+  }
+
+  void _toggleAllVisible() {
+    final visibleIds = _filtered.map((r) => r.id).toSet();
+    setState(() {
+      if (visibleIds.isNotEmpty && visibleIds.every(_selectedIds.contains)) {
+        _selectedIds.removeAll(visibleIds);
+      } else {
+        _selectedIds.addAll(visibleIds);
       }
+    });
+  }
+
+  bool? get _allVisibleSelectionState {
+    if (_filtered.isEmpty) return false;
+    final selectedVisible = _filtered.where((r) => _selectedIds.contains(r.id));
+    if (selectedVisible.isEmpty) return false;
+    if (selectedVisible.length == _filtered.length) return true;
+    return null;
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty || _deletingSelected) return;
+    if (!context.requireModuleAction(ModuleAction.delete)) return;
+    final ids = _selectedIds.toList()..sort();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.appSurface,
+        title: Text(
+          'Delete ${ids.length} reagents?',
+          style: GoogleFonts.spaceGrotesk(color: ctx.appTextPrimary),
+        ),
+        content: Text(
+          'The selected reagents will be permanently deleted. This cannot be undone.',
+          style: GoogleFonts.spaceGrotesk(
+            color: ctx.appTextSecondary,
+            fontSize: 13,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: AppDS.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete_forever_outlined, size: 17),
+            label: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingSelected = true);
+    try {
+      final deletedRows = await Supabase.instance.client
+          .from('reagents')
+          .delete()
+          .inFilter('reagent_id', ids)
+          .select('reagent_id');
+      final deletedCount = (deletedRows as List).length;
+      if (deletedCount > 0) {
+        await DataCache.clear('reagents');
+        await BackupService.instance.notifyCrudChange('reagents');
+      }
+      if (!mounted) return;
+      _selectionMode = false;
+      _selectedIds.clear();
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            deletedCount == ids.length
+                ? '$deletedCount reagents deleted.'
+                : '$deletedCount of ${ids.length} reagents deleted.',
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Bulk reagent delete error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deletingSelected = false);
     }
-    return 'BR${(highest + 1).toString().padLeft(4, '0')}';
+  }
+
+  Widget _buildSelectionToolbar(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          tooltip: 'Cancel selection',
+          onPressed: _deletingSelected ? null : _exitSelectionMode,
+          icon: const Icon(Icons.close_rounded),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '${_selectedIds.length} selected',
+          style: GoogleFonts.spaceGrotesk(
+            color: context.appTextPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(width: 12),
+        TextButton(
+          onPressed: _deletingSelected ? null : _toggleAllVisible,
+          child: Text(
+            _allVisibleSelectionState == true
+                ? 'Clear visible'
+                : 'Select all visible',
+          ),
+        ),
+        const Spacer(),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(backgroundColor: AppDS.red),
+          onPressed: _selectedIds.isEmpty || _deletingSelected
+              ? null
+              : _deleteSelected,
+          icon: _deletingSelected
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.delete_outline, size: 17),
+          label: Text('Delete (${_selectedIds.length})'),
+        ),
+      ],
+    );
   }
 
   Future<void> _showAddEditDialog([ReagentModel? existing]) async {
@@ -760,32 +914,26 @@ class _ReagentsPageState extends State<ReagentsPage> {
     _saveAndPatch(id, {
       'reagent_stock_status': ReagentModel.normalizeStockStatus(value),
     });
-    _advanceFromDropdown(id);
   }
 
   void _commitCategoryEdit(int id, String value) {
     _saveAndPatch(id, {'reagent_category': value, 'reagent_subcategory': null});
-    _advanceFromDropdown(id);
   }
 
   void _commitSubcategoryEdit(int id, String value) {
     _saveAndPatch(id, {'reagent_subcategory': value});
-    _advanceFromDropdown(id);
   }
 
   void _commitPhysicalStateEdit(int id, String? value) {
     _saveAndPatch(id, {'reagent_physical_state': value});
-    _advanceFromDropdown(id);
   }
 
   void _commitStorageTempEdit(int id, String? value) {
     _saveAndPatch(id, {'reagent_storage_temp': value});
-    _advanceFromDropdown(id);
   }
 
   void _commitContaminationEdit(int id, String value) {
     _saveAndPatch(id, {'reagent_contamination': value});
-    _advanceFromDropdown(id);
   }
 
   void _commitLocationEdit(int id, int? locationId) {
@@ -800,27 +948,12 @@ class _ReagentsPageState extends State<ReagentsPage> {
       'reagent_location_id': locationId,
       '_location_name': locName,
     });
-    _advanceFromDropdown(id);
   }
 
   void _commitRoomEdit(int id, int? roomId) {
     // Saving the room itself is intentional: it represents room-only storage.
     // A subsequent Location selection replaces it with the more specific child.
     _commitLocationEdit(id, roomId);
-  }
-
-  void _advanceFromDropdown(int id) {
-    final cell = _editingCell;
-    if (cell == null) return;
-    final key = cell['key'] as String;
-    final ci = _tabCols.indexOf(key);
-    if (ci >= 0 && ci < _tabCols.length - 1) {
-      final nextKey = _tabCols[ci + 1];
-      final r = _filtered.firstWhere((r) => r.id == id);
-      _startEdit(id, nextKey, _fieldValue(r, nextKey));
-    } else {
-      setState(() => _editingCell = null);
-    }
   }
 
   void _cancelEdit() {
@@ -1086,7 +1219,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
             border: Border(bottom: BorderSide(color: context.appBorder)),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
+          child: _selectionMode
+              ? _buildSelectionToolbar(context)
+              : Row(
             children: [
               if (MediaQuery.of(context).size.width < 700) ...[
                 IconButton(
@@ -1235,6 +1370,17 @@ class _ReagentsPageState extends State<ReagentsPage> {
                     size: 18,
                   ),
                   onPressed: _exportCsv,
+                ),
+              ),
+              Tooltip(
+                message: 'Select reagents',
+                child: IconButton(
+                  icon: Icon(
+                    Icons.checklist_rounded,
+                    color: context.appTextSecondary,
+                    size: 19,
+                  ),
+                  onPressed: _enterSelectionMode,
                 ),
               ),
               const SizedBox(width: 4),
@@ -1484,7 +1630,18 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                             color: context.appHeaderBg,
                                             child: Row(
                                               children: [
-                                                const SizedBox(width: _colBtn),
+                                                SizedBox(
+                                                  width: _colBtn,
+                                                  child: _selectionMode
+                                                      ? Checkbox(
+                                                          tristate: true,
+                                                          value:
+                                                              _allVisibleSelectionState,
+                                                          onChanged: (_) =>
+                                                              _toggleAllVisible(),
+                                                        )
+                                                      : null,
+                                                ),
                                                 SizedBox(
                                                   width: _colCode,
                                                   child: Padding(
@@ -1777,16 +1934,25 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                             child: ListView.builder(
                                               controller: _vertCtrl,
                                               padding: EdgeInsets.zero,
-                                              itemCount: _filtered.length + 1,
+                                              itemCount: _filtered.length +
+                                                  (_selectionMode ? 0 : 1),
                                               itemExtent: AppDS.tableRowH,
                                               itemBuilder: (ctx, i) {
-                                                if (i == 0) {
+                                                if (!_selectionMode && i == 0) {
                                                   return _buildAddRow();
                                                 }
-                                                final r = _filtered[i - 1];
+                                                final rowIndex =
+                                                    _selectionMode ? i : i - 1;
+                                                final r = _filtered[rowIndex];
                                                 return _ReagentRow(
                                                   reagent: r,
-                                                  rowIndex: i - 1,
+                                                  rowIndex: rowIndex,
+                                                  selectionMode: _selectionMode,
+                                                  selected: _selectedIds.contains(
+                                                    r.id,
+                                                  ),
+                                                  onToggleSelected: () =>
+                                                      _toggleSelected(r.id),
                                                   roomName:
                                                       _roomDisplayForLocationId(
                                                         r.locationId,
@@ -1813,7 +1979,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   editController:
                                                       _editController,
                                                   editFocus: _editFocus,
-                                                  onStartEdit: _startEdit,
+                                                  onStartEdit: _selectionMode
+                                                      ? (_, _, _) {}
+                                                      : _startEdit,
                                                   onAdvance: () =>
                                                       _advanceCell(),
                                                   onAdvanceBack: () =>

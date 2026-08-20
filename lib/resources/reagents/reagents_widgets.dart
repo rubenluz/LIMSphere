@@ -9,6 +9,9 @@ class _ReagentRow extends StatelessWidget {
   final ReagentModel reagent;
   final int rowIndex;
   final String? roomName;
+  final bool selectionMode;
+  final bool selected;
+  final VoidCallback onToggleSelected;
   final VoidCallback onViewMore;
   final VoidCallback onRequest;
   final Map<String, dynamic>? editingCell;
@@ -33,6 +36,9 @@ class _ReagentRow extends StatelessWidget {
     required this.reagent,
     required this.rowIndex,
     required this.roomName,
+    required this.selectionMode,
+    required this.selected,
+    required this.onToggleSelected,
     required this.onViewMore,
     required this.onRequest,
     required this.editingCell,
@@ -307,34 +313,50 @@ class _ReagentRow extends StatelessWidget {
     Color bg = rowIndex.isEven ? context.appSurface : context.appSurface2;
     if (r.isExpired) bg = AppDS.red.withValues(alpha: 0.08);
     if (r.isContaminated) bg = AppDS.purple.withValues(alpha: 0.06);
+    if (selected) bg = AppDS.accent.withValues(alpha: 0.12);
 
-    return Container(
-      height: AppDS.tableRowH,
-      decoration: BoxDecoration(
-        color: bg,
-        border: Border(bottom: BorderSide(color: context.appBorder)),
-      ),
-      child: Row(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: selectionMode ? onToggleSelected : null,
+      child: Container(
+        height: AppDS.tableRowH,
+        decoration: BoxDecoration(
+          color: bg,
+          border: Border(bottom: BorderSide(color: context.appBorder)),
+        ),
+        child: Row(
         children: [
           // ── Action buttons ────────────────────────────────────────────────
-          SizedBox(
-            width: 30,
-            child: _RowBtn(
-              Icons.open_in_new,
-              'View detail',
-              onViewMore,
-              color: muted,
+          if (selectionMode)
+            SizedBox(
+              width: _colBtn,
+              child: IgnorePointer(
+                child: Checkbox(
+                  value: selected,
+                  onChanged: (_) {},
+                ),
+              ),
+            )
+          else ...[
+            SizedBox(
+              width: 30,
+              child: _RowBtn(
+                Icons.open_in_new,
+                'View detail',
+                onViewMore,
+                color: muted,
+              ),
             ),
-          ),
-          SizedBox(
-            width: 30,
-            child: _RowBtn(
-              Icons.outbox_outlined,
-              'Quick Request',
-              onRequest,
-              color: muted,
+            SizedBox(
+              width: 30,
+              child: _RowBtn(
+                Icons.outbox_outlined,
+                'Quick Request',
+                onRequest,
+                color: muted,
+              ),
             ),
-          ),
+          ],
 
           // ── Code ──────────────────────────────────────────────────────────
           SizedBox(
@@ -375,6 +397,8 @@ class _ReagentRow extends StatelessWidget {
                         current: r.stockStatus,
                         labelOf: ReagentModel.stockStatusLabel,
                         onSelect: (v) => onCommitStockStatus(r.id, v),
+                        onAdvance: onAdvance,
+                        onAdvanceBack: onAdvanceBack,
                         onCancel: onCancel,
                         onAddNewRow: onAddNewRow,
                         autoOpen: true,
@@ -400,6 +424,8 @@ class _ReagentRow extends StatelessWidget {
                         current: r.category,
                         labelOf: ReagentModel.categoryLabel,
                         onSelect: (v) => onCommitCategory(r.id, v),
+                        onAdvance: onAdvance,
+                        onAdvanceBack: onAdvanceBack,
                         onCancel: onCancel,
                         onAddNewRow: onAddNewRow,
                         autoOpen: true,
@@ -428,6 +454,8 @@ class _ReagentRow extends StatelessWidget {
                         current: r.subcategory ?? '',
                         labelOf: ReagentModel.subcategoryLabel,
                         onSelect: (v) => onCommitSubcategory(r.id, v),
+                        onAdvance: onAdvance,
+                        onAdvanceBack: onAdvanceBack,
                         onCancel: onCancel,
                         onAddNewRow: onAddNewRow,
                         autoOpen: true,
@@ -580,6 +608,8 @@ class _ReagentRow extends StatelessWidget {
                               '—';
                         },
                         onSelect: (value) => onCommitRoom(r.id, value),
+                        onAdvance: onAdvance,
+                        onAdvanceBack: onAdvanceBack,
                         onCancel: onCancel,
                         onAddNewRow: onAddNewRow,
                         autoOpen: true,
@@ -626,6 +656,8 @@ class _ReagentRow extends StatelessWidget {
                         },
                         onSelect: (value) =>
                             onCommitLocation(r.id, value ?? _selectedRoomId),
+                        onAdvance: onAdvance,
+                        onAdvanceBack: onAdvanceBack,
                         onCancel: onCancel,
                         onAddNewRow: onAddNewRow,
                         autoOpen: true,
@@ -658,6 +690,8 @@ class _ReagentRow extends StatelessWidget {
                         current: r.storageTemp,
                         labelOf: (v) => v ?? '—',
                         onSelect: (v) => onCommitStorageTemp(r.id, v),
+                        onAdvance: onAdvance,
+                        onAdvanceBack: onAdvanceBack,
                         onCancel: onCancel,
                         onAddNewRow: onAddNewRow,
                         autoOpen: true,
@@ -695,6 +729,8 @@ class _ReagentRow extends StatelessWidget {
                             ? '—'
                             : ReagentModel.physicalStateLabel(v),
                         onSelect: (v) => onCommitPhysicalState(r.id, v),
+                        onAdvance: onAdvance,
+                        onAdvanceBack: onAdvanceBack,
                         onCancel: onCancel,
                         onAddNewRow: onAddNewRow,
                         autoOpen: true,
@@ -861,6 +897,8 @@ class _ReagentRow extends StatelessWidget {
                         current: r.contamination,
                         labelOf: ReagentModel.contaminationLabel,
                         onSelect: (v) => onCommitContamination(r.id, v),
+                        onAdvance: onAdvance,
+                        onAdvanceBack: onAdvanceBack,
                         onCancel: onCancel,
                         onAddNewRow: onAddNewRow,
                         autoOpen: true,
@@ -897,6 +935,7 @@ class _ReagentRow extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -929,6 +968,8 @@ class _ArrowDropdown<T> extends StatefulWidget {
   final T current;
   final String Function(T) labelOf;
   final void Function(T) onSelect;
+  final VoidCallback onAdvance;
+  final VoidCallback onAdvanceBack;
   final VoidCallback onCancel;
   final VoidCallback? onAddNewRow;
   final bool autoOpen;
@@ -937,6 +978,8 @@ class _ArrowDropdown<T> extends StatefulWidget {
     required this.current,
     required this.labelOf,
     required this.onSelect,
+    required this.onAdvance,
+    required this.onAdvanceBack,
     required this.onCancel,
     this.onAddNewRow,
     this.autoOpen = false,
@@ -1003,6 +1046,7 @@ class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
     if (picked != null) {
       setState(() => _index = picked);
       widget.onSelect(widget.values[picked]);
+      _focus.requestFocus();
     } else {
       _focus.requestFocus();
     }
@@ -1027,8 +1071,14 @@ class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
           widget.onSelect(widget.values[_index]);
           widget.onAddNewRow?.call();
         },
-        const SingleActivator(LogicalKeyboardKey.tab): () =>
-            widget.onSelect(widget.values[_index]),
+        const SingleActivator(LogicalKeyboardKey.tab): () {
+          widget.onSelect(widget.values[_index]);
+          widget.onAdvance();
+        },
+        const SingleActivator(LogicalKeyboardKey.tab, shift: true): () {
+          widget.onSelect(widget.values[_index]);
+          widget.onAdvanceBack();
+        },
         const SingleActivator(LogicalKeyboardKey.escape): widget.onCancel,
       },
       child: Focus(

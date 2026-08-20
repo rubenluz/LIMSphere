@@ -26,7 +26,7 @@ WizardStyle=modern
 ; Usar userdesktop simplifica se mudares de computador
 OutputDir=desktop_release
 OutputBaseFilename={#MyAppFileName}_installer_v{#MyAppVersion}
-SetupIconFile=C:\Users\ruben\Documents\blue_open_lims\windows\runner\resources\app_icon.ico
+SetupIconFile=C:\Users\ruben\Documents\LIMSphere\windows\runner\resources\app_icon.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -36,7 +36,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Flags: unchecked
 
 [Files]
 ; O flag 'ignoreversion' é ótimo para DLLs do Flutter/Windows
-Source: "C:\Users\ruben\Documents\blue_open_lims\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "C:\Users\ruben\Documents\LIMSphere\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

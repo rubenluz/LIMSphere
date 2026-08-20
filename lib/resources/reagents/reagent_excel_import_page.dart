@@ -15,6 +15,7 @@ import 'package:xml/xml.dart';
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
 import '../../backups/backup_service.dart';
+import 'reagent_code_allocator.dart';
 
 // ── Reagent DB fields for mapping dropdowns ────────────────────────────────
 const _reagentDbFields = [
@@ -457,6 +458,20 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
         if (code != null && code.isNotEmpty) _locationCache[code] = id;
       }
 
+      final existingCodeRows = await db
+          .from('reagents')
+          .select('reagent_code');
+      final existingCodes = <String?>[
+        for (final row in (existingCodeRows as List))
+          row['reagent_code']?.toString(),
+      ];
+      final codeAllocator = ReagentCodeAllocator(
+        existingCodes,
+        reservedCodes: [
+          for (final record in _parsed) record['reagent_code'],
+        ],
+      );
+
       for (final record in _parsed) {
         final name = record['reagent_name'];
         final code = record['reagent_code'];
@@ -466,9 +481,14 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
             ? code
             : '(no name)';
         final row = _buildInsertRow(record);
+        if ((row['reagent_code']?.toString().trim() ?? '').isEmpty) {
+          row['reagent_code'] = codeAllocator.next();
+        }
         try {
           await db.from('reagents').insert(row);
-          sb.writeln('✓ "$label" imported.');
+          sb.writeln(
+            '✓ "$label" imported as ${row['reagent_code']}.',
+          );
           imported++;
         } catch (e) {
           sb.writeln('✗ "$label" failed: $e');
