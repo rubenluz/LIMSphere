@@ -2,10 +2,13 @@
 // distribution by category (chemicals, biologicals, consumables, etc.).
 
 import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '/theme/theme.dart';
 
 class ReagentsByTypeWidget extends StatefulWidget {
@@ -20,7 +23,7 @@ class _ReagentsByTypeWidgetState extends State<ReagentsByTypeWidget> {
   bool _loading = true;
 
   static const _palette = [
-    AppDS.accent,   // sky
+    AppDS.accent, // sky
     AppDS.green,
     AppDS.purple,
     AppDS.orange,
@@ -40,12 +43,14 @@ class _ReagentsByTypeWidgetState extends State<ReagentsByTypeWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client
@@ -60,7 +65,8 @@ class _ReagentsByTypeWidgetState extends State<ReagentsByTypeWidget> {
       }
 
       final sorted = Map.fromEntries(
-          counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value)));
+        counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value)),
+      );
 
       if (!mounted) return;
       setState(() {
@@ -73,9 +79,9 @@ class _ReagentsByTypeWidgetState extends State<ReagentsByTypeWidget> {
     }
   }
 
-  String _pretty(String raw) =>
-      raw.replaceAll('_', ' ').replaceFirstMapped(
-          RegExp(r'^[a-z]'), (m) => m[0]!.toUpperCase());
+  String _pretty(String raw) => raw
+      .replaceAll('_', ' ')
+      .replaceFirstMapped(RegExp(r'^[a-z]'), (m) => m[0]!.toUpperCase());
 
   Widget _buildContent() {
     if (_loading) {
@@ -88,8 +94,10 @@ class _ReagentsByTypeWidgetState extends State<ReagentsByTypeWidget> {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
-          child: Text('No reagent data',
-              style: TextStyle(fontSize: 12, color: context.appTextSecondary)),
+          child: Text(
+            'No reagent data',
+            style: TextStyle(fontSize: 12, color: context.appTextSecondary),
+          ),
         ),
       );
     }
@@ -99,48 +107,66 @@ class _ReagentsByTypeWidgetState extends State<ReagentsByTypeWidget> {
 
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        SizedBox(
-          height: 140,
-          child: Center(
-            child: CustomPaint(
-              size: const Size(130, 130),
-              painter: _DonutPainter(entries, _palette, total),
-              child: SizedBox(
-                width: 130,
-                height: 130,
-                child: Center(
-                  child: Text('$total',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 140,
+            child: Center(
+              child: CustomPaint(
+                size: const Size(130, 130),
+                painter: _DonutPainter(entries, _palette, total),
+                child: SizedBox(
+                  width: 130,
+                  height: 130,
+                  child: Center(
+                    child: Text(
+                      '$total',
                       style: AppDS.mono(
-                          size: 18,
-                          color: context.appTextPrimary,
-                          weight: FontWeight.bold)),
+                        size: 18,
+                        color: context.appTextPrimary,
+                        weight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          alignment: WrapAlignment.center,
-          children: List.generate(entries.length, (i) {
-            final e = entries[i];
-            final color = _palette[i % _palette.length];
-            final pct = (e.value / total * 100).toStringAsFixed(0);
-            return Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 10, height: 10,
-                  decoration: BoxDecoration(
-                      color: color, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(width: 4),
-              Text('${_pretty(e.key)} ($pct%)',
-                  style: TextStyle(
-                      fontSize: 11, color: context.appTextSecondary)),
-            ]);
-          }),
-        ),
-      ]),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: List.generate(entries.length, (i) {
+              final e = entries[i];
+              final color = _palette[i % _palette.length];
+              final pct = (e.value / total * 100).toStringAsFixed(0);
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${_pretty(e.key)} ($pct%)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.appTextSecondary,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
     );
   }
 
@@ -159,26 +185,36 @@ class _ReagentsByTypeWidgetState extends State<ReagentsByTypeWidget> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.donut_small_outlined,
-                  size: 20, color: AppDS.purple),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Reagents by Category',
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.donut_small_outlined,
+                  size: 20,
+                  color: AppDS.purple,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Reagents by Category',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: context.appTextPrimary)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
-            ]),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
           Divider(height: 1, color: context.appBorder),
           if (desktop)
@@ -203,7 +239,10 @@ class _DonutPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
     const strokeWidth = 22.0;
-    final rect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+    final rect = Rect.fromCircle(
+      center: center,
+      radius: radius - strokeWidth / 2,
+    );
 
     double startAngle = -math.pi / 2;
     for (int i = 0; i < entries.length; i++) {

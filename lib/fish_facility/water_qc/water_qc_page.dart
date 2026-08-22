@@ -185,6 +185,7 @@ class _WaterQcPageState extends State<WaterQcPage> {
   // ── Loading ────────────────────────────────────────────────────────────────
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final results = await Future.wait([

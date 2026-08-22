@@ -2,12 +2,14 @@
 // extraction from the stored URL, and session restore on startup.
 
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
+
 import '/database_connection/database_connection_model.dart';
 import '/core/local_storage.dart';
 
 class SupabaseManager {
   static SupabaseClient? _client;
   static String? _currentUrl;
+  static String? _currentPublishableKey;
   static String? currentName;
 
   static SupabaseClient get client {
@@ -54,8 +56,13 @@ class SupabaseManager {
   }
 
   static Future<void> _init(String url, String anonKey) async {
-    // If already initialized to the same URL, reuse the existing instance
-    if (_client != null && _currentUrl == url) return;
+    // Reuse only when both connection values still match. A changed key for
+    // the same project must replace the existing client.
+    if (_client != null &&
+        _currentUrl == url &&
+        _currentPublishableKey == anonKey) {
+      return;
+    }
 
     // Only dispose if we previously initialized (avoids assert in debug mode)
     if (_client != null) {
@@ -64,11 +71,31 @@ class SupabaseManager {
       } catch (_) {}
       _client = null;
       _currentUrl = null;
+      _currentPublishableKey = null;
     }
 
     await Supabase.initialize(url: url, publishableKey: anonKey);
     _client = Supabase.instance.client;
     _currentUrl = url;
+    _currentPublishableKey = anonKey;
+  }
+
+  /// Reads the public initialization marker without attaching a restored user
+  /// session. A stale session must not make a valid project look disconnected.
+  static Future<Map<String, dynamic>?> readAppMetaAnonymously() async {
+    final url = _currentUrl;
+    final key = _currentPublishableKey;
+    if (url == null || key == null) {
+      throw StateError('Supabase connection is not initialized');
+    }
+
+    final temp = SupabaseClient(url, key);
+    try {
+      final initialized = await temp.rpc('limsphere_is_initialized');
+      return <String, dynamic>{'meta_initialized': initialized == true};
+    } finally {
+      await temp.dispose();
+    }
   }
 
   /// LIGHTWEIGHT HEALTH CHECK (for grid status dot)
@@ -76,11 +103,7 @@ class SupabaseManager {
   static Future<bool> testConnection(ConnectionModel conn) async {
     try {
       final temp = SupabaseClient(conn.url, conn.anonKey);
-      await temp
-          .from('app_meta')
-          .select('meta_initialized')
-          .limit(1)
-          .maybeSingle();
+      await temp.rpc('limsphere_is_initialized');
       await temp.dispose();
       return true;
     } catch (_) {
@@ -95,6 +118,7 @@ class SupabaseManager {
     } catch (_) {}
     _client = null;
     _currentUrl = null;
+    _currentPublishableKey = null;
     currentName = null;
     await LocalStorage.clearLastConnection();
   }
@@ -104,13 +128,8 @@ class SupabaseManager {
     if (!isInitialized) return false;
 
     try {
-      final res = await client
-          .from('app_meta')
-          .select('meta_initialized')
-          .limit(1)
-          .maybeSingle();
-
-      return res?['meta_initialized'] == true;
+      final res = await client.rpc('limsphere_is_initialized');
+      return res == true;
     } catch (_) {
       return false;
     }
@@ -120,12 +139,8 @@ class SupabaseManager {
   static Future<bool> adminExists() async {
     if (!isInitialized) return false;
     try {
-      final res = await client
-          .from('users')
-          .select('user_id')
-          .eq('user_role', 'superadmin')
-          .limit(1);
-      return (res as List).isNotEmpty;
+      final res = await client.rpc('limsphere_has_admin');
+      return res == true;
     } catch (_) {
       return false;
     }

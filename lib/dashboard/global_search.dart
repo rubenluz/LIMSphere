@@ -314,7 +314,8 @@ class GlobalSearchService {
   Future<List<GlobalSearchResult>> search(
     String input, {
     bool includeUsers = false,
-    int perCategory = 6,
+    int perCategory = 4,
+    int maxResults = 12,
   }) async {
     final query = normalizeQuery(input);
     if (query.length < 2) return const [];
@@ -330,13 +331,36 @@ class GlobalSearchService {
     );
     final results = batches.expand((batch) => batch).toList();
     results.sort((a, b) {
-      final aExact = a.title.toLowerCase() == query.toLowerCase();
-      final bExact = b.title.toLowerCase() == query.toLowerCase();
-      if (aExact != bExact) return aExact ? -1 : 1;
+      final byRelevance = resultRelevance(
+        a,
+        query,
+      ).compareTo(resultRelevance(b, query));
+      if (byRelevance != 0) return byRelevance;
       final byCategory = a.category.compareTo(b.category);
       return byCategory != 0 ? byCategory : a.title.compareTo(b.title);
     });
-    return results;
+    return results.take(maxResults).toList();
+  }
+
+  /// Lower scores are more relevant. Identity-field exact and prefix matches
+  /// rank ahead of incidental substring matches in descriptions or notes.
+  static int resultRelevance(GlobalSearchResult result, String input) {
+    final query = normalizeQuery(input).toLowerCase();
+    final values = [
+      result.title,
+      result.subtitle,
+      result.status,
+    ].whereType<String>().map((value) => value.toLowerCase());
+    if (values.any((value) => value == query)) return 0;
+    if (values.any((value) => value.startsWith(query))) return 1;
+    if (values.any(
+      (value) =>
+          value.split(RegExp(r'\s+')).any((word) => word.startsWith(query)),
+    )) {
+      return 2;
+    }
+    if (values.any((value) => value.contains(query))) return 3;
+    return 4;
   }
 
   Future<List<GlobalSearchResult>> _searchSpec(

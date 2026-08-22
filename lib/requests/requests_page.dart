@@ -262,6 +262,7 @@ class _RequestsPageState extends State<RequestsPage> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client
@@ -742,6 +743,7 @@ class _RequestsPageState extends State<RequestsPage> {
           .from('requests')
           .delete()
           .eq('request_id', r.id);
+      if (!mounted) return;
       setState(() {
         _all.removeWhere((x) => x.id == r.id);
         if (_expandedId == r.id) _expandedId = null;

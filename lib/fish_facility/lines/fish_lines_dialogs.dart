@@ -80,6 +80,7 @@ class _AddLineDialogState extends State<_AddLineDialog> {
         Navigator.pop(context);
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _saving = false;
         _error = e.toString();

@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '/theme/theme.dart';
 
 /// Fish by Line Widget — shows male/female/juvenile/total counts per fish line
@@ -23,7 +25,7 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
   int _totalFish = 0;
   bool _loading = true;
 
-  static const _accent  = Color(0xFF0EA5E9); // sky-blue, matches fish facility
+  static const _accent = Color(0xFF0EA5E9); // sky-blue, matches fish facility
 
   @override
   void initState() {
@@ -34,12 +36,14 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final data = await Supabase.instance.client
@@ -53,16 +57,18 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
       final byLine = <String, (int, int, int, int)>{};
       for (final row in data as List) {
         final lineData = row['fish_lines'] as Map<String, dynamic>?;
-        final name = (lineData?['fish_line_name']?.toString().trim().isNotEmpty == true
-                ? lineData!['fish_line_name'].toString().trim()
-                : row['fish_stocks_line']?.toString().trim())
-            ?.isNotEmpty == true
+        final name =
+            (lineData?['fish_line_name']?.toString().trim().isNotEmpty == true
+                        ? lineData!['fish_line_name'].toString().trim()
+                        : row['fish_stocks_line']?.toString().trim())
+                    ?.isNotEmpty ==
+                true
             ? (lineData?['fish_line_name']?.toString().trim() ??
-                row['fish_stocks_line']!.toString().trim())
+                  row['fish_stocks_line']!.toString().trim())
             : 'Unknown';
 
-        final m = (row['fish_stocks_males']   as num?)?.toInt() ?? 0;
-        final f = (row['fish_stocks_females']  as num?)?.toInt() ?? 0;
+        final m = (row['fish_stocks_males'] as num?)?.toInt() ?? 0;
+        final f = (row['fish_stocks_females'] as num?)?.toInt() ?? 0;
         final j = (row['fish_stocks_juveniles'] as num?)?.toInt() ?? 0;
         final p = byLine[name] ?? (0, 0, 0, 0);
         byLine[name] = (p.$1 + m, p.$2 + f, p.$3 + j, p.$4 + m + f + j);
@@ -73,9 +79,9 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
 
       if (!mounted) return;
       setState(() {
-        _rows      = sorted;
+        _rows = sorted;
         _totalFish = sorted.fold(0, (s, e) => s + e.value.$4);
-        _loading   = false;
+        _loading = false;
       });
     } catch (e) {
       debugPrint('FishByLineWidget error: $e');
@@ -93,9 +99,10 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
     if (_rows.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16),
-        child: Text('No active fish stocks.',
-            style: GoogleFonts.spaceGrotesk(
-                fontSize: 12, color: AppDS.textMuted)),
+        child: Text(
+          'No active fish stocks.',
+          style: GoogleFonts.spaceGrotesk(fontSize: 12, color: AppDS.textMuted),
+        ),
       );
     }
 
@@ -105,14 +112,17 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
     const colT = 44.0;
 
     Widget colHdr(String label, Color color) => SizedBox(
-          width: label == 'Total' ? colT : colM,
-          child: Text(label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.spaceGrotesk(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: color)),
-        );
+      width: label == 'Total' ? colT : colM,
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.spaceGrotesk(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
 
     Widget countCell(int v, double w, Color color, {bool bold = false}) =>
         SizedBox(
@@ -121,9 +131,10 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
             v > 0 ? '$v' : '—',
             textAlign: TextAlign.center,
             style: GoogleFonts.jetBrainsMono(
-                fontSize: 11,
-                fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
-                color: v > 0 ? color : AppDS.textMuted),
+              fontSize: 11,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+              color: v > 0 ? color : AppDS.textMuted,
+            ),
           ),
         );
 
@@ -133,58 +144,87 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Column headers
-          Row(children: [
-            const Expanded(child: SizedBox()),
-            colHdr('♂',     AppDS.accent),
-            colHdr('♀',     AppDS.pink),
-            colHdr('Juv',   AppDS.textMuted),
-            colHdr('Total', AppDS.textSecondary),
-          ]),
+          Row(
+            children: [
+              const Expanded(child: SizedBox()),
+              colHdr('♂', AppDS.accent),
+              colHdr('♀', AppDS.pink),
+              colHdr('Juv', AppDS.textMuted),
+              colHdr('Total', AppDS.textSecondary),
+            ],
+          ),
           const SizedBox(height: 4),
           const Divider(height: 1, color: AppDS.border),
           const SizedBox(height: 4),
 
           // Data rows
-          ..._rows.map((e) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(children: [
-              Expanded(
-                child: Text(e.key,
-                    style: GoogleFonts.spaceGrotesk(
-                        fontSize: 12, color: context.appTextPrimary),
-                    overflow: TextOverflow.ellipsis),
+          ..._rows.map(
+            (e) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      e.key,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 12,
+                        color: context.appTextPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  countCell(e.value.$1, colM, AppDS.accent),
+                  countCell(e.value.$2, colF, AppDS.pink),
+                  countCell(e.value.$3, colJ, AppDS.textMuted),
+                  countCell(
+                    e.value.$4,
+                    colT,
+                    context.appTextPrimary,
+                    bold: true,
+                  ),
+                ],
               ),
-              countCell(e.value.$1, colM, AppDS.accent),
-              countCell(e.value.$2, colF, AppDS.pink),
-              countCell(e.value.$3, colJ, AppDS.textMuted),
-              countCell(e.value.$4, colT, context.appTextPrimary, bold: true),
-            ]),
-          )),
+            ),
+          ),
 
           // Total footer
           if (_rows.length > 1) ...[
             const SizedBox(height: 4),
             const Divider(height: 1, color: AppDS.border),
             const SizedBox(height: 4),
-            Row(children: [
-              Expanded(
-                child: Text('Total',
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Total',
                     style: GoogleFonts.spaceGrotesk(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: context.appTextPrimary)),
-              ),
-              countCell(
-                  _rows.fold(0, (s, e) => s + e.value.$1), colM, AppDS.accent,
-                  bold: true),
-              countCell(
-                  _rows.fold(0, (s, e) => s + e.value.$2), colF, AppDS.pink,
-                  bold: true),
-              countCell(
-                  _rows.fold(0, (s, e) => s + e.value.$3), colJ, AppDS.textMuted,
-                  bold: true),
-              countCell(_totalFish, colT, context.appTextPrimary, bold: true),
-            ]),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                ),
+                countCell(
+                  _rows.fold(0, (s, e) => s + e.value.$1),
+                  colM,
+                  AppDS.accent,
+                  bold: true,
+                ),
+                countCell(
+                  _rows.fold(0, (s, e) => s + e.value.$2),
+                  colF,
+                  AppDS.pink,
+                  bold: true,
+                ),
+                countCell(
+                  _rows.fold(0, (s, e) => s + e.value.$3),
+                  colJ,
+                  AppDS.textMuted,
+                  bold: true,
+                ),
+                countCell(_totalFish, colT, context.appTextPrimary, bold: true),
+              ],
+            ),
           ],
         ],
       ),
@@ -209,41 +249,54 @@ class _FishByLineWidgetState extends State<FishByLineWidget> {
           // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.biotech_outlined, size: 20, color: _accent),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text('Active Fish Lines',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              ),
-              if (!_loading && lineCount > 0)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: _accent,
-                    borderRadius: BorderRadius.circular(12),
+            child: Row(
+              children: [
+                const Icon(Icons.biotech_outlined, size: 20, color: _accent),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Active Fish Lines',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  child: Text('$_totalFish',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold)),
                 ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
-            ]),
+                if (!_loading && lineCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _accent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$_totalFish',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
           const Divider(height: 1),
           if (desktop)
-            Expanded(child: SingleChildScrollView(child: _buildContent(context)))
+            Expanded(
+              child: SingleChildScrollView(child: _buildContent(context)),
+            )
           else
             _buildContent(context),
         ],

@@ -226,6 +226,9 @@ class _UserDetailPageState extends State<UserDetailPage> {
   bool get _canManageUserAccess =>
       _viewerRole == 'admin' || _viewerRole == 'superadmin';
   bool get _canEditProfile => _canManageUserAccess || _isSelf;
+  bool get _canAssignPermissions =>
+      _canManageUserAccess &&
+      widget.userMap['user_status']?.toString() == 'active';
 
   Map<String, dynamic> get _draftUserMap => {
     ...widget.userMap,
@@ -642,23 +645,26 @@ class _UserDetailPageState extends State<UserDetailPage> {
       if (_canManageUserAccess) {
         data.addAll({
           'user_email': _email.text.trim(),
-          'user_role': _role,
           'user_status': _status,
-          'user_table_dashboard': _permDashboard,
-          'user_table_labels': _permLabels,
-          'user_table_chat': _permChat,
-          'user_table_backups': _permBackups,
-          'user_table_culture_collection': _permCulture,
-          'user_table_fish_facility': _permFish,
-          'user_table_resources': _permResources,
-          if (_supportsGranularPermissions)
-            'user_permissions_json': _permissionJson,
+          if (previousStatus == 'active') ...{
+            'user_role': _role,
+            'user_table_dashboard': _permDashboard,
+            'user_table_labels': _permLabels,
+            'user_table_chat': _permChat,
+            'user_table_backups': _permBackups,
+            'user_table_culture_collection': _permCulture,
+            'user_table_fish_facility': _permFish,
+            'user_table_resources': _permResources,
+            if (_supportsGranularPermissions)
+              'user_permissions_json': _permissionJson,
+          },
         });
       }
       await Supabase.instance.client
           .from('users')
           .update(data)
           .eq('user_id', _id);
+      if (!mounted) return;
       widget.userMap.addAll(data);
       if (_supportsGranularPermissions && _canManageUserAccess) {
         widget.userMap['user_permissions_json'] = _permissionJson;
@@ -865,7 +871,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                       _role,
                       _roleOptions,
                       (v) => setState(() => _role = v ?? _role),
-                      enabled: _editing && _canManageUserAccess,
+                      enabled: _editing && _canAssignPermissions,
                     ),
                     _dropDown(
                       'Status',
@@ -878,6 +884,12 @@ class _UserDetailPageState extends State<UserDetailPage> {
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Module Permissions', [
+                  if (_canManageUserAccess && !_canAssignPermissions)
+                    _infoBanner(
+                      'Activate and save this account first. Permissions can be assigned only after validation.',
+                    ),
+                  if (_canManageUserAccess && !_canAssignPermissions)
+                    const SizedBox(height: 12),
                   if (!_canManageUserAccess)
                     _infoBanner(
                       'Granular access is visible here, but only administrators can modify it.',
@@ -1115,7 +1127,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                     ),
                   ),
                 ),
-                if (_editing && _canManageUserAccess)
+                if (_editing && _canAssignPermissions)
                   Wrap(
                     spacing: 6,
                     children: m.$4.map((opt) {
@@ -1168,7 +1180,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
       );
     }
 
-    final canEditRules = _editing && _canManageUserAccess;
+    final canEditRules = _editing && _canAssignPermissions;
     final groups = kPermissionModuleGroups.entries.toList();
 
     return Column(

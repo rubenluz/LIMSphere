@@ -490,7 +490,7 @@ class _MachineFormDialogState extends State<_MachineFormDialog> {
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      setState(() => _saving = false);
+      if (mounted) setState(() => _saving = false);
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Failed to save: $e')));

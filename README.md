@@ -35,22 +35,6 @@ The planned improvements and known gaps are tracked in the [project roadmap](TOD
 - A Supabase project URL and publishable key
 - Platform tooling for the target you want to run
 
-### Run locally
-
-```sh
-flutter pub get
-flutter run
-```
-
-On first launch, add a Supabase connection. LIMSphere can validate the database and guide an administrator through initial setup before login.
-
-### Development checks
-
-```sh
-flutter analyze
-flutter test
-```
-
 ## Project layout
 
 ```text

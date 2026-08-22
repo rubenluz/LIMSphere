@@ -4,6 +4,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
 
 class NeedNewTransferWidget extends StatefulWidget {
@@ -26,17 +27,21 @@ class _NeedNewTransferWidgetState extends State<NeedNewTransferWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final data = await Supabase.instance.client
           .from('strains')
-          .select('strain_code, strain_medium, strain_last_transfer, strain_periodicity')
+          .select(
+            'strain_code, strain_medium, strain_last_transfer, strain_periodicity',
+          )
           .eq('strain_need_new_transfer', true)
           .order('strain_last_transfer', ascending: true);
 
@@ -62,8 +67,10 @@ class _NeedNewTransferWidgetState extends State<NeedNewTransferWidget> {
     if (_rows.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(24),
-        child: Text('No strains flagged',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+        child: Text(
+          'No strains flagged',
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+        ),
       );
     }
     return ListView.builder(
@@ -72,9 +79,9 @@ class _NeedNewTransferWidgetState extends State<NeedNewTransferWidget> {
       itemCount: _rows.length,
       itemBuilder: (context, index) {
         final r = _rows[index];
-        final code     = r['strain_code']?.toString() ?? '—';
-        final medium   = r['strain_medium']?.toString() ?? '—';
-        final last     = r['strain_last_transfer']?.toString() ?? '—';
+        final code = r['strain_code']?.toString() ?? '—';
+        final medium = r['strain_medium']?.toString() ?? '—';
+        final last = r['strain_last_transfer']?.toString() ?? '—';
         final periodicity = r['strain_periodicity']?.toString() ?? '—';
 
         return Padding(
@@ -93,7 +100,9 @@ class _NeedNewTransferWidgetState extends State<NeedNewTransferWidget> {
                   child: Text(
                     code,
                     style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -120,7 +129,9 @@ class _NeedNewTransferWidgetState extends State<NeedNewTransferWidget> {
                     '${periodicity}d',
                     textAlign: TextAlign.right,
                     style: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w600, color: Colors.orange,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.orange,
                     ),
                   ),
                 ),
@@ -149,19 +160,29 @@ class _NeedNewTransferWidgetState extends State<NeedNewTransferWidget> {
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
-                const Icon(Icons.event_repeat_rounded, size: 20, color: Colors.orange),
+                const Icon(
+                  Icons.event_repeat_rounded,
+                  size: 20,
+                  color: Colors.orange,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Row(
                     children: [
                       const Text(
                         'Needs New Transfer',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                       const SizedBox(width: 6),
                       if (!_loading)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.orange.withAlpha(40),
                             borderRadius: BorderRadius.circular(8),
@@ -169,7 +190,9 @@ class _NeedNewTransferWidgetState extends State<NeedNewTransferWidget> {
                           child: Text(
                             '${_rows.length}',
                             style: const TextStyle(
-                              fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
                             ),
                           ),
                         ),
@@ -179,7 +202,10 @@ class _NeedNewTransferWidgetState extends State<NeedNewTransferWidget> {
                 IconButton(
                   icon: const Icon(Icons.refresh, size: 16),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
                   onPressed: _load,
                 ),
               ],
@@ -190,17 +216,50 @@ class _NeedNewTransferWidgetState extends State<NeedNewTransferWidget> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
               child: Row(
                 children: const [
-                  Expanded(flex: 2, child: Text('Strain',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey))),
-                  Expanded(flex: 2, child: Text('Medium',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey))),
-                  Expanded(flex: 2, child: Text('Last Transfer',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey))),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      'Strain',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      'Medium',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      'Last Transfer',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
                   SizedBox(
                     width: 50,
-                    child: Text('Cycle',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey)),
+                    child: Text(
+                      'Cycle',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
                   ),
                 ],
               ),

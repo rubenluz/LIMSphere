@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '/theme/theme.dart';
+import '../map/culture_map_layers.dart';
 
 class SampleCoordinates {
   final double latitude;
@@ -17,18 +18,6 @@ SampleCoordinates? parseSampleCoordinates({
   String? latitude,
   String? longitude,
 }) {
-  final decimalLatitude = parseSampleCoordinateValue(
-    latitude,
-    isLatitude: true,
-  );
-  final decimalLongitude = parseSampleCoordinateValue(
-    longitude,
-    isLatitude: false,
-  );
-  if (_coordinatesInRange(decimalLatitude, decimalLongitude)) {
-    return SampleCoordinates(decimalLatitude!, decimalLongitude!);
-  }
-
   final rawGps = gps?.trim() ?? '';
   // Slash/semicolon separators are unambiguous and therefore allow either a
   // decimal comma or decimal point in each coordinate.
@@ -82,6 +71,20 @@ SampleCoordinates? parseSampleCoordinates({
     final lon = convert(matches[1]);
     if (_coordinatesInRange(lat, lon)) return SampleCoordinates(lat, lon);
   }
+
+  // Separate columns remain a legacy fallback for existing/imported records.
+  // The combined GPS value is the user-facing source of truth.
+  final decimalLatitude = parseSampleCoordinateValue(
+    latitude,
+    isLatitude: true,
+  );
+  final decimalLongitude = parseSampleCoordinateValue(
+    longitude,
+    isLatitude: false,
+  );
+  if (_coordinatesInRange(decimalLatitude, decimalLongitude)) {
+    return SampleCoordinates(decimalLatitude!, decimalLongitude!);
+  }
   return null;
 }
 
@@ -119,7 +122,17 @@ class SampleMapPickerPage extends StatefulWidget {
 }
 
 class _SampleMapPickerPageState extends State<SampleMapPickerPage> {
+  final _mapController = MapController();
+  final _mapKey = GlobalKey();
   LatLng? _pin;
+  CultureBaseMap _baseMap = CultureBaseMap.street;
+
+  static const _pinIcon = Icon(
+    Icons.location_pin,
+    size: 46,
+    color: Color(0xFFDC2626),
+    shadows: [Shadow(color: Colors.white, blurRadius: 3)],
+  );
 
   @override
   void initState() {
@@ -132,6 +145,23 @@ class _SampleMapPickerPageState extends State<SampleMapPickerPage> {
   }
 
   @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  void _finishPinDrag(DraggableDetails details) {
+    final renderObject = _mapKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) return;
+    // The marker is anchored at the bottom-centre of its 48×48 drag feedback.
+    final anchor = details.offset + const Offset(24, 48);
+    final localOffset = renderObject.globalToLocal(anchor);
+    setState(() {
+      _pin = _mapController.camera.screenOffsetToLatLng(localOffset);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final initialCenter = _pin ?? const LatLng(20, 0);
     return Scaffold(
@@ -140,22 +170,25 @@ class _SampleMapPickerPageState extends State<SampleMapPickerPage> {
         backgroundColor: context.appSurface,
         foregroundColor: context.appTextPrimary,
         title: const Text('Choose GPS position'),
-        actions: widget.allowEditing
-            ? [
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: FilledButton.icon(
-                    onPressed: _pin == null
-                        ? null
-                        : () => Navigator.of(context).pop(
-                            SampleCoordinates(_pin!.latitude, _pin!.longitude),
-                          ),
-                    icon: const Icon(Icons.check, size: 17),
-                    label: const Text('Use this location'),
-                  ),
-                ),
-              ]
-            : null,
+        actions: [
+          cultureMapLayerButton(
+            selected: _baseMap,
+            onSelected: (layer) => setState(() => _baseMap = layer),
+          ),
+          if (widget.allowEditing)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: FilledButton.icon(
+                onPressed: _pin == null
+                    ? null
+                    : () => Navigator.of(
+                        context,
+                      ).pop(SampleCoordinates(_pin!.latitude, _pin!.longitude)),
+                icon: const Icon(Icons.check, size: 17),
+                label: const Text('Use this location'),
+              ),
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -170,7 +203,7 @@ class _SampleMapPickerPageState extends State<SampleMapPickerPage> {
                 Expanded(
                   child: Text(
                     widget.allowEditing
-                        ? 'Tap or click the map to move the sample pin.'
+                        ? 'Click the map to place the pin, drag it to adjust, then use the save button.'
                         : 'Current saved sample position.',
                     style: TextStyle(
                       color: context.appTextSecondary,
@@ -193,6 +226,8 @@ class _SampleMapPickerPageState extends State<SampleMapPickerPage> {
           ),
           Expanded(
             child: FlutterMap(
+              key: _mapKey,
+              mapController: _mapController,
               options: MapOptions(
                 initialCenter: initialCenter,
                 initialZoom: _pin == null ? 2.5 : 13,
@@ -203,10 +238,7 @@ class _SampleMapPickerPageState extends State<SampleMapPickerPage> {
                     : null,
               ),
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.silvuzapps.limsphere',
-                ),
+                cultureTileLayer(_baseMap),
                 if (_pin != null)
                   MarkerLayer(
                     markers: [
@@ -215,11 +247,21 @@ class _SampleMapPickerPageState extends State<SampleMapPickerPage> {
                         width: 48,
                         height: 48,
                         alignment: Alignment.topCenter,
-                        child: const Icon(
-                          Icons.location_pin,
-                          size: 46,
-                          color: Color(0xFFDC2626),
-                          shadows: [Shadow(color: Colors.white, blurRadius: 3)],
+                        child: Draggable<LatLng>(
+                          data: _pin,
+                          maxSimultaneousDrags: widget.allowEditing ? 1 : 0,
+                          feedback: const Material(
+                            color: Colors.transparent,
+                            child: _pinIcon,
+                          ),
+                          childWhenDragging: const SizedBox.shrink(),
+                          onDragEnd: _finishPinDrag,
+                          child: MouseRegion(
+                            cursor: widget.allowEditing
+                                ? SystemMouseCursors.move
+                                : MouseCursor.defer,
+                            child: _pinIcon,
+                          ),
                         ),
                       ),
                     ],
@@ -227,10 +269,10 @@ class _SampleMapPickerPageState extends State<SampleMapPickerPage> {
                 RichAttributionWidget(
                   attributions: [
                     TextSourceAttribution(
-                      'OpenStreetMap contributors',
+                      _baseMap.attribution,
                       onTap: () async {
                         await launchUrl(
-                          Uri.parse('https://www.openstreetmap.org/copyright'),
+                          _baseMap.attributionUri,
                           mode: LaunchMode.externalApplication,
                         );
                       },

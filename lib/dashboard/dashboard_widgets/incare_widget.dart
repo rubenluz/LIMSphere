@@ -4,7 +4,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '../../culture_collection/strains/strain_detail_page.dart'; // adjust import path as needed
 import '../../theme/module_permission.dart';
 
@@ -26,11 +28,14 @@ class _InCareWidgetState extends State<InCareWidget> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final data = await Supabase.instance.client
           .from('strains')
-          .select('strain_id, strain_code, strain_scientific_name, strain_medium, strain_next_transfer, strain_last_transfer, strain_periodicity')
+          .select(
+            'strain_id, strain_code, strain_scientific_name, strain_medium, strain_next_transfer, strain_last_transfer, strain_periodicity',
+          )
           .eq('strain_status', 'INCARE')
           .order('strain_code', ascending: true);
 
@@ -50,7 +55,8 @@ class _InCareWidgetState extends State<InCareWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     // Fallback: treat wide screens as desktop even if platform check fails.
     return MediaQuery.of(context).size.width >= 600;
@@ -82,7 +88,8 @@ class _InCareWidgetState extends State<InCareWidget> {
     } else if (daysRaw is num) {
       days = daysRaw.toInt();
     }
-    if (last != null && days != null && days > 0) return last.add(Duration(days: days));
+    if (last != null && days != null && days > 0)
+      return last.add(Duration(days: days));
     return null;
   }
 
@@ -108,8 +115,10 @@ class _InCareWidgetState extends State<InCareWidget> {
     if (_strains.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(24),
-        child: Text('No strains in care',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+        child: Text(
+          'No strains in care',
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+        ),
       );
     }
     return ListView.separated(
@@ -122,12 +131,12 @@ class _InCareWidgetState extends State<InCareWidget> {
       separatorBuilder: (_, _) =>
           const Divider(height: 1, indent: 12, endIndent: 12),
       itemBuilder: (context, i) {
-        final strain  = _strains[i];
-        final code    = strain['strain_code']?.toString() ?? '—';
-        final name    = strain['strain_scientific_name']?.toString() ?? '';
-        final medium  = strain['strain_medium']?.toString() ?? '';
-        final next    = _resolveNextTransfer(strain);
-        final now     = DateTime.now();
+        final strain = _strains[i];
+        final code = strain['strain_code']?.toString() ?? '—';
+        final name = strain['strain_scientific_name']?.toString() ?? '';
+        final medium = strain['strain_medium']?.toString() ?? '';
+        final next = _resolveNextTransfer(strain);
+        final now = DateTime.now();
 
         Color? dateColor;
         String? dateLabel;
@@ -147,8 +156,10 @@ class _InCareWidgetState extends State<InCareWidget> {
 
         return ListTile(
           dense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 2,
+          ),
           leading: Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
             decoration: BoxDecoration(
@@ -174,29 +185,35 @@ class _InCareWidgetState extends State<InCareWidget> {
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: medium.isNotEmpty
-              ? Text(medium,
+              ? Text(
+                  medium,
                   style: const TextStyle(fontSize: 10, color: Colors.grey),
-                  overflow: TextOverflow.ellipsis)
+                  overflow: TextOverflow.ellipsis,
+                )
               : null,
-          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (dateLabel != null) ...[
-              Text(
-                dateLabel,
-                style: TextStyle(
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (dateLabel != null) ...[
+                Text(
+                  dateLabel,
+                  style: TextStyle(
                     fontSize: 10,
                     color: dateColor,
-                    fontWeight: FontWeight.w600),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+              IconButton(
+                icon: const Icon(Icons.open_in_new, size: 15),
+                tooltip: 'Open strain',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                onPressed: () => _openDetail(strain['strain_id']),
               ),
-              const SizedBox(width: 4),
             ],
-            IconButton(
-              icon: const Icon(Icons.open_in_new, size: 15),
-              tooltip: 'Open strain',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              onPressed: () => _openDetail(strain['strain_id']),
-            ),
-          ]),
+          ),
           onTap: () => _openDetail(strain['strain_id']),
         );
       },
@@ -222,37 +239,52 @@ class _InCareWidgetState extends State<InCareWidget> {
           // ── Header ────────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.medical_services, size: 18, color: Colors.orange),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text('In Care',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              ),
-              if (!_loading)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.orange,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.medical_services,
+                  size: 18,
+                  color: Colors.orange,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
                   child: Text(
-                    '${_strains.length}',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold),
+                    'In Care',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
-            ]),
+                if (!_loading)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_strains.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
           const Divider(height: 1),
 
@@ -261,11 +293,7 @@ class _InCareWidgetState extends State<InCareWidget> {
           // within the fixed-height container.
           // On mobile:  plain _buildList() which shrink-wraps as before.
           if (desktop)
-            Expanded(
-              child: SingleChildScrollView(
-                child: _buildList(),
-              ),
-            )
+            Expanded(child: SingleChildScrollView(child: _buildList()))
           else
             _buildList(),
         ],

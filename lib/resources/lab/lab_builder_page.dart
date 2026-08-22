@@ -160,6 +160,7 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final results = await Future.wait([
@@ -1020,20 +1021,11 @@ class _LabBuilderPageState extends State<LabBuilderPage> {
         nextLayout['decorations'] = _decors.map((d) => d.toJson()).toList();
         nextLayout['canvas_size'] = _encodeCanvasSize(_backgroundSize);
         nextLayout['updated_at'] = DateTime.now().toUtc().toIso8601String();
-        newSettings['lab_layout'] = nextLayout;
-        final updated = await client
-            .from('app_meta')
-            .update({'meta_settings': newSettings})
-            .eq('meta_initialized', true)
-            .select('meta_initialized');
-        if ((updated as List).isEmpty) {
-          await client.from('app_meta').insert({
-            'meta_initialized': true,
-            'meta_version': '1.0',
-            'meta_settings': newSettings,
-          });
-        }
-        _appMetaSettings = newSettings;
+        final savedSettings = await client.rpc(
+          'limsphere_set_lab_layout',
+          params: {'p_layout': nextLayout},
+        );
+        _appMetaSettings = Map<String, dynamic>.from(savedSettings as Map);
         layoutSaved = true;
       } catch (e) {
         debugPrint('lab_builder: save decorations failed: $e');

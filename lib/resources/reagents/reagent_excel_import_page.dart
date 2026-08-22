@@ -458,18 +458,14 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
         if (code != null && code.isNotEmpty) _locationCache[code] = id;
       }
 
-      final existingCodeRows = await db
-          .from('reagents')
-          .select('reagent_code');
+      final existingCodeRows = await db.from('reagents').select('reagent_code');
       final existingCodes = <String?>[
         for (final row in (existingCodeRows as List))
           row['reagent_code']?.toString(),
       ];
       final codeAllocator = ReagentCodeAllocator(
         existingCodes,
-        reservedCodes: [
-          for (final record in _parsed) record['reagent_code'],
-        ],
+        reservedCodes: [for (final record in _parsed) record['reagent_code']],
       );
 
       for (final record in _parsed) {
@@ -486,9 +482,7 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
         }
         try {
           await db.from('reagents').insert(row);
-          sb.writeln(
-            '✓ "$label" imported as ${row['reagent_code']}.',
-          );
+          sb.writeln('✓ "$label" imported as ${row['reagent_code']}.');
           imported++;
         } catch (e) {
           sb.writeln('✗ "$label" failed: $e');
@@ -880,6 +874,7 @@ class _ReagentExcelImportPageState extends State<ReagentExcelImportPage> {
                                 .toList(),
                             onChanged: (v) {
                               if (v != null) setState(() => _colMap[i] = v);
+                              FocusManager.instance.primaryFocus?.unfocus();
                             },
                           ),
                         ),

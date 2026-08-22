@@ -2,9 +2,11 @@
 // connection, edit URL/key, delete, navigate to add-connection page.
 
 import 'package:flutter/material.dart';
+
 import '../core/local_storage.dart';
 import 'database_connection_model.dart';
 import '../supabase/supabase_manager.dart';
+import 'database_initializer.dart';
 
 class ConnectionsPage extends StatefulWidget {
   const ConnectionsPage({super.key});
@@ -26,6 +28,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
 
   Future<void> _load() async {
     final list = await LocalStorage.loadConnections();
+    if (!mounted) return;
     setState(() => connections = list);
     _checkHealth();
   }
@@ -63,6 +66,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
     if (confirm != true) return;
     connections.removeAt(index);
     await LocalStorage.saveConnections(connections);
+    if (!mounted) return;
     setState(() {});
   }
 
@@ -72,16 +76,57 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
       '/add_connection',
       arguments: connections[index],
     );
+    if (!mounted) return;
     _load();
   }
 
   Future<void> _connect(ConnectionModel conn, int index) async {
     setState(() => selectedIndex = index);
-    await SupabaseManager.initialize(conn);
-    conn.lastConnected = DateTime.now();
-    await LocalStorage.saveConnections(connections);
-    if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/db_check');
+    try {
+      await SupabaseManager.initialize(conn);
+      conn.lastConnected = DateTime.now();
+      await LocalStorage.saveConnections(connections);
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/db_check');
+    } catch (error) {
+      if (!mounted) return;
+      final result = DatabaseInitializer.classifyError(error);
+      setState(() => selectedIndex = null);
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.link_off_outlined),
+          title: Text(result.title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(result.message),
+              if (result.technicalDetails case final details?) ...[
+                const SizedBox(height: 12),
+                SelectableText(
+                  details,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _editConnection(index);
+              },
+              child: const Text('Edit Connection'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   String _lastConnectedText(ConnectionModel conn) {
@@ -261,9 +306,9 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
                                 children: [
                                   Text(
                                     _lastConnectedText(conn),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelSmall,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall,
                                   ),
                                   const Spacer(),
                                   AnimatedScale(

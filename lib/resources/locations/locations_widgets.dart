@@ -23,6 +23,8 @@ class _RoomCard extends StatefulWidget {
   final List<Map<String, dynamic>> users;
   final int? dragIndex;
   final VoidCallback onTap;
+  final VoidCallback? onExportPdf;
+  final bool exportingPdf;
   final void Function(LocationModel) onTapChild;
   final VoidCallback onAddChild;
   final VoidCallback? onEditAll;
@@ -37,6 +39,8 @@ class _RoomCard extends StatefulWidget {
     required this.users,
     required this.dragIndex,
     required this.onTap,
+    required this.onExportPdf,
+    required this.exportingPdf,
     required this.onTapChild,
     required this.onAddChild,
     this.onEditAll,
@@ -105,6 +109,9 @@ class _RoomCardState extends State<_RoomCard> {
 
   Widget _buildHeader(BuildContext context) {
     final desc = _stripCodePrefix(widget.room.name);
+    final roomTemperature = widget.room.temperature?.trim().isNotEmpty == true
+        ? widget.room.temperature!.trim()
+        : 'RT';
     final display = desc.isEmpty
         ? widget.roomCode
         : '${widget.roomCode} · $desc';
@@ -159,11 +166,10 @@ class _RoomCardState extends State<_RoomCard> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (widget.room.temperature != null ||
-                    widget.room.capacity != null)
+                if (roomTemperature.isNotEmpty || widget.room.capacity != null)
                   Row(
                     children: [
-                      if (widget.room.temperature != null) ...[
+                      if (roomTemperature.isNotEmpty) ...[
                         Icon(
                           Icons.thermostat_outlined,
                           size: 11,
@@ -171,7 +177,7 @@ class _RoomCardState extends State<_RoomCard> {
                         ),
                         const SizedBox(width: 2),
                         Text(
-                          widget.room.temperature!,
+                          roomTemperature,
                           style: GoogleFonts.spaceGrotesk(
                             color: context.appTextMuted,
                             fontSize: 11,
@@ -199,24 +205,6 @@ class _RoomCardState extends State<_RoomCard> {
               ],
             ),
           ),
-          if (widget.children.isNotEmpty) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: _roomAccent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '${widget.children.length}',
-                style: GoogleFonts.spaceGrotesk(
-                  color: _roomAccent,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
           if (widget.room.responsible != null &&
               widget.room.responsible!.trim().isNotEmpty) ...[
             Flexible(
@@ -249,6 +237,28 @@ class _RoomCardState extends State<_RoomCard> {
             ),
             const SizedBox(width: 4),
           ],
+          OutlinedButton.icon(
+            onPressed: widget.onExportPdf,
+            icon: widget.exportingPdf
+                ? const SizedBox.square(
+                    dimension: 12,
+                    child: CircularProgressIndicator(strokeWidth: 1.8),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined, size: 14),
+            label: const Text('PDF'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _roomAccent,
+              side: BorderSide(color: _roomAccent.withValues(alpha: 0.5)),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              minimumSize: const Size(0, 28),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+              textStyle: GoogleFonts.spaceGrotesk(fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 4),
           OutlinedButton(
             onPressed: widget.onTap,
             style: OutlinedButton.styleFrom(
@@ -541,6 +551,7 @@ class _QuickAddLocationDialogState extends State<_QuickAddLocationDialog> {
   final _formKey = GlobalKey<FormState>();
   final _countCtrl = TextEditingController(text: '1');
   final _descCtrl = TextEditingController();
+  final _temperatureCtrl = TextEditingController(text: 'RT');
   final Map<int, TextEditingController> _rangeDescCtrls = {};
   late String _kind;
   late int? _parentId;
@@ -596,6 +607,7 @@ class _QuickAddLocationDialogState extends State<_QuickAddLocationDialog> {
   void dispose() {
     _countCtrl.dispose();
     _descCtrl.dispose();
+    _temperatureCtrl.dispose();
     for (final c in _rangeDescCtrls.values) {
       c.dispose();
     }
@@ -621,6 +633,9 @@ class _QuickAddLocationDialogState extends State<_QuickAddLocationDialog> {
               'location_name': _descCtrl.text.trim(),
               'location_type': LocationModel.roomType,
               'location_sort_order': _nextRoomIndex + 1,
+              'location_temperature': _temperatureCtrl.text.trim().isEmpty
+                  ? null
+                  : _temperatureCtrl.text.trim(),
             })
             .select('location_id')
             .single();
@@ -756,6 +771,11 @@ class _QuickAddLocationDialogState extends State<_QuickAddLocationDialog> {
                     label: 'Description (e.g. Microscopy) *',
                     validator: (v) =>
                         (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  _DarkField(
+                    controller: _temperatureCtrl,
+                    label: 'Temperature (RT if empty)',
                   ),
                 ] else ...[
                   _DarkDropdown<String>(

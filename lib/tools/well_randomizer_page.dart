@@ -15,7 +15,6 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '/theme/theme.dart';
-import '/theme/module_permission.dart';
 
 const _rows = 8; // A..H
 const _cols = 12; // 1..12
@@ -23,6 +22,12 @@ const _accent = Color(0xFFA855F7);
 
 String _wellId(int r, int c) => '${String.fromCharCode(65 + r)}${c + 1}';
 String _maskedId(int index) => _wellId(index ~/ _cols, index % _cols);
+
+String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+String _defaultPlateName(DateTime dateTime) =>
+    '${dateTime.year}${_twoDigits(dateTime.month)}${_twoDigits(dateTime.day)}_'
+    '${_twoDigits(dateTime.hour)}${_twoDigits(dateTime.minute)}';
 
 // Distinct color per sample index using the golden-angle hue cycle.
 Color _sampleColor(int i) {
@@ -40,11 +45,12 @@ class WellRandomizerPage extends StatefulWidget {
 class _WellRandomizerPageState extends State<WellRandomizerPage> {
   int _uniqueCount = 6;
   int _defaultReps = 10;
-  bool _masked = true;
+  bool _masked = false;
   final Set<String> _excluded = {};
   final List<TextEditingController> _names = [];
   final List<TextEditingController> _repCtrls = [];
   late final TextEditingController _defaultRepsCtrl;
+  late final TextEditingController _plateNameCtrl;
   final Map<String, int> _assignment = {}; // well -> sample index
 
   final GlobalKey _plateKey = GlobalKey();
@@ -53,6 +59,9 @@ class _WellRandomizerPageState extends State<WellRandomizerPage> {
   void initState() {
     super.initState();
     _defaultRepsCtrl = TextEditingController(text: '$_defaultReps');
+    _plateNameCtrl = TextEditingController(
+      text: _defaultPlateName(DateTime.now()),
+    );
     for (int r = 0; r < _rows; r++) {
       for (int c = 0; c < _cols; c++) {
         if (r == 0 || r == _rows - 1 || c == 0 || c == _cols - 1) {
@@ -72,6 +81,7 @@ class _WellRandomizerPageState extends State<WellRandomizerPage> {
       c.dispose();
     }
     _defaultRepsCtrl.dispose();
+    _plateNameCtrl.dispose();
     super.dispose();
   }
 
@@ -211,8 +221,15 @@ class _WellRandomizerPageState extends State<WellRandomizerPage> {
 
   String _csvEscape(String v) => '"${v.replaceAll('"', '""')}"';
 
+  String get _exportBaseName {
+    final sanitized = _plateNameCtrl.text.trim().replaceAll(
+      RegExp(r'[<>:"/\\|?*\x00-\x1F]'),
+      '_',
+    );
+    return sanitized.isEmpty ? _defaultPlateName(DateTime.now()) : sanitized;
+  }
+
   Future<void> _exportCsv() async {
-    if (!context.requireModuleAction(ModuleAction.export)) return;
     try {
       final repCounter = <int, int>{};
       final buf = StringBuffer()
@@ -243,8 +260,7 @@ class _WellRandomizerPageState extends State<WellRandomizerPage> {
         }
       }
       final dir = await getDownloadsDirectory();
-      final path =
-          '${dir!.path}/well_plate_${DateTime.now().millisecondsSinceEpoch}.csv';
+      final path = '${dir!.path}/$_exportBaseName.csv';
       await File(path).writeAsString(buf.toString());
       await OpenFilex.open(path);
     } catch (e) {
@@ -253,7 +269,6 @@ class _WellRandomizerPageState extends State<WellRandomizerPage> {
   }
 
   Future<void> _exportImage() async {
-    if (!context.requireModuleAction(ModuleAction.export)) return;
     try {
       final boundary =
           _plateKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
@@ -262,8 +277,7 @@ class _WellRandomizerPageState extends State<WellRandomizerPage> {
           .buffer
           .asUint8List();
       final dir = await getDownloadsDirectory();
-      final path =
-          '${dir!.path}/well_plate_${DateTime.now().millisecondsSinceEpoch}.png';
+      final path = '${dir!.path}/$_exportBaseName.png';
       await File(path).writeAsBytes(bytes);
       await OpenFilex.open(path);
     } catch (e) {
@@ -338,6 +352,7 @@ class _WellRandomizerPageState extends State<WellRandomizerPage> {
           final wide = cons.maxWidth >= 900;
           if (wide) {
             return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(width: 380, child: _buildControls()),
                 Container(width: 1, color: context.appBorder),
@@ -369,6 +384,20 @@ class _WellRandomizerPageState extends State<WellRandomizerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              TextField(
+                controller: _plateNameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Plate name',
+                  helperText: 'Used as the CSV and PNG file name',
+                  isDense: true,
+                  filled: true,
+                  fillColor: context.appSurface2,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
               _controlsWarning(),
               const SizedBox(height: 14),
               _sectionLabel('Number of unique samples'),
@@ -414,7 +443,8 @@ class _WellRandomizerPageState extends State<WellRandomizerPage> {
     final color = over
         ? AppDS.red
         : (total == 0 ? context.appTextMuted : AppDS.green);
-    return Row(
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
           '$_includedCount wells available · ',

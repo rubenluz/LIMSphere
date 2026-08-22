@@ -15,6 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'strain_detail_page.dart';
 import '../function_excel_import_page.dart';
+import '../map/culture_map_page.dart';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
@@ -106,10 +107,27 @@ class StrainsPage extends StatefulWidget {
 }
 
 class _StrainsPageState extends State<StrainsPage> {
+  static const _initialPageSize = 50;
+  static const _backgroundPageSize = 250;
+  static const _strainSelect = '''
+        *,
+        samples (
+          sample_code, sample_rebeca, sample_ccpi, sample_date,
+          sample_collector, sample_country, sample_archipelago, sample_island,
+          sample_region, sample_municipality, sample_local,
+          sample_habitat_type, sample_habitat_1, sample_habitat_2, sample_habitat_3,
+          sample_substrate, sample_method, sample_gps, sample_temperature, sample_ph,
+          sample_conductivity, sample_oxygen, sample_salinity, sample_radiation,
+          sample_responsible, sample_observations
+        )
+      ''';
+
   // ── State ──────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _rows = [];
   List<Map<String, dynamic>> _filtered = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  int _loadEpoch = 0;
 
   bool _selectionMode = false;
   final Set<dynamic> _selectedRowIds = {};
@@ -195,6 +213,7 @@ class _StrainsPageState extends State<StrainsPage> {
 
   @override
   void dispose() {
+    _loadEpoch++;
     _editController.dispose();
     _searchController.dispose();
     _hScroll.dispose();
@@ -280,6 +299,7 @@ class _StrainsPageState extends State<StrainsPage> {
             .toList()) {
       await prefs.remove(k);
     }
+    if (!mounted) return;
     setState(() => _colWidths.clear());
   }
 
@@ -293,6 +313,7 @@ class _StrainsPageState extends State<StrainsPage> {
 
   Future<void> _resetColOrder() async {
     await (await SharedPreferences.getInstance()).remove(strainPrefColOrder);
+    if (!mounted) return;
     setState(() => _colOrder = null);
   }
 
@@ -335,71 +356,148 @@ class _StrainsPageState extends State<StrainsPage> {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   Future<void> _load() async {
-    setState(() => _loading = true);
+    if (!mounted) return;
+    final epoch = ++_loadEpoch;
+    final hadRows = _rows.isNotEmpty;
+    setState(() {
+      _loading = !hadRows;
+      _loadingMore = hadRows;
+    });
     final cacheKey = widget.filterSampleId != null
         ? 'strains_${widget.filterSampleId}'
         : 'strains';
+    // Start the network request immediately. Cache decoding and the first
+    // Supabase page race in parallel so a large cache never delays the query.
+    final firstPageFuture = _fetchStrainPage(0, _initialPageSize - 1);
     List<dynamic>? cached;
-    try {
-      cached = await DataCache.read(cacheKey);
-      if (cached != null && mounted) {
-        debugPrint('[StrainsPage] cache hit: ${cached.length} rows');
-        _rows = await compute(_parseStrainRows, cached);
-        if (!mounted) return;
-        if (_hideEmpty) {
-          _detectEmptyCols();
-        } else {
-          _emptyColKeys = {};
+    if (!hadRows) {
+      try {
+        cached = await DataCache.read(cacheKey);
+        if (epoch == _loadEpoch &&
+            mounted &&
+            cached != null &&
+            cached.isNotEmpty) {
+          debugPrint('[StrainsPage] cache hit: ${cached.length} rows');
+          final firstCached = cached.take(_initialPageSize).toList();
+          _replaceRows(
+            _parseStrainRows(firstCached),
+            loading: false,
+            loadingMore: true,
+          );
         }
-        _buildPeriodicityOptions();
-        _buildMediumOptions();
-        _applyFilter();
-        setState(() => _loading = false);
+      } catch (e, st) {
+        debugPrint('[StrainsPage] cache parse ERROR: $e');
+        debugPrint(st.toString());
       }
-    } catch (e, st) {
-      debugPrint('[StrainsPage] cache parse ERROR: $e');
-      debugPrint(st.toString());
-      if (mounted) setState(() => _loading = false);
     }
     try {
-      debugPrint('[StrainsPage] fetching strains from Supabase…');
-      var q = Supabase.instance.client.from('strains').select('''
-        *,
-        samples (
-          sample_code, sample_rebeca, sample_ccpi, sample_date,
-          sample_collector, sample_country, sample_archipelago, sample_island,
-          sample_region, sample_municipality, sample_local,
-          sample_habitat_type, sample_habitat_1, sample_habitat_2, sample_habitat_3,
-          sample_substrate, sample_method, sample_gps, sample_temperature, sample_ph,
-          sample_conductivity, sample_oxygen, sample_salinity, sample_radiation,
-          sample_responsible, sample_observations
-        )
-      ''');
-      if (widget.filterSampleId != null) {
-        q = q.eq('strain_sample_code', widget.filterSampleId);
-      }
-      final res = await q.order('strain_code', ascending: true);
-      debugPrint('[StrainsPage] fetch OK: ${(res as List).length} rows');
-      await DataCache.write(cacheKey, res);
-      if (!mounted) return;
-      _rows = await compute(_parseStrainRows, res);
-      if (!mounted) return;
-      if (_hideEmpty) {
-        _detectEmptyCols();
+      debugPrint('[StrainsPage] fetching first $_initialPageSize strains…');
+      final firstPage = await firstPageFuture;
+      if (epoch != _loadEpoch || !mounted) return;
+      final parsed = _parseStrainRows(firstPage);
+      final mayHaveMore = firstPage.length == _initialPageSize;
+      _replaceRows(parsed, loading: false, loadingMore: mayHaveMore);
+      debugPrint('[StrainsPage] first page OK: ${firstPage.length} rows');
+      if (mayHaveMore) {
+        unawaited(_loadRemainingStrains(epoch, cacheKey, firstPage));
       } else {
-        _emptyColKeys = {};
+        await DataCache.write(cacheKey, firstPage);
+        if (epoch == _loadEpoch && mounted) {
+          setState(() => _loadingMore = false);
+          unawaited(_syncNextTransferDates());
+        }
       }
-      _buildPeriodicityOptions();
-      _buildMediumOptions();
-      _applyFilter();
-      _syncNextTransferDates(); // background — no await
-      setState(() => _loading = false);
     } catch (e, st) {
       debugPrint('[StrainsPage] _load ERROR: $e');
       debugPrint(st.toString());
-      if (cached == null) _snack('Error loading strains: $e');
-      if (mounted) setState(() => _loading = false);
+      if (epoch == _loadEpoch &&
+          mounted &&
+          (cached == null || cached.isEmpty)) {
+        _snack('Error loading strains: $e');
+      }
+      if (epoch == _loadEpoch && mounted) {
+        setState(() {
+          _loading = false;
+          _loadingMore = false;
+        });
+      }
     }
+  }
+
+  Future<List<dynamic>> _fetchStrainPage(int from, int to) async {
+    var query = Supabase.instance.client.from('strains').select(_strainSelect);
+    if (widget.filterSampleId != null) {
+      query = query.eq('strain_sample_code', widget.filterSampleId);
+    }
+    final response = await query
+        .order('strain_code', ascending: true)
+        .order('strain_id', ascending: true)
+        .range(from, to);
+    return List<dynamic>.from(response as List);
+  }
+
+  Future<void> _loadRemainingStrains(
+    int epoch,
+    String cacheKey,
+    List<dynamic> firstPage,
+  ) async {
+    final allRaw = <dynamic>[...firstPage];
+    var offset = firstPage.length;
+    try {
+      while (epoch == _loadEpoch && mounted) {
+        final page = await _fetchStrainPage(
+          offset,
+          offset + _backgroundPageSize - 1,
+        );
+        if (epoch != _loadEpoch || !mounted) return;
+        if (page.isEmpty) break;
+        allRaw.addAll(page);
+        final parsed = await compute(_parseStrainRows, page);
+        if (epoch != _loadEpoch || !mounted) return;
+        _rows.addAll(parsed);
+        _refreshDerivedRows();
+        offset += page.length;
+        debugPrint('[StrainsPage] loaded $offset strains');
+        if (page.length < _backgroundPageSize) break;
+      }
+      if (epoch != _loadEpoch || !mounted) return;
+      await DataCache.write(cacheKey, allRaw);
+      if (epoch != _loadEpoch || !mounted) return;
+      setState(() => _loadingMore = false);
+      unawaited(_syncNextTransferDates());
+    } catch (e, st) {
+      debugPrint('[StrainsPage] background load ERROR: $e');
+      debugPrint(st.toString());
+      if (epoch == _loadEpoch && mounted) {
+        setState(() => _loadingMore = false);
+        _snack('Loaded ${_rows.length} strains; more could not be retrieved.');
+      }
+    }
+  }
+
+  void _replaceRows(
+    List<Map<String, dynamic>> rows, {
+    required bool loading,
+    required bool loadingMore,
+  }) {
+    _rows = rows;
+    _refreshDerivedRows();
+    if (!mounted) return;
+    setState(() {
+      _loading = loading;
+      _loadingMore = loadingMore;
+    });
+  }
+
+  void _refreshDerivedRows() {
+    if (_hideEmpty) {
+      _detectEmptyCols();
+    } else {
+      _emptyColKeys = {};
+    }
+    _buildPeriodicityOptions();
+    _buildMediumOptions();
+    _applyFilter();
   }
 
   void _computeNextTransfer(Map<String, dynamic> row) {
@@ -653,6 +751,7 @@ class _StrainsPageState extends State<StrainsPage> {
           .from('strains')
           .update(patch)
           .eq('strain_id', id);
+      if (!mounted) return;
       unawaited(BackupService.instance.notifyCrudChange('strains'));
       final idx = _rows.indexWhere((r) => r['strain_id'] == id);
       if (idx != -1) {
@@ -667,7 +766,7 @@ class _StrainsPageState extends State<StrainsPage> {
     } catch (e) {
       _snack('Save error: $e');
     }
-    setState(() => _editingCell = null);
+    if (mounted) setState(() => _editingCell = null);
   }
 
   Future<void> _showStatusPicker(Map<String, dynamic> row, Offset pos) async {
@@ -814,7 +913,9 @@ class _StrainsPageState extends State<StrainsPage> {
         context: context,
         child: StrainDetailPage(strainId: row['strain_id'], onSaved: _load),
       ),
-    ).then((_) => _load());
+    ).then((_) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _onRowActionSelected(
@@ -885,6 +986,7 @@ class _StrainsPageState extends State<StrainsPage> {
       );
     } catch (e, st) {
       debugPrint(st.toString());
+      if (!mounted) return;
       setState(() {
         if (idx != -1) _rows[idx]['strain_need_new_transfer'] = current;
         row['strain_need_new_transfer'] = current;
@@ -1252,7 +1354,9 @@ class _StrainsPageState extends State<StrainsPage> {
             context: context,
             child: StrainDetailPage(strainId: res['strain_id'], onSaved: _load),
           ),
-        ).then((_) => _load());
+        ).then((_) {
+          if (mounted) _load();
+        });
       }
     } catch (e, st) {
       debugPrint(st.toString());
@@ -1303,6 +1407,22 @@ class _StrainsPageState extends State<StrainsPage> {
                   setState(() => _showFilters = !_showFilters),
               onToggleColManager: () =>
                   setState(() => _showColManager = !_showColManager),
+              onMap: () => Navigator.push(
+                context,
+                modulePageRoute(
+                  context: context,
+                  child: Scaffold(
+                    backgroundColor: context.appBg,
+                    body: SafeArea(
+                      child: CultureMapPage(
+                        initialQuery: _search,
+                        strainsOnly: true,
+                        showBackButton: true,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               onImport: () async {
                 if (!context.requireModuleAction(ModuleAction.create)) return;
                 if (!context.requireModuleAction(ModuleAction.bulkUpdate)) {
@@ -1315,6 +1435,7 @@ class _StrainsPageState extends State<StrainsPage> {
                     child: const ExcelImportPage(mode: 'strains'),
                   ),
                 );
+                if (!mounted) return;
                 if (ok == true) _load();
               },
               onExport: _enterSelectionMode,
@@ -1395,6 +1516,7 @@ class _StrainsPageState extends State<StrainsPage> {
               onResetAll: () async {
                 await _resetColWidths();
                 await _resetColOrder();
+                if (!mounted) return;
                 setState(() => _hiddenCols = {});
                 _snack('All column settings reset');
               },
@@ -1421,6 +1543,11 @@ class _StrainsPageState extends State<StrainsPage> {
                   _hiddenCols.add(key);
                 }
               }),
+            ),
+          if (_loadingMore && !_loading)
+            const SizedBox(
+              height: 2,
+              child: LinearProgressIndicator(minHeight: 2),
             ),
           if (_loading)
             Expanded(

@@ -2,6 +2,8 @@
 // users, samples, strains, fish_lines, fish_stocks, locations, machines,
 // reagents, reservations, sops, messages, todo_items. Used by setup_page.
 
+import 'security_hardening_sql.dart';
+
 const String coreTablesSQL = '''
 
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -11,10 +13,12 @@ const String coreTablesSQL = '''
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 -- ── Extensions ─────────────────────────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS citext;
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA extensions;
 
 -- ── 1. app_meta ────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS app_meta (
+    meta_id            BIGINT PRIMARY KEY DEFAULT 1 CHECK (meta_id = 1),
     meta_initialized   BOOLEAN   DEFAULT false,
     meta_version       TEXT      DEFAULT '1.0',
     meta_settings      JSONB     DEFAULT '{}'
@@ -814,7 +818,7 @@ CREATE TABLE IF NOT EXISTS facility_sops (
 
     -- Context (which section this SOP belongs to)
     sop_context          TEXT DEFAULT 'fish_facility'
-                         CHECK (sop_context IN ('fish_facility','culture_collection')),
+                         CHECK (sop_context IN ('fish_facility','culture_collection','hplc','assays','reagent_preparation','sampling','cleaning_maintenance','molecular_biology')),
 
     -- Digital
     sop_qrcode           TEXT,
@@ -1225,7 +1229,10 @@ ALTER TABLE equipment         ADD COLUMN IF NOT EXISTS equipment_qrcode     TEXT
 ALTER TABLE fish_stocks       ADD COLUMN IF NOT EXISTS fish_stocks_dob      DATE;
 ALTER TABLE fish_stocks       ADD COLUMN IF NOT EXISTS fish_stocks_qrcode   TEXT;
 ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_qrcode           TEXT;
-ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_context          TEXT DEFAULT 'fish_facility' CHECK (sop_context IN ('fish_facility','culture_collection'));
+ALTER TABLE facility_sops     ADD COLUMN IF NOT EXISTS sop_context          TEXT DEFAULT 'fish_facility';
+ALTER TABLE facility_sops     DROP CONSTRAINT IF EXISTS facility_sops_sop_context_check;
+ALTER TABLE facility_sops     ADD CONSTRAINT facility_sops_sop_context_check
+  CHECK (sop_context IN ('fish_facility','culture_collection','hplc','assays','reagent_preparation','sampling','cleaning_maintenance','molecular_biology'));
 
 -- Rewrite stored QR payloads to the canonical LIMSphere deep-link format.
 -- The client invokes this with the active Supabase project reference.
@@ -1369,4 +1376,4 @@ CREATE TABLE IF NOT EXISTS label_templates (
 INSERT INTO app_meta (meta_initialized, meta_version)
 VALUES (true, '1.0')
 ON CONFLICT DO NOTHING;
-''';
+$securityHardeningSQL''';

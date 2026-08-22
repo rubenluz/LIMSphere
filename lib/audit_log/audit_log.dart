@@ -216,6 +216,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client

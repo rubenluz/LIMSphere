@@ -25,9 +25,10 @@ class _StartupPageState extends State<StartupPage>
       duration: const Duration(milliseconds: 900),
     );
     _fadeIn = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    _slideUp = Tween<double>(begin: 24, end: 0).animate(
-      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
-    );
+    _slideUp = Tween<double>(
+      begin: 24,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
     _animCtrl.forward();
     _startupLogic();
   }
@@ -41,8 +42,9 @@ class _StartupPageState extends State<StartupPage>
   /// Returns true if a real internet connection is available.
   static Future<bool> checkConnectivity() async {
     try {
-      final result = await InternetAddress.lookup('connectivitycheck.gstatic.com')
-          .timeout(const Duration(seconds: 4));
+      final result = await InternetAddress.lookup(
+        'connectivitycheck.gstatic.com',
+      ).timeout(const Duration(seconds: 4));
       return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
     } catch (_) {
       return false;
@@ -69,7 +71,21 @@ class _StartupPageState extends State<StartupPage>
 
         final sessionValid = await LocalStorage.hasValidSession();
         if (sessionValid && SupabaseManager.hasActiveSession) {
-          route = '/menu';
+          final email = SupabaseManager.client.auth.currentSession?.user.email;
+          if (email != null && email.isNotEmpty) {
+            final userRow = await SupabaseManager.client
+                .from('users')
+                .select('user_status')
+                .eq('user_email', email)
+                .maybeSingle();
+            if (hasActiveAccount(userRow)) {
+              route = '/menu';
+            } else {
+              await SupabaseManager.client.auth.signOut();
+              await LocalStorage.saveSessionExpiry(0);
+              route = '/login';
+            }
+          }
         }
       } catch (_) {}
     }();
@@ -179,10 +195,12 @@ class _StartupPageState extends State<StartupPage>
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                          color: const Color(0xFFF59E0B)
+                              .withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                            color: const Color(0xFFF59E0B)
+                                .withValues(alpha: 0.35),
                             width: 1,
                           ),
                         ),
@@ -223,10 +241,7 @@ class _StartupPageState extends State<StartupPage>
               child: const Text(
                 'Open Source | MIT License',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF334155),
-                ),
+                style: TextStyle(fontSize: 11, color: Color(0xFF334155)),
               ),
             ),
           ),

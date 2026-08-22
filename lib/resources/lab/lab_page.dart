@@ -78,6 +78,7 @@ class _LabPageState extends State<LabPage> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final results = await Future.wait([
@@ -86,7 +87,7 @@ class _LabPageState extends State<LabPage> {
             .select('*, parent:location_parent_id(location_name)')
             .order('location_sort_order'),
         Supabase.instance.client
-            .from('users')
+            .from('user_directory')
             .select(
               'user_id, user_email, user_name, user_phone, '
               'user_institution, user_group, user_role',

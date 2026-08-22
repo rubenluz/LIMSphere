@@ -4,7 +4,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '/theme/theme.dart';
 
 class PendingUsersWidget extends StatefulWidget {
@@ -27,12 +29,14 @@ class _PendingUsersWidgetState extends State<PendingUsersWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client
@@ -43,13 +47,14 @@ class _PendingUsersWidgetState extends State<PendingUsersWidget> {
 
       final List<_PendingUser> users = [];
       for (final r in rows as List) {
-        users.add(_PendingUser(
-          name: r['user_name'] as String? ?? '',
-          email: r['user_email'] as String? ?? '',
-          role: r['user_role'] as String? ?? '',
-          createdAt: DateTime.tryParse(
-              r['user_created_at'] as String? ?? ''),
-        ));
+        users.add(
+          _PendingUser(
+            name: r['user_name'] as String? ?? '',
+            email: r['user_email'] as String? ?? '',
+            role: r['user_role'] as String? ?? '',
+            createdAt: DateTime.tryParse(r['user_created_at'] as String? ?? ''),
+          ),
+        );
       }
 
       if (!mounted) return;
@@ -79,14 +84,21 @@ class _PendingUsersWidgetState extends State<PendingUsersWidget> {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.how_to_reg,
-                size: 32, color: AppDS.green.withAlpha(180)),
-            const SizedBox(height: 8),
-            Text('No pending users',
-                style: TextStyle(
-                    fontSize: 12, color: context.appTextSecondary)),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.how_to_reg,
+                size: 32,
+                color: AppDS.green.withAlpha(180),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No pending users',
+                style: TextStyle(fontSize: 12, color: context.appTextSecondary),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -106,59 +118,71 @@ class _PendingUsersWidgetState extends State<PendingUsersWidget> {
             border: Border.all(color: AppDS.yellow.withAlpha(100)),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Row(children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: AppDS.yellow.withAlpha(60),
-              child: Text(
-                (u.name.isNotEmpty ? u.name[0] : u.email.isNotEmpty ? u.email[0] : '?')
-                    .toUpperCase(),
-                style: const TextStyle(
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: AppDS.yellow.withAlpha(60),
+                child: Text(
+                  (u.name.isNotEmpty
+                          ? u.name[0]
+                          : u.email.isNotEmpty
+                          ? u.email[0]
+                          : '?')
+                      .toUpperCase(),
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: AppDS.yellow),
+                    color: AppDS.yellow,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    u.name.isNotEmpty ? u.name : u.email,
-                    style: TextStyle(
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      u.name.isNotEmpty ? u.name : u.email,
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: context.appTextPrimary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${u.email}  ·  ${_fmtDate(u.createdAt)}',
-                    style: TextStyle(
-                        fontSize: 10, color: context.appTextMuted),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                        color: context.appTextPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${u.email}  ·  ${_fmtDate(u.createdAt)}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: context.appTextMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppDS.yellow.withAlpha(50),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: AppDS.yellow.withAlpha(100)),
-              ),
-              child: Text(u.role.isNotEmpty ? u.role : 'viewer',
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppDS.yellow.withAlpha(50),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: AppDS.yellow.withAlpha(100)),
+                ),
+                child: Text(
+                  u.role.isNotEmpty ? u.role : 'viewer',
                   style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: AppDS.yellow)),
-            ),
-          ]),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppDS.yellow,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -179,36 +203,50 @@ class _PendingUsersWidgetState extends State<PendingUsersWidget> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.person_add_outlined,
-                  size: 20, color: AppDS.yellow),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text.rich(TextSpan(children: [
-                  TextSpan(
-                    text: 'Pending Users',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: context.appTextPrimary),
-                  ),
-                  if (_users.isNotEmpty)
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.person_add_outlined,
+                  size: 20,
+                  color: AppDS.yellow,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text.rich(
                     TextSpan(
-                      text: '  ${_users.length}',
-                      style: TextStyle(
-                          fontSize: 12, color: context.appTextMuted),
+                      children: [
+                        TextSpan(
+                          text: 'Pending Users',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: context.appTextPrimary,
+                          ),
+                        ),
+                        if (_users.isNotEmpty)
+                          TextSpan(
+                            text: '  ${_users.length}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.appTextMuted,
+                            ),
+                          ),
+                      ],
                     ),
-                ])),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
-            ]),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
           Divider(height: 1, color: context.appBorder),
           if (desktop)

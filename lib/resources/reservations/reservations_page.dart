@@ -50,9 +50,11 @@ class _ReservationsPageState extends State<ReservationsPage> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     final cachedRes = await DataCache.read('reservations');
     final cachedEquip = await DataCache.read('equipment_names');
-    if (cachedRes != null && cachedEquip != null && mounted) {
+    if (!mounted) return;
+    if (cachedRes != null && cachedEquip != null) {
       setState(() {
         _all = cachedRes
             .map<ReservationModel>(
@@ -128,6 +130,7 @@ class _ReservationsPageState extends State<ReservationsPage> {
         allReservations: _all,
       ),
     );
+    if (!mounted) return;
     if (result == true) _load();
   }
 

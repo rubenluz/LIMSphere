@@ -4,7 +4,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '/theme/theme.dart';
 
 class LowStockWidget extends StatefulWidget {
@@ -27,19 +29,22 @@ class _LowStockWidgetState extends State<LowStockWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       // Fetch reagents that have a container minimum threshold set.
       final rows = await Supabase.instance.client
           .from('reagents')
           .select(
-              'reagent_name, reagent_container_count, reagent_container_min, reagent_package_size, reagent_unit')
+            'reagent_name, reagent_container_count, reagent_container_min, reagent_package_size, reagent_unit',
+          )
           .not('reagent_container_min', 'is', null)
           .order('reagent_name');
 
@@ -49,13 +54,15 @@ class _LowStockWidgetState extends State<LowStockWidget> {
         final min = (r['reagent_container_min'] as num?)?.toInt();
         if (min == null || min <= 0) continue;
         if (count > min) continue;
-        items.add(_LowItem(
-          name: r['reagent_name'] as String? ?? '—',
-          count: count,
-          min: min,
-          packageSize: (r['reagent_package_size'] as num?)?.toDouble(),
-          unit: r['reagent_unit'] as String? ?? '',
-        ));
+        items.add(
+          _LowItem(
+            name: r['reagent_name'] as String? ?? '—',
+            count: count,
+            min: min,
+            packageSize: (r['reagent_package_size'] as num?)?.toDouble(),
+            unit: r['reagent_unit'] as String? ?? '',
+          ),
+        );
       }
 
       // Sort: lowest ratio first (most critical on top).
@@ -89,14 +96,21 @@ class _LowStockWidgetState extends State<LowStockWidget> {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.check_circle_outline, size: 32,
-                color: AppDS.green.withAlpha(180)),
-            const SizedBox(height: 8),
-            Text('All reagents above threshold',
-                style: TextStyle(
-                    fontSize: 12, color: context.appTextSecondary)),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.check_circle_outline,
+                size: 32,
+                color: AppDS.green.withAlpha(180),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'All reagents above threshold',
+                style: TextStyle(fontSize: 12, color: context.appTextSecondary),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -120,34 +134,39 @@ class _LowStockWidgetState extends State<LowStockWidget> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(it.name,
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: context.appTextPrimary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                it.name,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: context.appTextPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               const SizedBox(height: 4),
-              Row(children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: pct,
-                      minHeight: 5,
-                      backgroundColor: context.appBorder,
-                      valueColor: AlwaysStoppedAnimation(color),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: pct,
+                        minHeight: 5,
+                        backgroundColor: context.appBorder,
+                        valueColor: AlwaysStoppedAnimation(color),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  it.packageSize != null
-                      ? '${it.count} / ${it.min} × ${_fmt(it.packageSize!)} ${it.unit}'
-                      : '${it.count} / ${it.min} containers',
-                  style: AppDS.mono(size: 11, color: color),
-                ),
-              ]),
+                  const SizedBox(width: 10),
+                  Text(
+                    it.packageSize != null
+                        ? '${it.count} / ${it.min} × ${_fmt(it.packageSize!)} ${it.unit}'
+                        : '${it.count} / ${it.min} containers',
+                    style: AppDS.mono(size: 11, color: color),
+                  ),
+                ],
+              ),
             ],
           ),
         );
@@ -173,26 +192,36 @@ class _LowStockWidgetState extends State<LowStockWidget> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.inventory_2_outlined,
-                  size: 20, color: AppDS.orange),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Low Stock Alerts',
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 20,
+                  color: AppDS.orange,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Low Stock Alerts',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: context.appTextPrimary)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
-            ]),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
           Divider(height: 1, color: context.appBorder),
           if (desktop)
@@ -211,10 +240,11 @@ class _LowItem {
   final int min;
   final double? packageSize;
   final String unit;
-  const _LowItem(
-      {required this.name,
-      required this.count,
-      required this.min,
-      required this.packageSize,
-      required this.unit});
+  const _LowItem({
+    required this.name,
+    required this.count,
+    required this.min,
+    required this.packageSize,
+    required this.unit,
+  });
 }

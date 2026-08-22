@@ -1056,16 +1056,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           SizedBox(width: isMobile ? 10 : 24),
           Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: DashboardGlobalSearch(
-                  includeUsers: _isAdmin,
-                  compact: true,
-                ),
-              ),
-            ),
+            child: DashboardGlobalSearch(includeUsers: _isAdmin, compact: true),
           ),
           const SizedBox(width: 12),
           if (_isDesktop) _buildUpdateButton(),

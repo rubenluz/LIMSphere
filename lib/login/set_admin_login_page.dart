@@ -1,7 +1,6 @@
 // set_admin_login_page.dart - First-run admin setup: creates the first
 // superadmin account when no users exist in the users table.
 
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -13,14 +12,14 @@ class SetAdminLoginPage extends StatefulWidget {
 }
 
 class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
-  final _nameCtrl     = TextEditingController();
-  final _emailCtrl    = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _confirmCtrl  = TextEditingController();
+  final _confirmCtrl = TextEditingController();
 
-  bool _showPassword        = false;
+  bool _showPassword = false;
   bool _showConfirmPassword = false;
-  bool _loading             = false;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -32,10 +31,10 @@ class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
   }
 
   Future<void> _createAdmin() async {
-    final name     = _nameCtrl.text.trim();
-    final email    = _emailCtrl.text.trim();
+    final name = _nameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
-    final confirm  = _confirmCtrl.text;
+    final confirm = _confirmCtrl.text;
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) {
       _snack('Name, email and password are required.');
@@ -55,19 +54,19 @@ class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
       final supabase = Supabase.instance.client;
 
       final res = await supabase.auth.signUp(email: email, password: password);
-      if (res.user == null) throw Exception('Sign-up failed — check your Supabase Auth settings.');
+      if (res.session == null) {
+        throw Exception(
+          'Confirm the email, then sign in before completing first-admin setup.',
+        );
+      }
+      if (res.user == null) {
+        throw Exception('Sign-up failed — check your Supabase Auth settings.');
+      }
 
-      await supabase.from('users').upsert({
-        'user_name':                    name,
-        'user_email':                   email,
-        'user_role':                    'superadmin',
-        'user_status':                  'active',
-        'user_table_dashboard':         'write',
-        'user_table_chat':              'write',
-        'user_table_culture_collection':'write',
-        'user_table_fish_facility':     'write',
-        'user_table_resources':         'write',
-      }, onConflict: 'user_email');
+      await supabase.rpc(
+        'limsphere_bootstrap_superadmin',
+        params: {'p_name': name, 'p_email': email},
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -97,7 +96,8 @@ class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Back to connections',
-          onPressed: () => Navigator.pushReplacementNamed(context, '/connections'),
+          onPressed: () =>
+              Navigator.pushReplacementNamed(context, '/connections'),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -111,11 +111,16 @@ class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.admin_panel_settings_outlined,
-                      size: 52, color: colorScheme.primary),
+                  Icon(
+                    Icons.admin_panel_settings_outlined,
+                    size: 52,
+                    color: colorScheme.primary,
+                  ),
                   const SizedBox(height: 12),
-                  const Text('Admin Setup',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Admin Setup',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 24),
 
                   // ── Info banner ──────────────────────────────────────────
@@ -124,14 +129,18 @@ class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
                       color: colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: colorScheme.primary.withValues(alpha: 0.4)),
+                        color: colorScheme.primary.withValues(alpha: 0.4),
+                      ),
                     ),
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline_rounded,
-                            color: colorScheme.primary, size: 22),
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: colorScheme.primary,
+                          size: 22,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -139,8 +148,9 @@ class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
                             'the Administrator (superadmin) with full access to '
                             'manage users and data.',
                             style: TextStyle(
-                                fontSize: 13,
-                                color: colorScheme.onPrimaryContainer),
+                              fontSize: 13,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
                           ),
                         ),
                       ],
@@ -179,9 +189,11 @@ class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
-                        icon: Icon(_showPassword
-                            ? Icons.visibility_off
-                            : Icons.visibility),
+                        icon: Icon(
+                          _showPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
                         onPressed: () =>
                             setState(() => _showPassword = !_showPassword),
                       ),
@@ -198,11 +210,14 @@ class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
-                        icon: Icon(_showConfirmPassword
-                            ? Icons.visibility_off
-                            : Icons.visibility),
+                        icon: Icon(
+                          _showConfirmPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
                         onPressed: () => setState(
-                            () => _showConfirmPassword = !_showConfirmPassword),
+                          () => _showConfirmPassword = !_showConfirmPassword,
+                        ),
                       ),
                     ),
                   ),
@@ -217,7 +232,10 @@ class _SetAdminLoginPageState extends State<SetAdminLoginPage> {
                               height: 18,
                               width: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                           : const Text('Create Admin Account'),
                     ),
                   ),

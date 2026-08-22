@@ -362,17 +362,20 @@ class _BackupsPageState extends State<BackupsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            height: 56,
+            height: AppDS.moduleToolbarHeight,
             decoration: BoxDecoration(
               color: context.appSurface2,
               border: Border(bottom: BorderSide(color: context.appBorder)),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: AppDS.moduleToolbarPadding,
             child: Row(
               children: [
                 if (MediaQuery.of(context).size.width < 700) ...[
                   IconButton(
-                    icon: const Icon(Icons.menu_rounded, size: 20),
+                    icon: const Icon(
+                      Icons.menu_rounded,
+                      size: AppDS.moduleMenuIconSize,
+                    ),
                     color: context.appTextSecondary,
                     tooltip: 'Menu',
                     onPressed: () => Scaffold.of(context).openDrawer(),
@@ -381,16 +384,12 @@ class _BackupsPageState extends State<BackupsPage> {
                 const Icon(
                   Icons.backup_outlined,
                   color: BackupsPage.accent,
-                  size: 20,
+                  size: AppDS.moduleTitleIconSize,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Text(
                   'Backups',
-                  style: _uiStyle(
-                    color: context.appTextPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppDS.moduleTitle(context.appTextPrimary),
                 ),
                 const Spacer(),
                 if (_settings.localMirrorEnabled) ...[
@@ -404,7 +403,7 @@ class _BackupsPageState extends State<BackupsPage> {
                       color: (_saving || _service.isBusy)
                           ? context.appTextMuted
                           : BackupsPage.accent,
-                      size: 20,
+                      size: AppDS.moduleActionIconSize,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -420,7 +419,7 @@ class _BackupsPageState extends State<BackupsPage> {
                         color: _service.errorCount > 0
                             ? AppDS.red
                             : context.appTextMuted,
-                        size: 20,
+                        size: AppDS.moduleActionIconSize,
                       ),
                     ),
                     if (_service.errorCount > 0)

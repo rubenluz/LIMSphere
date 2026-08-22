@@ -23,6 +23,7 @@ import 'sample_detail_page.dart';
 import 'sample_map_picker_page.dart';
 import '/theme/grid_widgets.dart';
 import '../function_excel_import_page.dart';
+import '../map/culture_map_page.dart';
 import 'samples_columns.dart';
 import 'samples_design_tokens.dart';
 import '/theme/theme.dart';
@@ -132,7 +133,13 @@ class _SamplesPageState extends State<SamplesPage> {
   @override
   void initState() {
     super.initState();
-    _loadPrefs().then((_) => _load());
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await _loadPrefs();
+    if (!mounted) return;
+    await _load();
   }
 
   @override
@@ -149,6 +156,7 @@ class _SamplesPageState extends State<SamplesPage> {
   // ── Prefs ──────────────────────────────────────────────────────────────────
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       final keysStr = prefs.getString(samplePrefSortKeys);
       if (keysStr != null && keysStr.isNotEmpty) {
@@ -164,8 +172,9 @@ class _SamplesPageState extends State<SamplesPage> {
       for (final k in prefs.getKeys()) {
         if (k.startsWith('$samplePrefColWidths.')) {
           final w = prefs.getDouble(k);
-          if (w != null)
+          if (w != null) {
             _colWidths[k.substring('$samplePrefColWidths.'.length)] = w;
+          }
         }
       }
       final saved = prefs.getString(samplePrefColOrder);
@@ -244,8 +253,10 @@ class _SamplesPageState extends State<SamplesPage> {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   Future<void> _load() async {
+    if (!mounted) return;
     final cached = await DataCache.read('samples');
-    if (cached != null && mounted) {
+    if (!mounted) return;
+    if (cached != null) {
       _rows = List<Map<String, dynamic>>.from(cached);
       _detectEmptyCols();
       _applyFilter();
@@ -294,26 +305,49 @@ class _SamplesPageState extends State<SamplesPage> {
           )
           .toList();
     }
-    if (_filterCountry != null)
+    if (_filterCountry != null) {
       list = list
           .where((r) => r['sample_country']?.toString() == _filterCountry)
           .toList();
-    if (_filterIsland != null)
+    }
+    if (_filterIsland != null) {
       list = list
           .where((r) => r['sample_island']?.toString() == _filterIsland)
           .toList();
-    if (_filterHabitatType != null)
+    }
+    if (_filterHabitatType != null) {
       list = list
           .where(
             (r) => r['sample_habitat_type']?.toString() == _filterHabitatType,
           )
           .toList();
-    if (_filterProject != null)
+    }
+    if (_filterProject != null) {
       list = list
           .where((r) => r['sample_project']?.toString() == _filterProject)
           .toList();
+    }
     _filtered = list;
     _applySort();
+  }
+
+  void _showSamplesOnMap() {
+    Navigator.push(
+      context,
+      modulePageRoute(
+        context: context,
+        child: Scaffold(
+          backgroundColor: context.appBg,
+          body: SafeArea(
+            child: CultureMapPage(
+              initialQuery: _search,
+              samplesOnly: true,
+              showBackButton: true,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   static const _numericCols = {
@@ -396,34 +430,49 @@ class _SamplesPageState extends State<SamplesPage> {
       await _load();
       return;
     }
-    dynamic savedValue = value.isEmpty ? null : value;
-    if (key == 'sample_latitude' || key == 'sample_longitude') {
-      final parsed = parseSampleCoordinateValue(
-        value,
-        isLatitude: key == 'sample_latitude',
-      );
-      if (value.trim().isNotEmpty && parsed == null) {
-        _snack(
-          key == 'sample_latitude'
-              ? 'Latitude must be between -90 and 90.'
-              : 'Longitude must be between -180 and 180.',
-        );
-        return;
+    final values = <String, dynamic>{};
+    if (key == 'sample_gps') {
+      final rawGps = value.trim();
+      if (rawGps.isEmpty) {
+        values.addAll({
+          'sample_gps': null,
+          'sample_latitude': null,
+          'sample_longitude': null,
+        });
+      } else {
+        final coordinates = parseSampleCoordinates(gps: rawGps);
+        if (coordinates == null) {
+          _snack(
+            'Enter GPS as latitude, longitude (for example 37.733, -25.293).',
+          );
+          return;
+        }
+        final latitude = coordinates.latitude.toStringAsFixed(6);
+        final longitude = coordinates.longitude.toStringAsFixed(6);
+        values.addAll({
+          'sample_gps': '$latitude, $longitude',
+          'sample_latitude': coordinates.latitude,
+          'sample_longitude': coordinates.longitude,
+        });
       }
-      savedValue = parsed;
+    } else {
+      values[key] = value.trim().isEmpty ? null : value.trim();
     }
     try {
       await Supabase.instance.client
           .from('samples')
-          .update({key: savedValue})
+          .update(values)
           .eq('sample_id', id);
+      if (!mounted) return;
       final idx = _rows.indexWhere((r) => r['sample_id'] == id);
-      if (idx != -1) _rows[idx][key] = savedValue;
+      if (idx != -1) _rows[idx].addAll(values);
+      if (key == 'sample_gps') await DataCache.clear('samples');
+      if (!mounted) return;
       _applyFilter();
     } catch (e) {
       _snack('Save error: $e');
     }
-    setState(() => _editingCell = null);
+    if (mounted) setState(() => _editingCell = null);
   }
 
   Future<void> _openGpsPickerForRow(Map<String, dynamic> row) async {
@@ -465,9 +514,11 @@ class _SamplesPageState extends State<SamplesPage> {
           .from('samples')
           .update(values)
           .eq('sample_id', sampleId);
+      if (!mounted) return;
       final index = _rows.indexWhere((item) => item['sample_id'] == sampleId);
       if (index != -1) _rows[index].addAll(values);
       await DataCache.clear('samples');
+      if (!mounted) return;
       _detectEmptyCols();
       _applyFilter();
       _snack('GPS position saved.');
@@ -512,6 +563,7 @@ class _SamplesPageState extends State<SamplesPage> {
             .eq('sample_id', newId);
         newRow['sample_qrcode'] = qrcode;
       }
+      if (!mounted) return;
       _rows.add(newRow);
       _detectEmptyCols();
       _applyFilter();
@@ -539,7 +591,9 @@ class _SamplesPageState extends State<SamplesPage> {
         context: context,
         child: SampleDetailPage(sampleId: sampleId, onSaved: _load),
       ),
-    ).then((_) => _load());
+    ).then((_) {
+      if (mounted) _load();
+    });
   }
 
   void _snack(String msg) {
@@ -723,7 +777,11 @@ class _SamplesPageState extends State<SamplesPage> {
     }) => Tooltip(
       message: tip,
       child: IconButton(
-        icon: Icon(icon, size: 20, color: color ?? iconColor),
+        icon: Icon(
+          icon,
+          size: AppDS.moduleActionIconSize,
+          color: color ?? iconColor,
+        ),
         onPressed: onPressed,
         padding: const EdgeInsets.all(8),
         constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -731,14 +789,18 @@ class _SamplesPageState extends State<SamplesPage> {
     );
 
     return AppBar(
-      backgroundColor: context.appSurface,
+      backgroundColor: context.appSurface2,
       foregroundColor: context.appTextPrimary,
       elevation: 0,
+      shape: Border(bottom: BorderSide(color: context.appBorder)),
       titleSpacing: 0,
       leading: desktop
           ? null
           : IconButton(
-              icon: const Icon(Icons.menu_rounded),
+              icon: const Icon(
+                Icons.menu_rounded,
+                size: AppDS.moduleMenuIconSize,
+              ),
               color: iconColor,
               tooltip: 'Menu',
               onPressed: openAppDrawer,
@@ -747,7 +809,11 @@ class _SamplesPageState extends State<SamplesPage> {
         mainAxisSize: desktop ? MainAxisSize.max : MainAxisSize.min,
         children: [
           if (desktop) const SizedBox(width: 16),
-          const Icon(Icons.biotech_outlined, size: 18, color: AppDS.accent),
+          const Icon(
+            Icons.colorize_outlined,
+            size: AppDS.moduleTitleIconSize,
+            color: AppDS.accent,
+          ),
           const SizedBox(width: 8),
           Text(
             'Samples',
@@ -848,7 +914,7 @@ class _SamplesPageState extends State<SamplesPage> {
                     IconButton(
                       icon: Icon(
                         Icons.tune,
-                        size: 20,
+                        size: AppDS.moduleActionIconSize,
                         color: _showFilters ? AppDS.accent : iconColor,
                       ),
                       onPressed: () =>
@@ -888,19 +954,32 @@ class _SamplesPageState extends State<SamplesPage> {
                 () => setState(() => _showColManager = !_showColManager),
                 color: _showColManager ? AppDS.accent : null,
               ),
-              iconBtn(Icons.upload_file_rounded, 'Import from Excel', () async {
-                if (!context.requireModuleAction(ModuleAction.create)) return;
-                if (!context.requireModuleAction(ModuleAction.bulkUpdate))
-                  return;
-                final ok = await Navigator.push<bool>(
-                  context,
-                  modulePageRoute(
-                    context: context,
-                    child: const ExcelImportPage(mode: 'samples'),
-                  ),
-                );
-                if (ok == true) _load();
-              }),
+              iconBtn(
+                Icons.map_outlined,
+                _search.trim().isEmpty
+                    ? 'Show samples on map'
+                    : 'Show "$_search" on map',
+                _showSamplesOnMap,
+              ),
+              iconBtn(
+                Icons.upload_file_outlined,
+                'Import from Excel',
+                () async {
+                  if (!context.requireModuleAction(ModuleAction.create)) return;
+                  if (!context.requireModuleAction(ModuleAction.bulkUpdate)) {
+                    return;
+                  }
+                  final ok = await Navigator.push<bool>(
+                    context,
+                    modulePageRoute(
+                      context: context,
+                      child: const ExcelImportPage(mode: 'samples'),
+                    ),
+                  );
+                  if (!mounted) return;
+                  if (ok == true) _load();
+                },
+              ),
               iconBtn(Icons.download_outlined, 'Export CSV', _exportCsv),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
@@ -934,16 +1013,21 @@ class _SamplesPageState extends State<SamplesPage> {
                   side: BorderSide(color: context.appBorder2),
                 ),
                 onSelected: (v) async {
-                  if (v == 'filter')
+                  if (v == 'filter') {
                     setState(() => _showFilters = !_showFilters);
+                  }
                   if (v == 'select') _enterSelectionMode();
-                  if (v == 'columns')
+                  if (v == 'columns') {
                     setState(() => _showColManager = !_showColManager);
+                  }
+                  if (v == 'map') _showSamplesOnMap();
                   if (v == 'import') {
-                    if (!context.requireModuleAction(ModuleAction.create))
+                    if (!context.requireModuleAction(ModuleAction.create)) {
                       return;
-                    if (!context.requireModuleAction(ModuleAction.bulkUpdate))
+                    }
+                    if (!context.requireModuleAction(ModuleAction.bulkUpdate)) {
                       return;
+                    }
                     final ok = await Navigator.push<bool>(
                       context,
                       modulePageRoute(
@@ -951,6 +1035,7 @@ class _SamplesPageState extends State<SamplesPage> {
                         child: const ExcelImportPage(mode: 'samples'),
                       ),
                     );
+                    if (!mounted) return;
                     if (ok == true) _load();
                   }
                   if (v == 'export') _exportCsv();
@@ -1020,6 +1105,22 @@ class _SamplesPageState extends State<SamplesPage> {
                         const SizedBox(width: 10),
                         Text(
                           'Columns',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 13,
+                            color: context.appTextPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'map',
+                    child: Row(
+                      children: [
+                        Icon(Icons.map_outlined, size: 16, color: iconColor),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Show on map',
                           style: GoogleFonts.spaceGrotesk(
                             fontSize: 13,
                             color: context.appTextPrimary,
@@ -1793,8 +1894,9 @@ class _SamplesPageState extends State<SamplesPage> {
                         }
                         accum += _colWidth(cols[j]);
                       }
-                      if (_dropTargetIndex != slot)
+                      if (_dropTargetIndex != slot) {
                         setState(() => _dropTargetIndex = slot);
+                      }
                     },
                     onDragEnd: () {
                       if (_dropTargetIndex != null && _draggingColKey != null) {
@@ -2089,7 +2191,9 @@ class _SamplesPageState extends State<SamplesPage> {
                       row[col.key]?.toString() ?? '',
                       style: TextStyle(
                         fontSize: 12,
-                        color: context.appTextMuted,
+                        color: context.canEditModule
+                            ? context.appTextPrimary
+                            : context.appTextMuted,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

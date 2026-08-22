@@ -60,6 +60,7 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client
@@ -109,7 +110,7 @@ class _LocationDetailPageState extends State<LocationDetailPage> {
       List<Map<String, dynamic>> users = [];
       try {
         final userRows = await Supabase.instance.client
-            .from('users')
+            .from('user_directory')
             .select(
               'user_id, user_email, user_name, user_phone, '
               'user_institution, user_group, user_role',

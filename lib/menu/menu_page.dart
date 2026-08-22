@@ -22,6 +22,7 @@ import '../resources/machines/machines_page.dart';
 import '../resources/reservations/reservations_page.dart';
 import '/theme/theme.dart';
 import '/theme/module_permission.dart';
+import '/login/account_access.dart';
 import '../admin/settings_page.dart';
 import '../backups/backups_page.dart';
 import '../backups/backup_service.dart';
@@ -36,6 +37,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 
 import '../culture_collection/samples/samples_page.dart';
 import '../culture_collection/strains/strains_page.dart';
+import '../culture_collection/map/culture_map_page.dart';
 import '../dashboard/dashboard_page.dart';
 import '../users/users_page.dart';
 import '../users/user_detail_page.dart';
@@ -187,6 +189,13 @@ class _MenuPageState extends State<MenuPage> {
       accent: const Color(0xFFA855F7),
       builder: (_) => const ToolsPage(),
     ),
+    _NavItem(
+      id: 'sops',
+      label: 'SOPs',
+      icon: Icons.menu_book_outlined,
+      accent: const Color(0xFF06B6D4),
+      builder: (s) => SopPage(userInfo: s._userInfo),
+    ),
   ];
 
   late final List<_NavGroup> _groups = [
@@ -210,11 +219,11 @@ class _MenuPageState extends State<MenuPage> {
           builder: (_) => const SamplesPage(),
         ),
         _NavItem(
-          id: 'sops_inventory',
-          label: 'SOPs',
-          icon: Icons.menu_book_outlined,
-          accent: const Color(0xFF06B6D4),
-          builder: (_) => const SopPage(sopContext: 'culture_collection'),
+          id: 'culture_map',
+          label: 'Map',
+          icon: Icons.public_outlined,
+          accent: const Color(0xFF14B8A6),
+          builder: (_) => const CultureMapPage(),
         ),
       ],
     ),
@@ -251,13 +260,6 @@ class _MenuPageState extends State<MenuPage> {
           accent: const Color(0xFF22D3EE),
           builder: (_) => const WaterQcPage(),
         ),
-        _NavItem(
-          id: 'sops_fish',
-          label: 'SOPs',
-          icon: Icons.menu_book_outlined,
-          accent: const Color(0xFF06B6D4),
-          builder: (_) => const SopPage(sopContext: 'fish_facility'),
-        ),
       ],
     ),
     _NavGroup(
@@ -283,14 +285,14 @@ class _MenuPageState extends State<MenuPage> {
           id: 'reagents',
           label: 'Reagents',
           icon: Icons.water_drop_outlined,
-          accent: const Color(0xFFF59E0B),
+          accent: AppDS.reagentsAccent,
           builder: (_) => const ReagentsPage(),
         ),
         _NavItem(
           id: 'equipment',
           label: 'Machines',
           icon: Icons.precision_manufacturing_outlined,
-          accent: const Color(0xFF14B8A6),
+          accent: AppDS.machinesAccent,
           builder: (_) => const MachinesPage(),
         ),
         _NavItem(
@@ -489,7 +491,9 @@ class _MenuPageState extends State<MenuPage> {
       if (Platform.isAndroid || Platform.isIOS) return false;
     } else if (item.mobileOnly) {
       if (!(Platform.isAndroid || Platform.isIOS)) return false;
-    } else if (item.id != 'tools' && !_visibleGroups.contains(item.id)) {
+    } else if (item.id != 'tools' &&
+        item.id != 'sops' &&
+        !_visibleGroups.contains(item.id)) {
       return false;
     }
     return _getModuleAccess(item.id).canView;
@@ -498,6 +502,11 @@ class _MenuPageState extends State<MenuPage> {
   bool _isTopItemVisibleInSidebar(_NavItem item, {required bool isDrawer}) {
     if (item.mobileOnly) return isDrawer && _isTopItemAvailable(item);
     return _isTopItemAvailable(item);
+  }
+
+  bool _isGroupVisible(_NavGroup group, String userRole) {
+    if (group.key == 'admin') return _hasRole(userRole, 'admin');
+    return _visibleGroups.contains(group.key);
   }
 
   /// If the currently-selected item is in a now-hidden group, reset to first visible item.
@@ -510,9 +519,7 @@ class _MenuPageState extends State<MenuPage> {
     }
     if (_groups.any(
       (g) =>
-          (g.key == 'admin'
-              ? _hasRole(userRole, 'admin')
-              : _visibleGroups.contains(g.key)) &&
+          _isGroupVisible(g, userRole) &&
           g.children.any(
             (i) => i.id == _selectedId && _getModuleAccess(i.id).canView,
           ),
@@ -528,9 +535,7 @@ class _MenuPageState extends State<MenuPage> {
       }
     }
     for (final g in _groups) {
-      if (g.key == 'admin'
-          ? _hasRole(userRole, 'admin')
-          : _visibleGroups.contains(g.key)) {
+      if (_isGroupVisible(g, userRole)) {
         for (final item in g.children) {
           if (_getModuleAccess(item.id).canView) {
             _selectedId = item.id;
@@ -546,6 +551,48 @@ class _MenuPageState extends State<MenuPage> {
   /// the legacy module columns with any granular per-page overrides.
   ModuleAccess _getModuleAccess(String id) {
     if (_userInfo.isEmpty) return const ModuleAccess.none();
+    if (id == 'sops') {
+      final culture = resolveModuleAccess(
+        moduleId: 'sops_inventory',
+        userRow: _userInfo,
+      );
+      final fish = resolveModuleAccess(
+        moduleId: 'sops_fish',
+        userRow: _userInfo,
+      );
+      final resources = resolveModuleAccess(
+        moduleId: 'sops_resources',
+        userRow: _userInfo,
+      );
+      final actions = <String>{
+        ...culture.actions,
+        ...fish.actions,
+        ...resources.actions,
+      };
+      final canMutate =
+          culture.canMutate || fish.canMutate || resources.canMutate;
+      return ModuleAccess(
+        moduleId: 'sops',
+        pagePermission: canMutate
+            ? 'write'
+            : (culture.canView || fish.canView || resources.canView
+                  ? 'read'
+                  : 'none'),
+        actions: actions,
+        scope: 'all',
+        publicationAccess: 'inherit',
+        responsibilityScope: 'inherit',
+        recordLockBypass:
+            culture.recordLockBypass ||
+            fish.recordLockBypass ||
+            resources.recordLockBypass,
+        workflowEditStates: const [],
+        hasGranularRules:
+            culture.hasGranularRules ||
+            fish.hasGranularRules ||
+            resources.hasGranularRules,
+      );
+    }
     return resolveModuleAccess(moduleId: id, userRow: _userInfo);
   }
 
@@ -559,8 +606,16 @@ class _MenuPageState extends State<MenuPage> {
           .eq('user_email', email)
           .limit(1);
       if (rows.isNotEmpty) {
+        final userRow = Map<String, dynamic>.from(rows[0]);
+        if (!hasActiveAccount(userRow)) {
+          await Supabase.instance.client.auth.signOut();
+          if (!mounted) return;
+          Navigator.pushReplacementNamed(context, '/login');
+          return;
+        }
+        if (!mounted) return;
         setState(() {
-          _userInfo = Map<String, dynamic>.from(rows[0]);
+          _userInfo = userRow;
           _loadingUser = false;
           _ensureValidSelection();
         });
@@ -568,16 +623,17 @@ class _MenuPageState extends State<MenuPage> {
           _loadPendingUsers();
         }
       } else {
-        setState(() {
-          _loadingUser = false;
-          _ensureValidSelection();
-        });
+        await Supabase.instance.client.auth.signOut();
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/login');
+        return;
       }
     } catch (_) {
-      setState(() {
-        _loadingUser = false;
-        _ensureValidSelection();
-      });
+      try {
+        await Supabase.instance.client.auth.signOut();
+      } catch (_) {}
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/login');
     }
   }
 
@@ -587,6 +643,7 @@ class _MenuPageState extends State<MenuPage> {
           .from('users')
           .select()
           .eq('user_status', 'pending');
+      if (!mounted) return;
       setState(() => _pendingUsers = List<Map<String, dynamic>>.from(res));
     } catch (_) {}
   }
@@ -618,7 +675,7 @@ class _MenuPageState extends State<MenuPage> {
     String adminEmail = '';
     try {
       final admins = await Supabase.instance.client
-          .from('users')
+          .from('user_directory')
           .select('user_name, user_email, user_role')
           .inFilter('user_role', ['admin', 'superadmin'])
           .eq('user_status', 'active')
@@ -699,9 +756,7 @@ class _MenuPageState extends State<MenuPage> {
       }
     }
     for (final g in _groups) {
-      if (g.key == 'admin'
-          ? !_hasRole(userRole, 'admin')
-          : !_visibleGroups.contains(g.key)) {
+      if (!_isGroupVisible(g, userRole)) {
         continue;
       }
       for (final item in g.children) {
@@ -857,146 +912,137 @@ class _MenuPageState extends State<MenuPage> {
                           ),
                         ),
                     const SizedBox(height: 4),
-                    ..._groups
-                        .where(
-                          (g) => g.key == 'admin'
-                              ? _hasRole(userRole, 'admin')
-                              : _visibleGroups.contains(g.key),
-                        )
-                        .map((group) {
-                          final isExpanded = _expandedGroups.contains(
-                            group.label,
-                          );
-                          final anyAccessible = group.children.any((c) {
-                            if (_perItemVisibilityKeys.contains(c.id) &&
-                                !_visibleGroups.contains(c.id)) {
-                              return false;
-                            }
-                            return _getModuleAccess(c.id).canView;
-                          });
+                    ..._groups.where((g) => _isGroupVisible(g, userRole)).map((
+                      group,
+                    ) {
+                      final isExpanded = _expandedGroups.contains(group.label);
+                      final anyAccessible = group.children.any((c) {
+                        if (_perItemVisibilityKeys.contains(c.id) &&
+                            !_visibleGroups.contains(c.id)) {
+                          return false;
+                        }
+                        return _getModuleAccess(c.id).canView;
+                      });
 
-                          // Hide groups the user has no access to (admin group always shown to admins)
-                          if (!anyAccessible) return const SizedBox.shrink();
+                      // Hide groups the user has no access to (admin group always shown to admins)
+                      if (!anyAccessible) return const SizedBox.shrink();
 
-                          if (collapsed) {
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  child: Divider(
-                                    color: Colors.white10,
-                                    height: 1,
+                      if (collapsed) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              child: Divider(color: Colors.white10, height: 1),
+                            ),
+                            ...group.children
+                                .where(
+                                  (item) =>
+                                      !_perItemVisibilityKeys.contains(
+                                        item.id,
+                                      ) ||
+                                      _visibleGroups.contains(item.id),
+                                )
+                                .map(
+                                  (item) => _buildLeafTile(
+                                    item: item,
+                                    collapsed: true,
+                                    isDrawer: isDrawer,
+                                    userRole: userRole,
+                                    indented: false,
                                   ),
                                 ),
-                                ...group.children
-                                    .where(
-                                      (item) =>
-                                          !_perItemVisibilityKeys.contains(
-                                            item.id,
-                                          ) ||
-                                          _visibleGroups.contains(item.id),
-                                    )
-                                    .map(
-                                      (item) => _buildLeafTile(
-                                        item: item,
-                                        collapsed: true,
-                                        isDrawer: isDrawer,
-                                        userRole: userRole,
-                                        indented: false,
-                                      ),
-                                    ),
-                              ],
-                            );
-                          }
+                          ],
+                        );
+                      }
 
-                          return Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              InkWell(
-                                borderRadius: BorderRadius.circular(8),
-                                onTap: () => setState(() {
-                                  isExpanded
-                                      ? _expandedGroups.remove(group.label)
-                                      : _expandedGroups.add(group.label);
-                                }),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 6,
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => setState(() {
+                              isExpanded
+                                  ? _expandedGroups.remove(group.label)
+                                  : _expandedGroups.add(group.label);
+                            }),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    group.icon,
+                                    size: 15,
+                                    color: anyAccessible
+                                        ? Colors.white38
+                                        : Colors.white24,
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        group.icon,
-                                        size: 15,
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      group.label.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 1.1,
                                         color: anyAccessible
                                             ? Colors.white38
                                             : Colors.white24,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          group.label.toUpperCase(),
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: 1.1,
-                                            color: anyAccessible
-                                                ? Colors.white38
-                                                : Colors.white24,
-                                          ),
-                                        ),
-                                      ),
-                                      Icon(
-                                        isExpanded
-                                            ? Icons.expand_less
-                                            : Icons.expand_more,
-                                        size: 14,
-                                        color: Colors.white24,
-                                      ),
-                                    ],
+                                    ),
                                   ),
-                                ),
+                                  Icon(
+                                    isExpanded
+                                        ? Icons.expand_less
+                                        : Icons.expand_more,
+                                    size: 14,
+                                    color: Colors.white24,
+                                  ),
+                                ],
                               ),
-                              AnimatedCrossFade(
-                                duration: const Duration(milliseconds: 180),
-                                firstCurve: Curves.easeOut,
-                                secondCurve: Curves.easeIn,
-                                crossFadeState: isExpanded
-                                    ? CrossFadeState.showFirst
-                                    : CrossFadeState.showSecond,
-                                firstChild: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: group.children
-                                      .where(
-                                        (item) =>
-                                            !_perItemVisibilityKeys.contains(
-                                              item.id,
-                                            ) ||
-                                            _visibleGroups.contains(item.id),
-                                      )
-                                      .map(
-                                        (item) => _buildLeafTile(
-                                          item: item,
-                                          collapsed: false,
-                                          isDrawer: isDrawer,
-                                          userRole: userRole,
-                                          indented: true,
-                                        ),
-                                      )
-                                      .toList(),
-                                ),
-                                secondChild: const SizedBox.shrink(),
-                              ),
-                              const SizedBox(height: 4),
-                            ],
-                          );
-                        }),
+                            ),
+                          ),
+                          AnimatedCrossFade(
+                            duration: const Duration(milliseconds: 180),
+                            firstCurve: Curves.easeOut,
+                            secondCurve: Curves.easeIn,
+                            crossFadeState: isExpanded
+                                ? CrossFadeState.showFirst
+                                : CrossFadeState.showSecond,
+                            firstChild: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: group.children
+                                  .where(
+                                    (item) =>
+                                        !_perItemVisibilityKeys.contains(
+                                          item.id,
+                                        ) ||
+                                        _visibleGroups.contains(item.id),
+                                  )
+                                  .map(
+                                    (item) => _buildLeafTile(
+                                      item: item,
+                                      collapsed: false,
+                                      isDrawer: isDrawer,
+                                      userRole: userRole,
+                                      indented: true,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                            secondChild: const SizedBox.shrink(),
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                      );
+                    }),
                   ],
                 ),
               ),

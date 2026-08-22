@@ -1286,18 +1286,22 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
       data: (isDark ? ThemeData.dark() : ThemeData.light()).copyWith(
         scaffoldBackgroundColor: context.appBg,
         appBarTheme: AppBarTheme(
-          backgroundColor: context.appSurface,
+          backgroundColor: context.appSurface2,
           foregroundColor: context.appTextPrimary,
           elevation: 0,
           shadowColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
+          shape: Border(bottom: BorderSide(color: context.appBorder)),
         ),
       ),
       child: Scaffold(
         appBar: AppBar(
           leading: MediaQuery.of(context).size.width < 700
               ? IconButton(
-                  icon: const Icon(Icons.menu_rounded),
+                  icon: const Icon(
+                    Icons.menu_rounded,
+                    size: AppDS.moduleMenuIconSize,
+                  ),
                   color: context.appTextSecondary,
                   tooltip: 'Menu',
                   onPressed: openAppDrawer,
@@ -1305,11 +1309,15 @@ class _PrintStrainsPageState extends State<PrintStrainsPage> {
               : null,
           title: Row(
             children: [
-              const Icon(Icons.print_rounded, size: 18, color: AppDS.accent),
-              const SizedBox(width: 10),
-              const Text(
+              const Icon(
+                Icons.print_outlined,
+                size: AppDS.moduleTitleIconSize,
+                color: AppDS.accent,
+              ),
+              const SizedBox(width: 8),
+              Text(
                 'Label Printing',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: AppDS.moduleTitle(context.appTextPrimary),
               ),
               const SizedBox(width: 12),
               // Profile switcher
@@ -1546,28 +1554,36 @@ class _PrinterSettingsPageState extends State<_PrinterSettingsPage> {
     return Scaffold(
       backgroundColor: context.appBg,
       appBar: AppBar(
-        backgroundColor: context.appSurface,
+        backgroundColor: context.appSurface2,
         foregroundColor: context.appTextPrimary,
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
+        shape: Border(bottom: BorderSide(color: context.appBorder)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.print_outlined, size: 16, color: AppDS.accent),
-            SizedBox(width: 8),
+            const Icon(
+              Icons.print_outlined,
+              size: AppDS.moduleTitleIconSize,
+              color: AppDS.accent,
+            ),
+            const SizedBox(width: 8),
             Text(
               'Printer Profiles',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              style: AppDS.moduleTitle(context.appTextPrimary),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.manage_search_rounded, size: 20),
+            icon: const Icon(
+              Icons.manage_search_outlined,
+              size: AppDS.moduleActionIconSize,
+            ),
             tooltip: 'Auto-detect installed printers',
             onPressed: _openDetect,
           ),

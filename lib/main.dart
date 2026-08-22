@@ -2,8 +2,10 @@
 // auth/session restore, route to login or menu. ErrorWidget override.
 
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import 'core/local_storage.dart';
 import 'supabase/supabase_manager.dart';
 import 'theme/theme_controller.dart';
@@ -15,6 +17,7 @@ import 'database_connection/setup_page.dart';
 import 'login/set_admin_login_page.dart';
 import 'login/login_page.dart';
 import 'login/register_page.dart';
+import 'login/account_access.dart';
 
 part 'startup_page.dart';
 
@@ -35,11 +38,15 @@ void main() async {
             children: [
               const Icon(Icons.error_outline, color: Colors.red, size: 56),
               const SizedBox(height: 16),
-              const Text('Something went wrong',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                'Something went wrong',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               Text(
-                kDebugMode ? details.exceptionAsString() : 'Please restart the app.',
+                kDebugMode
+                    ? details.exceptionAsString()
+                    : 'Please restart the app.',
                 style: const TextStyle(fontSize: 13, color: Colors.grey),
                 textAlign: TextAlign.center,
               ),
@@ -115,14 +122,14 @@ class MyApp extends StatelessWidget {
         },
         home: const StartupPage(),
         routes: {
-          '/connections':     (context) => const ConnectionsPage(),
-          '/add_connection':  (context) => const AddConnectionPage(),
-          '/login':           (context) => const LoginPage(),
-          '/db_check':        (context) => const DatabaseCheckPage(),
-          '/setup':           (context) => const SetupPage(),
+          '/connections': (context) => const ConnectionsPage(),
+          '/add_connection': (context) => const AddConnectionPage(),
+          '/login': (context) => const LoginPage(),
+          '/db_check': (context) => const DatabaseCheckPage(),
+          '/setup': (context) => const SetupPage(),
           '/set_admin_login': (context) => const SetAdminLoginPage(),
-          '/register':        (context) => const RegisterPage(),
-          '/menu':            (context) => const MenuPage(),
+          '/register': (context) => const RegisterPage(),
+          '/menu': (context) => const MenuPage(),
         },
       ),
     );

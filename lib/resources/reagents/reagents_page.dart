@@ -16,6 +16,7 @@ import 'dart:io';
 
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 
 import '/core/data_cache.dart';
@@ -53,28 +54,51 @@ const _colContam = 110.0;
 const _colBrand = 110.0;
 const _colSupp = 120.0;
 const _colTags = 160.0;
-const _tableW =
-    _colBtn +
-    _colCode +
-    _colStock +
-    _colCategory +
-    _colSubcat +
-    _colName +
-    _colState +
-    _colCas +
-    _colFormula +
-    _colOpened +
-    _colRoom +
-    _colLoc +
-    _colStorage +
-    _colPackSize +
-    _colCount +
-    _colMin +
-    _colUnit +
-    _colContam +
-    _colBrand +
-    _colSupp +
-    _colTags;
+const _reagentDefaultWidths = <String, double>{
+  'code': _colCode,
+  'stockStatus': _colStock,
+  'category': _colCategory,
+  'subcategory': _colSubcat,
+  'tags': _colTags,
+  'name': _colName,
+  'room': _colRoom,
+  'location': _colLoc,
+  'storageTemp': _colStorage,
+  'physicalState': _colState,
+  'casNumber': _colCas,
+  'formula': _colFormula,
+  'openedDate': _colOpened,
+  'packageSize': _colPackSize,
+  'unit': _colUnit,
+  'containerCount': _colCount,
+  'containerMin': _colMin,
+  'contamination': _colContam,
+  'brand': _colBrand,
+  'supplier': _colSupp,
+};
+
+const _reagentHeaders = <(String, String)>[
+  ('code', 'CODE'),
+  ('stockStatus', 'STOCK'),
+  ('category', 'CATEGORY'),
+  ('subcategory', 'SUBCAT'),
+  ('tags', 'TAGS'),
+  ('name', 'NAME'),
+  ('room', 'ROOM'),
+  ('location', 'LOCATION'),
+  ('storageTemp', 'TEMP'),
+  ('physicalState', 'STATE'),
+  ('casNumber', 'CAS'),
+  ('formula', 'FORMULA'),
+  ('openedDate', 'OPENED'),
+  ('packageSize', 'SIZE'),
+  ('unit', 'UNIT'),
+  ('containerCount', 'COUNT'),
+  ('containerMin', 'MIN'),
+  ('contamination', 'CONTAM'),
+  ('brand', 'BRAND'),
+  ('supplier', 'SUPPLIER'),
+];
 
 // Tab-navigable columns — matches visual column order left-to-right.
 // 'stockStatus', 'category', 'subcategory', 'storageTemp',
@@ -119,7 +143,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
   String _categoryFilter = 'all';
   String _statusFilter = 'all';
   bool _showFilters = false;
-  String _sortKey = 'code';
+  String _sortKey = 'name';
   bool _sortAsc = true;
   final _searchCtrl = TextEditingController();
   Map<String, dynamic>? _editingCell;
@@ -133,11 +157,41 @@ class _ReagentsPageState extends State<ReagentsPage> {
   final _vertCtrl = ScrollController();
   final _hOffset = ValueNotifier<double>(0);
   final _vOffset = ValueNotifier<double>(0);
+  final Map<String, double> _columnWidths = {};
+
+  double _columnWidth(String key) =>
+      _columnWidths[key] ?? _reagentDefaultWidths[key]!;
+
+  double get _tableW =>
+      _colBtn +
+      _reagentHeaders.fold(0.0, (sum, column) => sum + _columnWidth(column.$1));
 
   @override
   void initState() {
     super.initState();
+    unawaited(_loadColumnWidths());
     _load();
+  }
+
+  Future<void> _loadColumnWidths() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    final savedWidths = <String, double>{};
+    for (final key in _reagentDefaultWidths.keys) {
+      final width = preferences.getDouble('reagents.column_width.$key');
+      if (width != null) savedWidths[key] = width;
+    }
+    if (savedWidths.isNotEmpty) {
+      setState(() => _columnWidths.addAll(savedWidths));
+    }
+  }
+
+  Future<void> _saveColumnWidth(String key) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setDouble(
+      'reagents.column_width.$key',
+      _columnWidth(key),
+    );
   }
 
   @override
@@ -166,11 +220,12 @@ class _ReagentsPageState extends State<ReagentsPage> {
 
   Future<void> _load() async {
     final cached = await DataCache.read('reagents');
-    if (cached != null && mounted) {
+    if (!mounted) return;
+    if (cached != null) {
       setState(() {
         _all = _reagentsFromRaw(cached);
         _loading = false;
-        _applyFilters();
+        _applyFilters(notify: false);
       });
     } else {
       setState(() => _loading = true);
@@ -185,7 +240,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
       setState(() {
         _all = _reagentsFromRaw(rows);
         _loading = false;
-        _applyFilters();
+        _applyFilters(notify: false);
       });
     } catch (e) {
       debugPrint('Reagents load error: $e');
@@ -195,10 +250,13 @@ class _ReagentsPageState extends State<ReagentsPage> {
             .showSnackBar(SnackBar(content: Text('Failed to load: $e')));
       }
     }
+    if (!mounted) return;
     final locations = await _loadLocations();
     if (!mounted) return;
-    setState(() => _locations = locations);
-    _applyFilters();
+    setState(() {
+      _locations = locations;
+      _applyFilters(notify: false);
+    });
   }
 
   Map<String, dynamic>? _locationMetaById(int? id) {
@@ -232,7 +290,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
     return (loc['_display'] as String?) ?? (loc['location_name'] as String?);
   }
 
-  void _applyFilters() {
+  void _applyFilters({bool notify = true}) {
     final q = _search.toLowerCase();
     var result = _all.where((r) {
       if (_categoryFilter != 'all' && r.category != _categoryFilter) {
@@ -325,7 +383,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
           }
           c = naturalCode(a.code!, b.code!);
         case 'name':
-          c = (a.name ?? '').compareTo(b.name ?? '');
+          c = (a.name ?? '').toLowerCase().compareTo(
+            (b.name ?? '').toLowerCase(),
+          );
         case 'supplier':
           c = (a.supplier ?? '').compareTo(b.supplier ?? '');
         case 'brand':
@@ -369,12 +429,19 @@ class _ReagentsPageState extends State<ReagentsPage> {
         case 'tags':
           c = (a.tags ?? '').compareTo(b.tags ?? '');
         default:
-          c = (a.name ?? '').compareTo(b.name ?? '');
+          c = (a.name ?? '').toLowerCase().compareTo(
+            (b.name ?? '').toLowerCase(),
+          );
       }
       return _sortAsc ? c : -c;
     });
 
-    setState(() => _filtered = result);
+    if (!mounted) return;
+    if (notify) {
+      setState(() => _filtered = result);
+    } else {
+      _filtered = result;
+    }
   }
 
   void _sort(String key) {
@@ -498,9 +565,8 @@ class _ReagentsPageState extends State<ReagentsPage> {
     } catch (e) {
       debugPrint('Bulk reagent delete error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _deletingSelected = false);
@@ -559,13 +625,16 @@ class _ReagentsPageState extends State<ReagentsPage> {
     if (!mounted) return;
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => _ReagentFormDialog(
-        existing: existing,
-        locations: locations,
-        nextCode: existing == null ? _nextCode() : null,
+      builder: (ctx) => ModulePermission.inherit(
+        context,
+        _ReagentFormDialog(
+          existing: existing,
+          locations: locations,
+          nextCode: existing == null ? _nextCode() : null,
+        ),
       ),
     );
-    if (result == true) _load();
+    if (result == true && mounted) unawaited(_load());
   }
 
   Future<List<Map<String, dynamic>>> _loadLocations() async {
@@ -961,6 +1030,13 @@ class _ReagentsPageState extends State<ReagentsPage> {
     _editFocus.unfocus();
   }
 
+  void _commitAndCloseCurrentEdit() {
+    if (_editingCell == null) return;
+    _commitCurrentEdit();
+    setState(() => _editingCell = null);
+    _editFocus.unfocus();
+  }
+
   void _advanceCell({bool forward = true}) {
     final cell = _editingCell;
     if (cell == null) return;
@@ -1030,104 +1106,67 @@ class _ReagentsPageState extends State<ReagentsPage> {
     _ => '',
   };
 
-  Future<void> _addNewRow() async {
-    if (!context.requireModuleAction(ModuleAction.create)) return;
-    final code = _nextCode();
-    try {
-      final row = await Supabase.instance.client
-          .from('reagents')
-          .insert({
-            'reagent_code': code,
-            'reagent_category': 'chemical',
-            'reagent_stock_status': 'in_stock',
-            'reagent_contamination': 'none',
-            'reagent_container_count': 1,
-            'reagent_updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .select('reagent_id')
-          .single();
-      final newId = row['reagent_id'] as int;
-      await Supabase.instance.client
-          .from('reagents')
-          .update({
-            'reagent_qrcode': QrRules.build(
-              SupabaseManager.projectRef ?? 'local',
-              'reagents',
-              newId,
-            ),
-          })
-          .eq('reagent_id', newId);
-      unawaited(BackupService.instance.notifyCrudChange('reagents'));
-      if (!mounted) return;
-      await _load();
-      if (!mounted) return;
-      // Defer the scroll until the ListView has rebuilt with the new row —
-      // otherwise maxScrollExtent is still computed for the old item count.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_vertCtrl.hasClients) return;
-        final ri = _filtered.indexWhere((r) => r.id == newId);
-        if (ri < 0) return;
-        final rowOffset = (ri + 1) * AppDS.tableRowH; // +1 for the add-row
-        final viewport = _vertCtrl.position.viewportDimension;
-        final max = _vertCtrl.position.maxScrollExtent;
-        final target = (rowOffset - viewport / 2 + AppDS.tableRowH / 2).clamp(
-          0.0,
-          max,
-        );
-        _vertCtrl.animateTo(
-          target,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-        );
-      });
-      _startEdit(newId, 'category', 'chemical');
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to add: $e'),
-          backgroundColor: AppDS.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-    }
-  }
-
   Widget _sortHdr(BuildContext context, String label, String key) {
     final active = _sortKey == key;
-    return GestureDetector(
-      onTap: () => _sort(key),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Row(
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.spaceGrotesk(
-                color: active ? AppDS.accent : context.appTextMuted,
-                fontSize: 10,
-                letterSpacing: 0.8,
-                fontWeight: FontWeight.w600,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: () => _sort(key),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.spaceGrotesk(
+                        color: active
+                            ? AppDS.reagentsAccent
+                            : context.appTextMuted,
+                        fontSize: 10,
+                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    active
+                        ? (_sortAsc
+                              ? Icons.arrow_upward_rounded
+                              : Icons.arrow_downward_rounded)
+                        : Icons.unfold_more_rounded,
+                    size: 11,
+                    color: active
+                        ? AppDS.reagentsAccent
+                        : context.appTextMuted.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(width: 6),
+                ],
               ),
             ),
-            const SizedBox(width: 2),
-            Icon(
-              active
-                  ? (_sortAsc
-                        ? Icons.arrow_upward_rounded
-                        : Icons.arrow_downward_rounded)
-                  : Icons.unfold_more_rounded,
-              size: 11,
-              color: active
-                  ? AppDS.accent
-                  : context.appTextMuted.withValues(alpha: 0.4),
-            ),
-          ],
+          ),
         ),
-      ),
+        Positioned(
+          right: -10,
+          top: 0,
+          bottom: 0,
+          width: 12,
+          child: AppColumnResizeHandle(
+            color: AppDS.reagentsAccent,
+            onDrag: (delta) => setState(
+              () => _columnWidths[key] = (_columnWidth(key) + delta).clamp(
+                56.0,
+                600.0,
+              ),
+            ),
+            onDragEnd: () => _saveColumnWidth(key),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1162,10 +1201,10 @@ class _ReagentsPageState extends State<ReagentsPage> {
   }
 
   Widget _buildAddRow() {
-    const accent = Color(0xFFF59E0B);
+    const accent = AppDS.reagentsAccent;
     final code = _nextCode();
     return InkWell(
-      onTap: _addNewRow,
+      onTap: () => _showAddEditDialog(),
       child: Container(
         decoration: BoxDecoration(
           color: accent.withValues(alpha: 0.06),
@@ -1191,7 +1230,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
             ),
             const SizedBox(width: 8),
             Text(
-              '— click or Ctrl+Enter to add',
+              '— click or Ctrl+Enter to open the validated form',
               style: GoogleFonts.spaceGrotesk(
                 fontSize: 10,
                 color: accent.withValues(alpha: 0.6),
@@ -1209,6 +1248,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final canInsert = context.canInsertModule;
+    final canBulkImport = canInsert && context.canBulkUpdateModule;
+    final showAddRow = !_selectionMode && canInsert;
     return Column(
       children: [
         // ── Toolbar ──────────────────────────────────────────────────────────────
@@ -1222,190 +1264,200 @@ class _ReagentsPageState extends State<ReagentsPage> {
           child: _selectionMode
               ? _buildSelectionToolbar(context)
               : Row(
-            children: [
-              if (MediaQuery.of(context).size.width < 700) ...[
-                IconButton(
-                  icon: const Icon(Icons.menu_rounded, size: 20),
-                  color: context.appTextSecondary,
-                  tooltip: 'Menu',
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-              ],
-              const Icon(
-                Icons.water_drop_outlined,
-                color: Color(0xFFF59E0B),
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Reagents',
-                style: GoogleFonts.spaceGrotesk(
-                  color: context.appTextPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (v) {
-                      _search = v;
-                      _applyFilters();
-                    },
-                    style: GoogleFonts.spaceGrotesk(
-                      color: context.appTextPrimary,
-                      fontSize: 13,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Search reagents...',
-                      hintStyle: GoogleFonts.spaceGrotesk(
-                        color: context.appTextMuted,
-                        fontSize: 13,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: context.appTextMuted,
-                        size: 16,
-                      ),
-                      suffixIcon: _search.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(
-                                Icons.clear,
-                                size: 14,
-                                color: context.appTextMuted,
-                              ),
-                              onPressed: () {
-                                _searchCtrl.clear();
-                                _search = '';
-                                _applyFilters();
-                              },
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: context.appSurface3,
-                      contentPadding: EdgeInsets.zero,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: context.appBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: context.appBorder),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppDS.accent),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Tooltip(
-                message: _showFilters ? 'Hide filters' : 'Show filters',
-                child: Stack(
                   children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.tune,
-                        color: _showFilters
-                            ? AppDS.accent
-                            : context.appTextSecondary,
-                        size: 18,
+                    if (MediaQuery.of(context).size.width < 700) ...[
+                      IconButton(
+                        icon: const Icon(Icons.menu_rounded, size: 20),
+                        color: context.appTextSecondary,
+                        tooltip: 'Menu',
+                        onPressed: () => Scaffold.of(context).openDrawer(),
                       ),
-                      onPressed: () =>
-                          setState(() => _showFilters = !_showFilters),
+                    ],
+                    const Icon(
+                      Icons.water_drop_outlined,
+                      color: AppDS.reagentsAccent,
+                      size: 18,
                     ),
-                    if (_hasActiveFilter)
-                      Positioned(
-                        right: 6,
-                        top: 6,
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const BoxDecoration(
-                            color: AppDS.accent,
-                            shape: BoxShape.circle,
+                    const SizedBox(width: 8),
+                    Text(
+                      'Reagents',
+                      style: GoogleFonts.spaceGrotesk(
+                        color: context.appTextPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: SizedBox(
+                        height: 36,
+                        child: TextField(
+                          controller: _searchCtrl,
+                          onChanged: (v) {
+                            _search = v;
+                            _applyFilters();
+                          },
+                          style: GoogleFonts.spaceGrotesk(
+                            color: context.appTextPrimary,
+                            fontSize: 13,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Search reagents...',
+                            hintStyle: GoogleFonts.spaceGrotesk(
+                              color: context.appTextMuted,
+                              fontSize: 13,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: context.appTextMuted,
+                              size: 16,
+                            ),
+                            suffixIcon: _search.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(
+                                      Icons.clear,
+                                      size: 14,
+                                      color: context.appTextMuted,
+                                    ),
+                                    onPressed: () {
+                                      _searchCtrl.clear();
+                                      _search = '';
+                                      _applyFilters();
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: context.appSurface3,
+                            contentPadding: EdgeInsets.zero,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: context.appBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: context.appBorder),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: AppDS.reagentsAccent,
+                              ),
+                            ),
                           ),
                         ),
                       ),
+                    ),
+                    const SizedBox(width: 4),
+                    Tooltip(
+                      message: _showFilters ? 'Hide filters' : 'Show filters',
+                      child: Stack(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.tune,
+                              color: _showFilters
+                                  ? AppDS.reagentsAccent
+                                  : context.appTextSecondary,
+                              size: 18,
+                            ),
+                            onPressed: () =>
+                                setState(() => _showFilters = !_showFilters),
+                          ),
+                          if (_hasActiveFilter)
+                            Positioned(
+                              right: 6,
+                              top: 6,
+                              child: Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                  color: AppDS.reagentsAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Tooltip(
+                      message: 'Import from Excel',
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.upload_file_outlined,
+                          color: context.appTextSecondary,
+                          size: 18,
+                        ),
+                        onPressed: canBulkImport
+                            ? () async {
+                                if (!context.requireModuleAction(
+                                  ModuleAction.create,
+                                )) {
+                                  return;
+                                }
+                                if (!context.requireModuleAction(
+                                  ModuleAction.bulkUpdate,
+                                )) {
+                                  return;
+                                }
+                                final imported = await Navigator.push<bool>(
+                                  context,
+                                  modulePageRoute(
+                                    context: context,
+                                    child: const ReagentExcelImportPage(),
+                                  ),
+                                );
+                                if (imported == true && mounted) {
+                                  unawaited(_load());
+                                }
+                              }
+                            : null,
+                      ),
+                    ),
+                    Tooltip(
+                      message: 'Export CSV',
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.download_outlined,
+                          color: context.appTextSecondary,
+                          size: 18,
+                        ),
+                        onPressed: _exportCsv,
+                      ),
+                    ),
+                    Tooltip(
+                      message: 'Select reagents',
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.checklist_rounded,
+                          color: context.appTextSecondary,
+                          size: 19,
+                        ),
+                        onPressed: _enterSelectionMode,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppDS.reagentsAccent,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 0,
+                        ),
+                        minimumSize: const Size(0, 36),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: canInsert ? () => _showAddEditDialog() : null,
+                      icon: const Icon(Icons.add, size: 16),
+                      label: Text(
+                        'Add',
+                        style: GoogleFonts.spaceGrotesk(fontSize: 13),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              Tooltip(
-                message: 'Import from Excel',
-                child: IconButton(
-                  icon: Icon(
-                    Icons.upload_file_outlined,
-                    color: context.appTextSecondary,
-                    size: 18,
-                  ),
-                  onPressed: () async {
-                    if (!context.requireModuleAction(ModuleAction.create)) {
-                      return;
-                    }
-                    if (!context.requireModuleAction(ModuleAction.bulkUpdate)) {
-                      return;
-                    }
-                    final imported = await Navigator.push<bool>(
-                      context,
-                      modulePageRoute(
-                        context: context,
-                        child: const ReagentExcelImportPage(),
-                      ),
-                    );
-                    if (imported == true) _load();
-                  },
-                ),
-              ),
-              Tooltip(
-                message: 'Export CSV',
-                child: IconButton(
-                  icon: Icon(
-                    Icons.download_outlined,
-                    color: context.appTextSecondary,
-                    size: 18,
-                  ),
-                  onPressed: _exportCsv,
-                ),
-              ),
-              Tooltip(
-                message: 'Select reagents',
-                child: IconButton(
-                  icon: Icon(
-                    Icons.checklist_rounded,
-                    color: context.appTextSecondary,
-                    size: 19,
-                  ),
-                  onPressed: _enterSelectionMode,
-                ),
-              ),
-              const SizedBox(width: 4),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFF59E0B),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 0,
-                  ),
-                  minimumSize: const Size(0, 36),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                onPressed: () => _showAddEditDialog(),
-                icon: const Icon(Icons.add, size: 16),
-                label: Text(
-                  'Add',
-                  style: GoogleFonts.spaceGrotesk(fontSize: 13),
-                ),
-              ),
-            ],
-          ),
         ),
 
         // ── Filter panel ─────────────────────────────────────────────────────────
@@ -1643,7 +1695,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                       : null,
                                                 ),
                                                 SizedBox(
-                                                  width: _colCode,
+                                                  width: _columnWidth('code'),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1657,7 +1709,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colStock,
+                                                  width: _columnWidth(
+                                                    'stockStatus',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1671,7 +1725,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colCategory,
+                                                  width: _columnWidth(
+                                                    'category',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1685,7 +1741,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colSubcat,
+                                                  width: _columnWidth(
+                                                    'subcategory',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1699,7 +1757,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colTags,
+                                                  width: _columnWidth('tags'),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1713,7 +1771,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colName,
+                                                  width: _columnWidth('name'),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1727,7 +1785,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colRoom,
+                                                  width: _columnWidth('room'),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1741,7 +1799,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colLoc,
+                                                  width: _columnWidth(
+                                                    'location',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1755,7 +1815,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colStorage,
+                                                  width: _columnWidth(
+                                                    'storageTemp',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1769,7 +1831,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colState,
+                                                  width: _columnWidth(
+                                                    'physicalState',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1783,7 +1847,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colCas,
+                                                  width: _columnWidth(
+                                                    'casNumber',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1797,7 +1863,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colFormula,
+                                                  width: _columnWidth(
+                                                    'formula',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1811,7 +1879,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colOpened,
+                                                  width: _columnWidth(
+                                                    'openedDate',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1825,7 +1895,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colPackSize,
+                                                  width: _columnWidth(
+                                                    'packageSize',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1839,7 +1911,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colUnit,
+                                                  width: _columnWidth('unit'),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1853,7 +1925,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colCount,
+                                                  width: _columnWidth(
+                                                    'containerCount',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1867,7 +1941,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colMin,
+                                                  width: _columnWidth(
+                                                    'containerMin',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1881,7 +1957,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colContam,
+                                                  width: _columnWidth(
+                                                    'contamination',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1895,7 +1973,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colBrand,
+                                                  width: _columnWidth('brand'),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1909,7 +1987,9 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   ),
                                                 ),
                                                 SizedBox(
-                                                  width: _colSupp,
+                                                  width: _columnWidth(
+                                                    'supplier',
+                                                  ),
                                                   child: Padding(
                                                     padding:
                                                         const EdgeInsets.symmetric(
@@ -1934,23 +2014,24 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                             child: ListView.builder(
                                               controller: _vertCtrl,
                                               padding: EdgeInsets.zero,
-                                              itemCount: _filtered.length +
-                                                  (_selectionMode ? 0 : 1),
+                                              itemCount:
+                                                  _filtered.length +
+                                                  (showAddRow ? 1 : 0),
                                               itemExtent: AppDS.tableRowH,
                                               itemBuilder: (ctx, i) {
-                                                if (!_selectionMode && i == 0) {
+                                                if (showAddRow && i == 0) {
                                                   return _buildAddRow();
                                                 }
-                                                final rowIndex =
-                                                    _selectionMode ? i : i - 1;
+                                                final rowIndex = showAddRow
+                                                    ? i - 1
+                                                    : i;
                                                 final r = _filtered[rowIndex];
                                                 return _ReagentRow(
                                                   reagent: r,
                                                   rowIndex: rowIndex,
                                                   selectionMode: _selectionMode,
-                                                  selected: _selectedIds.contains(
-                                                    r.id,
-                                                  ),
+                                                  selected: _selectedIds
+                                                      .contains(r.id),
                                                   onToggleSelected: () =>
                                                       _toggleSelected(r.id),
                                                   roomName:
@@ -1967,7 +2048,11 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                                 reagentId: r.id,
                                                               ),
                                                         ),
-                                                      ).then((_) => _load()),
+                                                      ).then((_) {
+                                                        if (mounted) {
+                                                          unawaited(_load());
+                                                        }
+                                                      }),
                                                   onRequest: () =>
                                                       showQuickRequestDialog(
                                                         context,
@@ -1989,12 +2074,14 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                         forward: false,
                                                       ),
                                                   onCancel: _cancelEdit,
+                                                  onCommitAndClose:
+                                                      _commitAndCloseCurrentEdit,
                                                   onAddNewRow: () {
                                                     _commitCurrentEdit();
                                                     setState(
                                                       () => _editingCell = null,
                                                     );
-                                                    _addNewRow();
+                                                    _showAddEditDialog();
                                                   },
                                                   onCommitStockStatus:
                                                       _commitStockStatusEdit,
@@ -2012,6 +2099,7 @@ class _ReagentsPageState extends State<ReagentsPage> {
                                                   onCommitLocation:
                                                       _commitLocationEdit,
                                                   locations: _locations,
+                                                  columnWidth: _columnWidth,
                                                 );
                                               },
                                             ),
@@ -2026,7 +2114,8 @@ class _ReagentsPageState extends State<ReagentsPage> {
                             // ── Vertical thumb ──────────────────────────────
                             AppVerticalThumb(
                               contentLength:
-                                  (_filtered.length + 1) * AppDS.tableRowH,
+                                  (_filtered.length + (showAddRow ? 1 : 0)) *
+                                  AppDS.tableRowH,
                               topPadding: AppDS.tableHeaderH,
                               offset: _vOffset,
                               onScrollTo: (y) {

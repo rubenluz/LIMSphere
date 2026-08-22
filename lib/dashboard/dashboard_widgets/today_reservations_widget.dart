@@ -4,7 +4,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '/theme/theme.dart';
 
 class TodayReservationsWidget extends StatefulWidget {
@@ -28,45 +30,61 @@ class _TodayReservationsWidgetState extends State<TodayReservationsWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final now = DateTime.now();
-      final todayStart =
-          DateTime(now.year, now.month, now.day).toIso8601String();
-      final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59)
-          .toIso8601String();
+      final todayStart = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).toIso8601String();
+      final todayEnd = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        23,
+        59,
+        59,
+      ).toIso8601String();
 
       final rows = await Supabase.instance.client
           .from('reservations')
           .select(
-              'reservation_resource_name, reservation_start, reservation_end, '
-              'reservation_status, reservation_purpose, '
-              'user:reservation_user_id(user_name)')
+            'reservation_resource_name, reservation_start, reservation_end, '
+            'reservation_status, reservation_purpose, '
+            'user:reservation_user_id(user_name)',
+          )
           .lte('reservation_start', todayEnd)
           .gte('reservation_end', todayStart)
           .order('reservation_start');
 
       final List<_Res> items = [];
       for (final r in rows as List) {
-        final start = DateTime.tryParse(r['reservation_start'] as String? ?? '');
+        final start = DateTime.tryParse(
+          r['reservation_start'] as String? ?? '',
+        );
         final end = DateTime.tryParse(r['reservation_end'] as String? ?? '');
         if (start == null || end == null) continue;
 
         final userMap = r['user'] as Map<String, dynamic>?;
-        items.add(_Res(
-          resource: r['reservation_resource_name'] as String? ?? '—',
-          userName: userMap?['user_name'] as String? ?? '—',
-          start: start,
-          end: end,
-          status: r['reservation_status'] as String? ?? '',
-          purpose: r['reservation_purpose'] as String? ?? '',
-        ));
+        items.add(
+          _Res(
+            resource: r['reservation_resource_name'] as String? ?? '—',
+            userName: userMap?['user_name'] as String? ?? '—',
+            start: start,
+            end: end,
+            status: r['reservation_status'] as String? ?? '',
+            purpose: r['reservation_purpose'] as String? ?? '',
+          ),
+        );
       }
 
       if (!mounted) return;
@@ -84,9 +102,9 @@ class _TodayReservationsWidgetState extends State<TodayReservationsWidget> {
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   Color _statusColor(String s) => switch (s) {
-    'in_use'    => AppDS.green,
+    'in_use' => AppDS.green,
     'confirmed' => AppDS.accent,
-    'pending'   => AppDS.yellow,
+    'pending' => AppDS.yellow,
     'completed' => AppDS.textMuted,
     'cancelled' || 'no_show' => AppDS.red,
     _ => AppDS.textSecondary,
@@ -103,14 +121,21 @@ class _TodayReservationsWidgetState extends State<TodayReservationsWidget> {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.event_available,
-                size: 32, color: AppDS.textMuted.withAlpha(150)),
-            const SizedBox(height: 8),
-            Text('No reservations today',
-                style: TextStyle(
-                    fontSize: 12, color: context.appTextSecondary)),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.event_available,
+                size: 32,
+                color: AppDS.textMuted.withAlpha(150),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No reservations today',
+                style: TextStyle(fontSize: 12, color: context.appTextSecondary),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -131,42 +156,51 @@ class _TodayReservationsWidgetState extends State<TodayReservationsWidget> {
             border: Border.all(color: color.withAlpha(100)),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Row(children: [
-            Container(
-              width: 4,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(r.resource,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      r.resource,
                       style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: context.appTextPrimary),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: context.appTextPrimary,
+                      ),
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${r.userName}${r.purpose.isNotEmpty ? '  ·  ${r.purpose}' : ''}',
-                    style: TextStyle(
-                        fontSize: 10, color: context.appTextMuted),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${r.userName}${r.purpose.isNotEmpty ? '  ·  ${r.purpose}' : ''}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: context.appTextMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text('${_fmtTime(r.start)} – ${_fmtTime(r.end)}',
-                style: AppDS.mono(size: 10, color: context.appTextSecondary)),
-          ]),
+              const SizedBox(width: 8),
+              Text(
+                '${_fmtTime(r.start)} – ${_fmtTime(r.end)}',
+                style: AppDS.mono(size: 10, color: context.appTextSecondary),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -187,26 +221,36 @@ class _TodayReservationsWidgetState extends State<TodayReservationsWidget> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.calendar_today_outlined,
-                  size: 20, color: AppDS.accent),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text("Today's Reservations",
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 20,
+                  color: AppDS.accent,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Today's Reservations",
                     style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: context.appTextPrimary)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
-            ]),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
           Divider(height: 1, color: context.appBorder),
           if (desktop)

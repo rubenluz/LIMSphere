@@ -4,7 +4,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '/theme/theme.dart';
 
 class BreedingActivityWidget extends StatefulWidget {
@@ -27,17 +29,21 @@ class _BreedingActivityWidgetState extends State<BreedingActivityWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client
           .from('fish_stocks')
-          .select('fish_stocks_line, fish_stocks_last_breeding, fish_stocks_tank_id')
+          .select(
+            'fish_stocks_line, fish_stocks_last_breeding, fish_stocks_tank_id',
+          )
           .eq('fish_stocks_status', 'active')
           .not('fish_stocks_last_breeding', 'is', null)
           .order('fish_stocks_last_breeding', ascending: false);
@@ -49,11 +55,13 @@ class _BreedingActivityWidgetState extends State<BreedingActivityWidget> {
         final date = DateTime.tryParse(raw.toString());
         if (date == null) continue;
 
-        stocks.add(_StockBreed(
-          tankId: r['fish_stocks_tank_id']?.toString() ?? '—',
-          line: (r['fish_stocks_line'] as String?)?.trim() ?? '',
-          lastBreed: date,
-        ));
+        stocks.add(
+          _StockBreed(
+            tankId: r['fish_stocks_tank_id']?.toString() ?? '—',
+            line: (r['fish_stocks_line'] as String?)?.trim() ?? '',
+            lastBreed: date,
+          ),
+        );
       }
 
       if (!mounted) return;
@@ -97,8 +105,10 @@ class _BreedingActivityWidgetState extends State<BreedingActivityWidget> {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
-          child: Text('No breeding records',
-              style: TextStyle(fontSize: 12, color: context.appTextSecondary)),
+          child: Text(
+            'No breeding records',
+            style: TextStyle(fontSize: 12, color: context.appTextSecondary),
+          ),
         ),
       );
     }
@@ -119,45 +129,59 @@ class _BreedingActivityWidgetState extends State<BreedingActivityWidget> {
             border: Border.all(color: color.withAlpha(100)),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Row(children: [
-            Icon(Icons.egg_outlined, size: 18, color: color),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(s.tankId,
+          child: Row(
+            children: [
+              Icon(Icons.egg_outlined, size: 18, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s.tankId,
                       style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: context.appTextPrimary),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: context.appTextPrimary,
+                      ),
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  if (s.line.isNotEmpty) ...[
-                    const SizedBox(height: 1),
-                    Text(s.line,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (s.line.isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        s.line,
                         style: TextStyle(
-                            fontSize: 10, color: context.appTextMuted),
+                          fontSize: 10,
+                          color: context.appTextMuted,
+                        ),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _fmtDate(s.lastBreed),
+                    style: AppDS.mono(
+                      size: 10,
+                      color: context.appTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    _ago(s.lastBreed),
+                    style: TextStyle(fontSize: 9, color: context.appTextMuted),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(_fmtDate(s.lastBreed),
-                    style: AppDS.mono(
-                        size: 10, color: context.appTextSecondary)),
-                const SizedBox(height: 1),
-                Text(_ago(s.lastBreed),
-                    style: TextStyle(
-                        fontSize: 9, color: context.appTextMuted)),
-              ],
-            ),
-          ]),
+            ],
+          ),
         );
       },
     );
@@ -178,25 +202,32 @@ class _BreedingActivityWidgetState extends State<BreedingActivityWidget> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.egg_outlined, size: 20, color: AppDS.pink),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Breeding Activity',
+            child: Row(
+              children: [
+                const Icon(Icons.egg_outlined, size: 20, color: AppDS.pink),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Breeding Activity',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: context.appTextPrimary)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
-            ]),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
           Divider(height: 1, color: context.appBorder),
           if (desktop)

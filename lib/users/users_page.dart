@@ -313,8 +313,10 @@ class _UsersPageState extends State<UsersPage> {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   Future<void> _load() async {
+    if (!mounted) return;
     final cached = await DataCache.read('users');
-    if (cached != null && mounted) {
+    if (!mounted) return;
+    if (cached != null) {
       _users = cached
           .map((r) => _User.fromMap(Map<String, dynamic>.from(r as Map)))
           .toList();
@@ -686,7 +688,6 @@ class _UsersPageState extends State<UsersPage> {
     return Column(
       children: [
         _buildToolbar(),
-        Divider(height: 1, color: context.appBorder),
         Expanded(child: _buildBody()),
       ],
     );
@@ -695,62 +696,82 @@ class _UsersPageState extends State<UsersPage> {
   Widget _buildToolbar() {
     final showDrawerButton = MediaQuery.of(context).size.width < 700;
     return Container(
-      color: context.appBg,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      height: AppDS.moduleToolbarHeight,
+      padding: AppDS.moduleToolbarPadding,
+      decoration: BoxDecoration(
+        color: context.appSurface2,
+        border: Border(bottom: BorderSide(color: context.appBorder)),
+      ),
       child: Row(
         children: [
           if (showDrawerButton) ...[
             IconButton(
-              icon: const Icon(Icons.menu_rounded, size: 20),
+              icon: const Icon(
+                Icons.menu_rounded,
+                size: AppDS.moduleMenuIconSize,
+              ),
               color: context.appTextSecondary,
               tooltip: 'Menu',
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
-            const SizedBox(width: 6),
           ],
+          const Icon(
+            Icons.people_outline,
+            size: AppDS.moduleTitleIconSize,
+            color: AppDS.indigo,
+          ),
+          const SizedBox(width: 8),
+          Text('Users', style: AppDS.moduleTitle(context.appTextPrimary)),
+          const SizedBox(width: 16),
           Expanded(
-            child: TextField(
-              controller: _searchCtrl,
-              style: _spaceGrotesk(fontSize: 13, color: context.appTextPrimary),
-              decoration: InputDecoration(
-                hintText: 'Search users…',
-                hintStyle: _spaceGrotesk(
-                  fontSize: 12,
-                  color: context.appTextMuted,
+            child: SizedBox(
+              height: AppDS.moduleSearchHeight,
+              child: TextField(
+                controller: _searchCtrl,
+                style: _spaceGrotesk(
+                  fontSize: AppDS.moduleSearchFontSize,
+                  color: context.appTextPrimary,
                 ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  size: 16,
-                  color: context.appTextMuted,
-                ),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(
-                          Icons.clear,
-                          size: 16,
-                          color: context.appTextMuted,
-                        ),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          _applyFilter();
-                        },
-                      )
-                    : null,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 9),
-                filled: true,
-                fillColor: context.appSurface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: context.appBorder),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: context.appBorder),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppDS.accent),
+                decoration: InputDecoration(
+                  hintText: 'Search users…',
+                  hintStyle: _spaceGrotesk(
+                    fontSize: AppDS.moduleSearchFontSize,
+                    color: context.appTextMuted,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: AppDS.moduleSearchIconSize,
+                    color: context.appTextMuted,
+                  ),
+                  suffixIcon: _searchCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(
+                            Icons.clear,
+                            size: AppDS.moduleClearIconSize,
+                            color: context.appTextMuted,
+                          ),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            _applyFilter();
+                          },
+                        )
+                      : null,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                  filled: true,
+                  fillColor: context.appSurface3,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: context.appBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: context.appBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppDS.accent),
+                  ),
                 ),
               ),
             ),
@@ -1153,7 +1174,7 @@ class _UsersPageState extends State<UsersPage> {
           u.role,
           roleColor,
           icon: Icons.shield_outlined,
-          onTapDown: canManage
+          onTapDown: canManage && u.status == 'active'
               ? (details) => _showMenuPicker(
                   u,
                   'user_role',
@@ -1381,7 +1402,7 @@ class _UsersPageState extends State<UsersPage> {
                   u.role,
                   _roleColor(u.role),
                   icon: Icons.shield_outlined,
-                  onTapDown: canManage
+                  onTapDown: canManage && u.status == 'active'
                       ? (d) => _showMenuPicker(
                           u,
                           'user_role',

@@ -18,6 +18,7 @@ import '/theme/theme.dart';
 import '/supabase/supabase_manager.dart';
 import '../../camera/qr_scanner/qr_code_rules.dart';
 import '../../requests/requests_page.dart';
+import 'ncbi_links.dart';
 
 part 'strain_detail_widgets.dart';
 
@@ -547,6 +548,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final res = await Supabase.instance.client
@@ -1528,24 +1530,7 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
       .toList();
 
   Uri? _referenceUri(String key, String value) {
-    final parsed = Uri.tryParse(value);
-    if (parsed != null &&
-        (parsed.scheme == 'http' || parsed.scheme == 'https')) {
-      return parsed;
-    }
-    final encoded = Uri.encodeComponent(value);
-    if (key == 'strain_gca_accession') {
-      return Uri.parse(
-        'https://www.ncbi.nlm.nih.gov/datasets/genome/$encoded/',
-      );
-    }
-    if (key.startsWith('strain_genbank_')) {
-      return Uri.parse('https://www.ncbi.nlm.nih.gov/nuccore/$encoded');
-    }
-    if (key == 'strain_sequence_literature_ids') {
-      return Uri.parse('https://pubmed.ncbi.nlm.nih.gov/?term=$encoded');
-    }
-    return null;
+    return buildNcbiReferenceUri(key, value);
   }
 
   Future<void> _openReference(String key, String value) async {
@@ -1645,7 +1630,9 @@ class _StrainDetailPageState extends State<StrainDetailPage> {
               size: 18,
               color: _DS.accent,
             ),
-            tooltip: _sequenceReferenceKeys.contains(f.key)
+            tooltip: isGenBankAccessionField(f.key)
+                ? 'Search this accession with NCBI BLAST'
+                : _sequenceReferenceKeys.contains(f.key)
                 ? 'Open sequence reference'
                 : 'Open file or link',
             onPressed: ctrl.text.trim().isEmpty

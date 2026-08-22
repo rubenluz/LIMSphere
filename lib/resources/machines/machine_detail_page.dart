@@ -100,6 +100,7 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
   // ── Data ───────────────────────────────────────────────────────────────────
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final results = await Future.wait([
@@ -120,7 +121,7 @@ class _MachineDetailPageState extends State<MachineDetailPage> {
             .select('location_id, location_name')
             .order('location_name'),
         Supabase.instance.client
-            .from('users')
+            .from('user_directory')
             .select(
               'user_id, user_email, user_name, user_phone, '
               'user_institution, user_group, user_role',

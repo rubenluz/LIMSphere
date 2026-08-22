@@ -34,7 +34,7 @@ class FacilitySop {
   final String? author;
   final String? lastUpdatedBy;
   final String? revisionNotes;
-  final String? sopContext;      // 'fish_facility' | 'culture_collection'
+  final String? sopContext; // 'fish_facility' | 'culture_collection'
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -72,36 +72,36 @@ class FacilitySop {
   });
 
   factory FacilitySop.fromMap(Map<String, dynamic> m) => FacilitySop(
-    id:            m[SopSch.id]            as int?,
-    code:          m[SopSch.code]          as String?,
-    name:          (m[SopSch.name]         as String?) ?? '',
-    version:       m[SopSch.version]       as String?,
-    type:          m[SopSch.type]          as String?,
-    category:      m[SopSch.category]      as String?,
-    status:        m[SopSch.status]        as String?,
-    description:   m[SopSch.description]   as String?,
-    tags:          m[SopSch.tags]          as String?,
-    filePath:      m[SopSch.filePath]      as String?,
-    fileName:      m[SopSch.fileName]      as String?,
-    fileSize:      m[SopSch.fileSize]      as int?,
-    fileMime:      m[SopSch.fileMime]      as String?,
-    txtFilePath:   m[SopSch.txtFilePath]   as String?,
-    txtFileName:   m[SopSch.txtFileName]   as String?,
-    txtFileSize:   m[SopSch.txtFileSize]   as int?,
-    docFilePath:   m[SopSch.docFilePath]   as String?,
-    docFileName:   m[SopSch.docFileName]   as String?,
-    docFileSize:   m[SopSch.docFileSize]   as int?,
+    id: m[SopSch.id] as int?,
+    code: m[SopSch.code] as String?,
+    name: (m[SopSch.name] as String?) ?? '',
+    version: m[SopSch.version] as String?,
+    type: m[SopSch.type] as String?,
+    category: m[SopSch.category] as String?,
+    status: m[SopSch.status] as String?,
+    description: m[SopSch.description] as String?,
+    tags: m[SopSch.tags] as String?,
+    filePath: m[SopSch.filePath] as String?,
+    fileName: m[SopSch.fileName] as String?,
+    fileSize: m[SopSch.fileSize] as int?,
+    fileMime: m[SopSch.fileMime] as String?,
+    txtFilePath: m[SopSch.txtFilePath] as String?,
+    txtFileName: m[SopSch.txtFileName] as String?,
+    txtFileSize: m[SopSch.txtFileSize] as int?,
+    docFilePath: m[SopSch.docFilePath] as String?,
+    docFileName: m[SopSch.docFileName] as String?,
+    docFileSize: m[SopSch.docFileSize] as int?,
     effectiveDate: _parseDate(m[SopSch.effectiveDate]),
-    reviewDate:    _parseDate(m[SopSch.reviewDate]),
-    lastReviewed:  _parseDate(m[SopSch.lastReviewed]),
-    responsible:   m[SopSch.responsible]   as String?,
+    reviewDate: _parseDate(m[SopSch.reviewDate]),
+    lastReviewed: _parseDate(m[SopSch.lastReviewed]),
+    responsible: m[SopSch.responsible] as String?,
     responsibleId: m[SopSch.responsibleId] as int?,
-    author:        m[SopSch.author]        as String?,
+    author: m[SopSch.author] as String?,
     lastUpdatedBy: m[SopSch.lastUpdatedBy] as String?,
     revisionNotes: m[SopSch.revisionNotes] as String?,
-    sopContext:    m[SopSch.context]       as String?,
-    createdAt:     _parseDate(m[SopSch.createdAt]),
-    updatedAt:     _parseDate(m[SopSch.updatedAt]),
+    sopContext: m[SopSch.context] as String?,
+    createdAt: _parseDate(m[SopSch.createdAt]),
+    updatedAt: _parseDate(m[SopSch.updatedAt]),
   );
 
   static DateTime? _parseDate(dynamic v) {
@@ -110,7 +110,7 @@ class FacilitySop {
     return DateTime.tryParse(v.toString());
   }
 
-  bool get hasPdfFile => filePath    != null && filePath!.isNotEmpty;
+  bool get hasPdfFile => filePath != null && filePath!.isNotEmpty;
   bool get hasTxtFile => txtFilePath != null && txtFilePath!.isNotEmpty;
   bool get hasDocFile => docFilePath != null && docFilePath!.isNotEmpty;
   bool get hasAnyFile => hasPdfFile || hasTxtFile || hasDocFile;
@@ -118,8 +118,9 @@ class FacilitySop {
   // kept for backward compat
   bool get hasFile => hasPdfFile;
 
-  bool get isPdf    => fileMime == 'application/pdf' ||
-                       (fileName?.toLowerCase().endsWith('.pdf') ?? false);
+  bool get isPdf =>
+      fileMime == 'application/pdf' ||
+      (fileName?.toLowerCase().endsWith('.pdf') ?? false);
 
   String get pdfFileSizeLabel => _sizeLabel(fileSize);
   String get txtFileSizeLabel => _sizeLabel(txtFileSize);
@@ -145,35 +146,90 @@ class FacilitySop {
     return reviewDate!.isBefore(DateTime.now().add(const Duration(days: 30)));
   }
 
-
   static const List<String> types = [
-    'sop', 'protocol', 'guideline', 'checklist', 'form', 'training',
+    'sop',
+    'protocol',
+    'guideline',
+    'checklist',
+    'form',
+    'training',
   ];
 
   static const List<String> statuses = [
-    'draft', 'active', 'under_review', 'archived', 'superseded',
+    'draft',
+    'active',
+    'under_review',
+    'archived',
+    'superseded',
   ];
+
+  static const List<String> contexts = [
+    'culture_collection',
+    'fish_facility',
+    'hplc',
+    'assays',
+    'reagent_preparation',
+    'sampling',
+    'cleaning_maintenance',
+    'molecular_biology',
+  ];
+
+  static String contextLabel(String? context) {
+    switch (context) {
+      case 'culture_collection':
+        return 'Culture Collection';
+      case 'fish_facility':
+        return 'Fish Facility';
+      case 'hplc':
+        return 'HPLC';
+      case 'assays':
+        return 'Assays';
+      case 'reagent_preparation':
+        return 'Reagent Preparation';
+      case 'sampling':
+        return 'Sampling';
+      case 'cleaning_maintenance':
+        return 'Cleaning & Maintenance';
+      case 'molecular_biology':
+        return 'Molecular Biology';
+      default:
+        return context ?? 'Uncategorized';
+    }
+  }
 
   static String typeLabel(String? t) {
     switch (t) {
-      case 'sop':        return 'SOP';
-      case 'protocol':   return 'Protocol';
-      case 'guideline':  return 'Guideline';
-      case 'checklist':  return 'Checklist';
-      case 'form':       return 'Form';
-      case 'training':   return 'Training';
-      default:           return t ?? 'SOP';
+      case 'sop':
+        return 'SOP';
+      case 'protocol':
+        return 'Protocol';
+      case 'guideline':
+        return 'Guideline';
+      case 'checklist':
+        return 'Checklist';
+      case 'form':
+        return 'Form';
+      case 'training':
+        return 'Training';
+      default:
+        return t ?? 'SOP';
     }
   }
 
   static String statusLabel(String? s) {
     switch (s) {
-      case 'draft':        return 'Draft';
-      case 'active':       return 'Active';
-      case 'under_review': return 'Under Review';
-      case 'archived':     return 'Archived';
-      case 'superseded':   return 'Superseded';
-      default:             return s ?? 'Draft';
+      case 'draft':
+        return 'Draft';
+      case 'active':
+        return 'Active';
+      case 'under_review':
+        return 'Under Review';
+      case 'archived':
+        return 'Archived';
+      case 'superseded':
+        return 'Superseded';
+      default:
+        return s ?? 'Draft';
     }
   }
 }

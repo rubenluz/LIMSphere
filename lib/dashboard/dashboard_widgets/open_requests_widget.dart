@@ -4,7 +4,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '/theme/theme.dart';
 
 class OpenRequestsWidget extends StatefulWidget {
@@ -30,12 +32,14 @@ class _OpenRequestsWidgetState extends State<OpenRequestsWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client
@@ -50,8 +54,9 @@ class _OpenRequestsWidgetState extends State<OpenRequestsWidget> {
         final type = r['request_type'] as String? ?? 'other';
         final priority = r['request_priority'] as String? ?? 'normal';
         final title = r['request_title'] as String? ?? '';
-        byType.putIfAbsent(type, () => []).add(
-            _Req(title: title, priority: priority));
+        byType
+            .putIfAbsent(type, () => [])
+            .add(_Req(title: title, priority: priority));
       }
 
       // Sort items within each group: urgent first.
@@ -87,21 +92,21 @@ class _OpenRequestsWidgetState extends State<OpenRequestsWidget> {
 
   static Color _prioColor(String p) => switch (p) {
     'urgent' => AppDS.red,
-    'high'   => AppDS.orange,
+    'high' => AppDS.orange,
     'normal' => AppDS.accent,
-    _        => AppDS.textMuted,
+    _ => AppDS.textMuted,
   };
 
   static IconData _prioIcon(String p) => switch (p) {
     'urgent' => Icons.error,
-    'high'   => Icons.priority_high,
+    'high' => Icons.priority_high,
     'normal' => Icons.circle_outlined,
-    _        => Icons.arrow_downward,
+    _ => Icons.arrow_downward,
   };
 
-  String _pretty(String raw) =>
-      raw.replaceAll('_', ' ').replaceFirstMapped(
-          RegExp(r'^[a-z]'), (m) => m[0]!.toUpperCase());
+  String _pretty(String raw) => raw
+      .replaceAll('_', ' ')
+      .replaceFirstMapped(RegExp(r'^[a-z]'), (m) => m[0]!.toUpperCase());
 
   Widget _buildContent() {
     if (_loading) {
@@ -114,14 +119,21 @@ class _OpenRequestsWidgetState extends State<OpenRequestsWidget> {
       return Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.check_circle_outline,
-                size: 32, color: AppDS.green.withAlpha(180)),
-            const SizedBox(height: 8),
-            Text('No pending requests',
-                style: TextStyle(
-                    fontSize: 12, color: context.appTextSecondary)),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.check_circle_outline,
+                size: 32,
+                color: AppDS.green.withAlpha(180),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No pending requests',
+                style: TextStyle(fontSize: 12, color: context.appTextSecondary),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -147,51 +159,68 @@ class _OpenRequestsWidgetState extends State<OpenRequestsWidget> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-                  Text(_pretty(g.type),
+                Row(
+                  children: [
+                    Text(
+                      _pretty(g.type),
                       style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: context.appTextPrimary)),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: topColor,
-                      borderRadius: BorderRadius.circular(4),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: context.appTextPrimary,
+                      ),
                     ),
-                    child: Text('${g.items.length}',
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: topColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${g.items.length}',
                         style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
-                  ),
-                ]),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 6),
                 for (final req in g.items.take(5))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 3),
-                    child: Row(children: [
-                      Icon(_prioIcon(req.priority),
-                          size: 12, color: _prioColor(req.priority)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          req.title.isNotEmpty ? req.title : '(no title)',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: context.appTextSecondary),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        Icon(
+                          _prioIcon(req.priority),
+                          size: 12,
+                          color: _prioColor(req.priority),
                         ),
-                      ),
-                    ]),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            req.title.isNotEmpty ? req.title : '(no title)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.appTextSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 if (g.items.length > 5)
-                  Text('  +${g.items.length - 5} more',
-                      style: TextStyle(
-                          fontSize: 10, color: context.appTextMuted)),
+                  Text(
+                    '  +${g.items.length - 5} more',
+                    style: TextStyle(fontSize: 10, color: context.appTextMuted),
+                  ),
               ],
             ),
           ),
@@ -215,36 +244,50 @@ class _OpenRequestsWidgetState extends State<OpenRequestsWidget> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.assignment_outlined,
-                  size: 20, color: AppDS.yellow),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text.rich(TextSpan(children: [
-                  TextSpan(
-                    text: 'Open Requests',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: context.appTextPrimary),
-                  ),
-                  if (_total > 0)
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.assignment_outlined,
+                  size: 20,
+                  color: AppDS.yellow,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text.rich(
                     TextSpan(
-                      text: '  $_total',
-                      style: TextStyle(
-                          fontSize: 12, color: context.appTextMuted),
+                      children: [
+                        TextSpan(
+                          text: 'Open Requests',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: context.appTextPrimary,
+                          ),
+                        ),
+                        if (_total > 0)
+                          TextSpan(
+                            text: '  $_total',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.appTextMuted,
+                            ),
+                          ),
+                      ],
                     ),
-                ])),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
-            ]),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
           Divider(height: 1, color: context.appBorder),
           if (desktop)

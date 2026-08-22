@@ -22,6 +22,25 @@ void main() {
     });
   });
 
+  test('global results rank identity prefixes before incidental matches', () {
+    const prefix = GlobalSearchResult(
+      type: 'strains',
+      id: 1,
+      category: 'Strain',
+      title: 'BACA0001',
+      subtitle: 'Kamptonema animale',
+    );
+    const incidental = GlobalSearchResult(
+      type: 'sops',
+      id: 2,
+      category: 'SOP',
+      title: 'Microscopy procedure',
+    );
+
+    expect(GlobalSearchService.resultRelevance(prefix, 'kamptonem'), 1);
+    expect(GlobalSearchService.resultRelevance(incidental, 'kamptonem'), 4);
+  });
+
   testWidgets('clicking an overlay result opens it', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     GlobalSearchResult? opened;

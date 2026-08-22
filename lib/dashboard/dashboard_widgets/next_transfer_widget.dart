@@ -4,6 +4,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
 
 class NextTransferWidget extends StatefulWidget {
@@ -26,7 +27,8 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
@@ -68,12 +70,15 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
   }
 
   Future<void> _loadNextTransfers() async {
+    if (!mounted) return;
     setState(() => _loading = true);
 
     try {
       final data = await Supabase.instance.client
           .from('strains')
-          .select('strain_periodicity, strain_next_transfer, strain_last_transfer')
+          .select(
+            'strain_periodicity, strain_next_transfer, strain_last_transfer',
+          )
           .neq('strain_status', 'DEAD');
 
       final Map<int, DateTime> byTimeDays = {};
@@ -113,11 +118,13 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
 
       setState(() {
         _nextTransfers = sortedEntries
-            .map((e) => {
-                  'strain_periodicity': e.key,
-                  'strain_next_transfer': e.value,
-                  'strain_count': countByTimeDays[e.key] ?? 0,
-                })
+            .map(
+              (e) => {
+                'strain_periodicity': e.key,
+                'strain_next_transfer': e.value,
+                'strain_count': countByTimeDays[e.key] ?? 0,
+              },
+            )
             .toList();
         _loading = false;
       });
@@ -138,8 +145,10 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
     if (_nextTransfers.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(24),
-        child: Text('No transfer data',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+        child: Text(
+          'No transfer data',
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+        ),
       );
     }
     return ListView.builder(
@@ -147,11 +156,11 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _nextTransfers.length,
       itemBuilder: (context, index) {
-        final item     = _nextTransfers[index];
+        final item = _nextTransfers[index];
         final timeDays = item['strain_periodicity'] as int;
         final nextDate = item['strain_next_transfer'] as DateTime;
-        final count    = item['strain_count'] as int;
-        final now      = DateTime.now();
+        final count = item['strain_count'] as int;
+        final now = DateTime.now();
         final daysLeft = nextDate.difference(now).inDays;
 
         final dateStr =
@@ -160,8 +169,8 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
         final Color color = daysLeft < 0
             ? Colors.red
             : daysLeft <= 7
-                ? Colors.orange
-                : Colors.green;
+            ? Colors.orange
+            : Colors.green;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -187,8 +196,8 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
                   daysLeft < 0
                       ? '${daysLeft.abs()}d overdue'
                       : daysLeft == 0
-                          ? 'today'
-                          : 'in ${daysLeft}d',
+                      ? 'today'
+                      : 'in ${daysLeft}d',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -235,7 +244,10 @@ class _NextTransferWidgetState extends State<NextTransferWidget> {
                 IconButton(
                   icon: const Icon(Icons.refresh, size: 16),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
                   onPressed: _loadNextTransfers,
                 ),
               ],

@@ -33,9 +33,7 @@ const List<SampleColDef> sampleAllColumns = [
   SampleColDef('sample_municipality', 'Municipality', width: 140),
   SampleColDef('sample_parish', 'Parish', width: 120),
   SampleColDef('sample_local', 'Local', width: 150),
-  SampleColDef('sample_gps', 'GPS', width: 180, readOnly: true),
-  SampleColDef('sample_latitude', 'Latitude', width: 100),
-  SampleColDef('sample_longitude', 'Longitude', width: 110),
+  SampleColDef('sample_gps', 'GPS', width: 210),
   SampleColDef('sample_altitude_m', 'Altitude (m)', width: 110),
   // Habitat
   SampleColDef('sample_habitat_type', 'Habitat Type', width: 130),

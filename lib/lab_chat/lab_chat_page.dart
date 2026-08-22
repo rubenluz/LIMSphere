@@ -292,7 +292,7 @@ class _LabChatPageState extends State<LabChatPage> {
     try {
       final rows =
           await _supabase
-                  .from('users')
+                  .from('user_directory')
                   .select(
                     'user_id, user_name, user_email, user_auth_uid, user_role, user_phone, user_institution, user_group',
                   )
@@ -796,25 +796,28 @@ class _LabChatPageState extends State<LabChatPage> {
   Widget _buildChatHeader() {
     final ch = _currentChannel;
     return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      height: AppDS.moduleToolbarHeight,
+      padding: AppDS.moduleToolbarPadding,
       decoration: BoxDecoration(
-        color: context.appSurface,
+        color: context.appSurface2,
         border: Border(bottom: BorderSide(color: context.appBorder)),
       ),
       child: Row(
         children: [
           if (MediaQuery.of(context).size.width < 700) ...[
             IconButton(
-              icon: const Icon(Icons.menu_rounded, size: 20),
+              icon: const Icon(
+                Icons.menu_rounded,
+                size: AppDS.moduleMenuIconSize,
+              ),
               color: context.appTextSecondary,
               tooltip: 'Menu',
               onPressed: openAppDrawer,
             ),
           ],
-          Icon(ch.icon, size: 16, color: ch.color),
-          const SizedBox(width: 10),
-          Text(ch.label, style: _body(size: 15, weight: FontWeight.w700)),
+          Icon(ch.icon, size: AppDS.moduleTitleIconSize, color: ch.color),
+          const SizedBox(width: 8),
+          Text(ch.label, style: AppDS.moduleTitle(context.appTextPrimary)),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 12),
             width: 1,
@@ -829,16 +832,19 @@ class _LabChatPageState extends State<LabChatPage> {
           // Inline search
           SizedBox(
             width: 200,
-            height: 32,
+            height: AppDS.moduleSearchHeight,
             child: TextField(
               onChanged: (v) => setState(() => _search = v),
-              style: _body(size: 12),
+              style: _body(size: AppDS.moduleSearchFontSize),
               decoration: InputDecoration(
                 hintText: 'Search…',
-                hintStyle: _body(size: 12, color: context.appTextMuted),
+                hintStyle: _body(
+                  size: AppDS.moduleSearchFontSize,
+                  color: context.appTextMuted,
+                ),
                 prefixIcon: Icon(
                   Icons.search,
-                  size: 14,
+                  size: AppDS.moduleSearchIconSize,
                   color: context.appTextMuted,
                 ),
                 filled: true,

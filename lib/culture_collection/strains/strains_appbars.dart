@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '/menu/app_nav.dart';
 import '/theme/theme.dart';
 
@@ -20,6 +21,7 @@ Widget buildStrainsToolbar({
   required ValueChanged<String> onSearchChanged,
   required VoidCallback onToggleFilters,
   required VoidCallback onToggleColManager,
+  required VoidCallback onMap,
   required VoidCallback onImport,
   required VoidCallback onExport,
   required VoidCallback onExportMirri,
@@ -41,7 +43,11 @@ Widget buildStrainsToolbar({
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.menu_rounded, color: context.appTextSecondary),
+            icon: Icon(
+              Icons.menu_rounded,
+              color: context.appTextSecondary,
+              size: AppDS.moduleMenuIconSize,
+            ),
             tooltip: 'Menu',
             onPressed: openAppDrawer,
             padding: EdgeInsets.zero,
@@ -79,6 +85,8 @@ Widget buildStrainsToolbar({
                   onToggleFilters();
                 case 'columns':
                   onToggleColManager();
+                case 'map':
+                  onMap();
                 case 'import':
                   onImport();
                 case 'export':
@@ -103,16 +111,17 @@ Widget buildStrainsToolbar({
                 Icons.view_column_outlined,
                 'Columns',
               ),
+              _popupItem(context, 'map', Icons.map_outlined, 'Show on map'),
               _popupItem(
                 context,
                 'import',
-                Icons.upload_file_rounded,
+                Icons.upload_file_outlined,
                 'Import',
               ),
               _popupItem(
                 context,
                 'export',
-                Icons.file_download_outlined,
+                Icons.download_outlined,
                 'Export CSV',
               ),
               _popupItem(
@@ -154,7 +163,11 @@ Widget buildStrainsToolbar({
     padding: const EdgeInsets.symmetric(horizontal: 16),
     child: Row(
       children: [
-        const Icon(Icons.biotech_outlined, size: 18, color: Color(0xFF0EA5E9)),
+        const Icon(
+          Icons.biotech_outlined,
+          size: AppDS.moduleTitleIconSize,
+          color: Color(0xFF0EA5E9),
+        ),
         const SizedBox(width: 8),
         Text(
           title,
@@ -204,7 +217,7 @@ Widget buildStrainsToolbar({
                 icon: Icon(
                   Icons.tune,
                   color: showFilters ? AppDS.accent : context.appTextSecondary,
-                  size: 18,
+                  size: AppDS.moduleActionIconSize,
                 ),
                 onPressed: onToggleFilters,
               ),
@@ -218,9 +231,23 @@ Widget buildStrainsToolbar({
             icon: Icon(
               Icons.view_column_outlined,
               color: context.appTextSecondary,
-              size: 18,
+              size: AppDS.moduleActionIconSize,
             ),
             onPressed: onToggleColManager,
+          ),
+        ),
+        // Map
+        Tooltip(
+          message: search.trim().isEmpty
+              ? 'Show strains on map'
+              : 'Show "$search" on map',
+          child: IconButton(
+            icon: Icon(
+              Icons.map_outlined,
+              color: context.appTextSecondary,
+              size: AppDS.moduleActionIconSize,
+            ),
+            onPressed: onMap,
           ),
         ),
         // Import
@@ -228,9 +255,9 @@ Widget buildStrainsToolbar({
           message: 'Import from Excel',
           child: IconButton(
             icon: Icon(
-              Icons.upload_file_rounded,
+              Icons.upload_file_outlined,
               color: context.appTextSecondary,
-              size: 18,
+              size: AppDS.moduleActionIconSize,
             ),
             onPressed: onImport,
           ),
@@ -256,7 +283,7 @@ Widget buildStrainsToolbar({
             _popupItem(
               context,
               'export',
-              Icons.file_download_outlined,
+              Icons.download_outlined,
               'Export CSV',
             ),
             _popupItem(
@@ -269,9 +296,9 @@ Widget buildStrainsToolbar({
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Icon(
-              Icons.file_download_outlined,
+              Icons.download_outlined,
               color: context.appTextSecondary,
-              size: 18,
+              size: AppDS.moduleActionIconSize,
             ),
           ),
         ),
@@ -340,13 +367,17 @@ Widget _buildSearchField(
         fontSize: 13,
       ),
       prefixIcon: Icon(
-        Icons.search_rounded,
+        Icons.search,
         color: context.appTextMuted,
-        size: 16,
+        size: AppDS.moduleSearchIconSize,
       ),
       suffixIcon: search.isNotEmpty
           ? IconButton(
-              icon: Icon(Icons.clear, size: 14, color: context.appTextMuted),
+              icon: Icon(
+                Icons.clear,
+                size: AppDS.moduleClearIconSize,
+                color: context.appTextMuted,
+              ),
               onPressed: () {
                 controller.clear();
                 onChanged('');
@@ -407,7 +438,7 @@ PreferredSizeWidget buildStrainsSelectionAppBar({
       );
     }
     return IconButton(
-      icon: Icon(icon, size: 20),
+      icon: Icon(icon, size: AppDS.moduleActionIconSize),
       tooltip: tooltip,
       onPressed: fn,
       color: Colors.white70,
@@ -419,7 +450,7 @@ PreferredSizeWidget buildStrainsSelectionAppBar({
     foregroundColor: Colors.white,
     elevation: 0,
     leading: IconButton(
-      icon: const Icon(Icons.close),
+      icon: const Icon(Icons.close_rounded, size: AppDS.moduleActionIconSize),
       tooltip: 'Exit selection',
       onPressed: onExit,
     ),
@@ -471,7 +502,7 @@ PreferredSizeWidget buildStrainsSelectionAppBar({
         fn: onCopy,
       ),
       selBtn(
-        icon: Icons.grid_on_rounded,
+        icon: Icons.download_outlined,
         tooltip: 'Export CSV',
         label: 'Export CSV',
         fn: onExport,

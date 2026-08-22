@@ -434,6 +434,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     if (result.isEmpty) return;
     final file = result.first;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
     setState(() {
       _sampleCsvRows = _parseCsvBytes(bytes);
       _fileName = file.name;
@@ -449,6 +450,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     if (result.isEmpty) return;
     final file = result.first;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
     setState(() {
       _strainCsvRows = _parseCsvBytes(bytes);
       _strainFileName = file.name;

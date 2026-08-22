@@ -1,9 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:limsphere/culture_collection/samples/sample_map_picker_page.dart';
 
 void main() {
   group('sample GPS parsing', () {
-    test('prefers separate decimal latitude and longitude fields', () {
+    test('prefers the editable GPS field over legacy coordinate columns', () {
       final result = parseSampleCoordinates(
         gps: '0, 0',
         latitude: '37.733',
@@ -11,8 +12,8 @@ void main() {
       );
 
       expect(result, isNotNull);
-      expect(result!.latitude, 37.733);
-      expect(result.longitude, -25.293);
+      expect(result!.latitude, 0);
+      expect(result.longitude, 0);
     });
 
     test('parses a decimal GPS pair', () {
@@ -54,5 +55,25 @@ void main() {
       expect(parseSampleCoordinates(gps: ''), isNull);
       expect(parseSampleCoordinates(gps: '120, 250'), isNull);
     });
+  });
+
+  testWidgets('saved sample pin can be dragged before it is accepted', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SampleMapPickerPage(
+          initialLatitude: 37.733,
+          initialLongitude: -25.293,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('37.733000, -25.293000'), findsOneWidget);
+    await tester.drag(find.byIcon(Icons.location_pin), const Offset(40, 0));
+    await tester.pump();
+
+    expect(find.text('37.733000, -25.293000'), findsNothing);
   });
 }

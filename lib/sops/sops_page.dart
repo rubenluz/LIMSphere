@@ -28,6 +28,29 @@ part 'sops_widgets.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 class _DS {
+  static Color contextColor(String? context) {
+    switch (context) {
+      case 'culture_collection':
+        return const Color(0xFF10B981);
+      case 'fish_facility':
+        return const Color(0xFF0EA5E9);
+      case 'hplc':
+        return AppDS.purple;
+      case 'assays':
+        return AppDS.orange;
+      case 'reagent_preparation':
+        return AppDS.yellow;
+      case 'sampling':
+        return AppDS.blue;
+      case 'cleaning_maintenance':
+        return AppDS.green;
+      case 'molecular_biology':
+        return AppDS.pink;
+      default:
+        return AppDS.textSecondary;
+    }
+  }
+
   static Color typeColor(String? t) {
     switch (t) {
       case 'sop':
@@ -89,9 +112,8 @@ Color _tagColor(String tag) {
 // SopPage
 // ═════════════════════════════════════════════════════════════════════════════
 class SopPage extends StatefulWidget {
-  /// 'fish_facility' | 'culture_collection'
-  final String sopContext;
-  const SopPage({super.key, required this.sopContext});
+  final Map<String, dynamic> userInfo;
+  const SopPage({super.key, required this.userInfo});
 
   @override
   State<SopPage> createState() => _SopPageState();
@@ -105,6 +127,7 @@ class _SopPageState extends State<SopPage> {
   String? _error;
   String _filterType = 'all';
   String _filterStatus = 'all';
+  String _filterContext = 'all';
   bool _showFilters = false;
 
   @override
@@ -115,19 +138,6 @@ class _SopPageState extends State<SopPage> {
   }
 
   @override
-  void didUpdateWidget(SopPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.sopContext != widget.sopContext) {
-      _sops = [];
-      _filtered = [];
-      _filterType = 'all';
-      _filterStatus = 'all';
-      _search.clear();
-      _load();
-    }
-  }
-
-  @override
   void dispose() {
     _search.dispose();
     super.dispose();
@@ -135,9 +145,11 @@ class _SopPageState extends State<SopPage> {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   Future<void> _load() async {
-    final cacheKey = 'sops_${widget.sopContext}';
+    if (!mounted) return;
+    const cacheKey = 'sops_all';
     final cached = await DataCache.read(cacheKey);
-    if (cached != null && mounted) {
+    if (!mounted) return;
+    if (cached != null) {
       _sops = cached
           .map((r) => FacilitySop.fromMap(Map<String, dynamic>.from(r as Map)))
           .toList();
@@ -157,7 +169,6 @@ class _SopPageState extends State<SopPage> {
           await Supabase.instance.client
                   .from(SopSch.table)
                   .select()
-                  .eq(SopSch.context, widget.sopContext)
                   .order(SopSch.name)
               as List<dynamic>;
       await DataCache.write(cacheKey, rows);
@@ -177,7 +188,7 @@ class _SopPageState extends State<SopPage> {
   }
 
   void _applyFilter() {
-    var d = _sops.toList();
+    var d = _sops.where((s) => _accessFor(s.sopContext).canView).toList();
     final q = _search.text.toLowerCase();
     if (q.isNotEmpty) {
       d = d
@@ -188,7 +199,10 @@ class _SopPageState extends State<SopPage> {
                 (s.category?.toLowerCase().contains(q) ?? false) ||
                 (s.responsible?.toLowerCase().contains(q) ?? false) ||
                 (s.description?.toLowerCase().contains(q) ?? false) ||
-                (s.tags?.toLowerCase().contains(q) ?? false),
+                (s.tags?.toLowerCase().contains(q) ?? false) ||
+                FacilitySop.contextLabel(s.sopContext)
+                    .toLowerCase()
+                    .contains(q),
           )
           .toList();
     }
@@ -196,6 +210,9 @@ class _SopPageState extends State<SopPage> {
       d = d.where((s) => s.type == _filterType).toList();
     if (_filterStatus != 'all')
       d = d.where((s) => s.status == _filterStatus).toList();
+    if (_filterContext != 'all') {
+      d = d.where((s) => s.sopContext == _filterContext).toList();
+    }
     setState(() => _filtered = d);
   }
 
@@ -211,7 +228,10 @@ class _SopPageState extends State<SopPage> {
   }
 
   Future<void> _deleteSop(FacilitySop sop) async {
-    if (!context.requireModuleAction(ModuleAction.delete)) return;
+    if (!_accessFor(sop.sopContext).canDelete) {
+      context.warnReadOnly();
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (dlgCtx) => AlertDialog(
@@ -302,26 +322,53 @@ class _SopPageState extends State<SopPage> {
 
   void _showDialog({FacilitySop? sop}) async {
     final action = sop == null ? ModuleAction.create : ModuleAction.edit;
-    if (!context.requireModuleAction(action)) return;
+    final allowedContexts = FacilitySop.contexts
+        .where((value) => _accessFor(value).allows(action))
+        .toList();
+    if (sop != null && !_accessFor(sop.sopContext).allows(action)) {
+      context.warnReadOnly();
+      return;
+    }
+    if (allowedContexts.isEmpty) {
+      context.warnReadOnly();
+      return;
+    }
     final saved = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _SopDialog(sop: sop, sopContext: widget.sopContext),
+      builder: (_) => _SopDialog(sop: sop, allowedContexts: allowedContexts),
     );
     if (saved == true) _load();
   }
 
-  bool get _hasActiveFilter => _filterType != 'all' || _filterStatus != 'all';
+  bool get _hasActiveFilter =>
+      _filterType != 'all' || _filterStatus != 'all' || _filterContext != 'all';
+
+  ModuleAccess _accessFor(String? sopContext) {
+    final moduleId = switch (sopContext) {
+      'fish_facility' => 'sops_fish',
+      'hplc' ||
+      'assays' ||
+      'reagent_preparation' ||
+      'sampling' ||
+      'cleaning_maintenance' ||
+      'molecular_biology' => 'sops_resources',
+      _ => 'sops_inventory',
+    };
+    return resolveModuleAccess(moduleId: moduleId, userRow: widget.userInfo);
+  }
 
   Future<void> _exportCsv() async {
     if (!context.requireModuleAction(ModuleAction.export)) return;
     final buf = StringBuffer();
     buf.writeln(
-      'Code,Name,Type,Status,Category,Responsible,Version,Review Date,Tags,Description',
+      'Code,Name,Subcategory,Type,Status,Category,Responsible,Version,Review Date,Tags,Description',
     );
-    for (final s in _filtered) {
+    for (final s in _filtered.where(
+      (s) => _accessFor(s.sopContext).canExport,
+    )) {
       buf.writeln(
-        '"${s.code ?? ''}","${s.name}","${FacilitySop.typeLabel(s.type)}","${FacilitySop.statusLabel(s.status)}","${s.category ?? ''}","${s.responsible ?? ''}","${s.version ?? ''}","${s.reviewDate != null ? _dateFmt.format(s.reviewDate!) : ''}","${s.tags ?? ''}","${(s.description ?? '').replaceAll('"', "'")}"',
+        '"${s.code ?? ''}","${s.name}","${FacilitySop.contextLabel(s.sopContext)}","${FacilitySop.typeLabel(s.type)}","${FacilitySop.statusLabel(s.status)}","${s.category ?? ''}","${s.responsible ?? ''}","${s.version ?? ''}","${s.reviewDate != null ? _dateFmt.format(s.reviewDate!) : ''}","${s.tags ?? ''}","${(s.description ?? '').replaceAll('"', "'")}"',
       );
     }
     try {
@@ -340,7 +387,9 @@ class _SopPageState extends State<SopPage> {
 
   Future<void> _downloadAllFiles() async {
     if (!context.requireModuleAction(ModuleAction.export)) return;
-    final toDownload = _filtered.where((s) => s.hasAnyFile).toList();
+    final toDownload = _filtered
+        .where((s) => s.hasAnyFile && _accessFor(s.sopContext).canExport)
+        .toList();
     if (toDownload.isEmpty) {
       _snack('No files to download in the current selection.');
       return;
@@ -401,6 +450,43 @@ class _SopPageState extends State<SopPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          Row(
+            children: [
+              Text(
+                'Subcategory',
+                style: GoogleFonts.spaceGrotesk(
+                  color: context.appTextMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 12),
+              _FilterChip(
+                label: 'All',
+                selected: _filterContext == 'all',
+                onTap: () {
+                  setState(() => _filterContext = 'all');
+                  _applyFilter();
+                },
+              ),
+              ...FacilitySop.contexts
+                  .where((value) => _accessFor(value).canView)
+                  .map(
+                    (value) => Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: _FilterChip(
+                        label: FacilitySop.contextLabel(value),
+                        selected: _filterContext == value,
+                        onTap: () {
+                          setState(() => _filterContext = value);
+                          _applyFilter();
+                        },
+                      ),
+                    ),
+                  ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               Text(

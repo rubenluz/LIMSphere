@@ -3,8 +3,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../supabase/core_tables_sql.dart';
 import '../supabase/supabase_manager.dart';
+import 'database_initializer.dart';
 
 class SetupPage extends StatefulWidget {
   const SetupPage({super.key});
@@ -19,9 +21,8 @@ class _SetupPageState extends State<SetupPage> {
   Future<void> _copySQL() async {
     await Clipboard.setData(ClipboardData(text: coreTablesSQL));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('SQL copied to clipboard')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('SQL copied to clipboard')));
   }
 
   Future<void> _checkDatabase() async {
@@ -29,17 +30,17 @@ class _SetupPageState extends State<SetupPage> {
     setState(() => isLoading = true);
 
     try {
-      final ready = await SupabaseManager.checkInitialized();
+      final result = await DatabaseInitializer.checkDatabase();
       if (!mounted) return;
 
-      if (ready) {
+      if (result.isReady) {
         final adminExists = await SupabaseManager.adminExists();
         if (!mounted) return;
         Navigator.pushReplacementNamed(
           context,
           adminExists ? '/login' : '/set_admin_login',
         );
-      } else {
+      } else if (result.needsSetup) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -48,12 +49,46 @@ class _SetupPageState extends State<SetupPage> {
             duration: Duration(seconds: 4),
           ),
         );
+      } else {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(Icons.error_outline),
+            title: Text(result.title),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(result.message),
+                if (result.technicalDetails case final details?) ...[
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    details,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushReplacementNamed(context, '/connections');
+                },
+                child: const Text('Connections'),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -84,14 +119,22 @@ class _SetupPageState extends State<SetupPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(children: [
-                      Icon(Icons.info_outline,
-                          color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(width: 8),
-                      const Text('Database not initialized',
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Database not initialized',
                           style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
-                    ]),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     const Text(
                       'Copy the SQL below and run it in your Supabase SQL Editor, '
@@ -107,9 +150,7 @@ class _SetupPageState extends State<SetupPage> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 padding: const EdgeInsets.all(12),
@@ -117,7 +158,9 @@ class _SetupPageState extends State<SetupPage> {
                   child: SelectableText(
                     coreTablesSQL,
                     style: const TextStyle(
-                        fontFamily: 'monospace', fontSize: 12),
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ),

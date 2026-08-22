@@ -1,9 +1,8 @@
 // register_page.dart - User registration form: email, password, display name;
-// creates Supabase auth user, inserts users-table row, logs in, navigates to menu.
+// creates a pending Supabase user/profile, signs out, and waits for admin approval.
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
-import '../core/local_storage.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -13,17 +12,17 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  final _nameCtrl        = TextEditingController();
-  final _emailCtrl       = TextEditingController();
-  final _passwordCtrl    = TextEditingController();
-  final _confirmCtrl     = TextEditingController();
-  final _phoneCtrl       = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   final _institutionCtrl = TextEditingController();
-  final _groupCtrl       = TextEditingController();
+  final _groupCtrl = TextEditingController();
 
-  bool _showPassword        = false;
+  bool _showPassword = false;
   bool _showConfirmPassword = false;
-  bool _loading             = false;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -38,10 +37,10 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _submit() async {
-    final name     = _nameCtrl.text.trim();
-    final email    = _emailCtrl.text.trim();
+    final name = _nameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
-    final confirm  = _confirmCtrl.text;
+    final confirm = _confirmCtrl.text;
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) {
       _snack('Name, email and password are required.');
@@ -57,19 +56,29 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     setState(() => _loading = true);
+    var authUserCreated = false;
     try {
       final res = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
       );
       if (res.user == null) throw Exception('Registration failed.');
+      authUserCreated = true;
 
       await Supabase.instance.client.from('users').insert({
-        'user_name':        name,
-        'user_email':       email,
-        'user_role':        'researcher',
-        'user_status':      'active',
-        'user_last_login':  DateTime.now().toIso8601String(),
+        'user_auth_uid': res.user!.id,
+        'user_name': name,
+        'user_email': email,
+        'user_role': 'researcher',
+        'user_status': 'pending',
+        'user_table_dashboard': 'none',
+        'user_table_labels': 'none',
+        'user_table_chat': 'none',
+        'user_table_backups': 'none',
+        'user_table_culture_collection': 'none',
+        'user_table_fish_facility': 'none',
+        'user_table_resources': 'none',
+        'user_permissions_json': const <String, dynamic>{},
         if (_phoneCtrl.text.trim().isNotEmpty)
           'user_phone': _phoneCtrl.text.trim(),
         if (_institutionCtrl.text.trim().isNotEmpty)
@@ -78,13 +87,44 @@ class _RegisterPageState extends State<RegisterPage> {
           'user_group': _groupCtrl.text.trim(),
       });
 
-      await LocalStorage.saveSessionExpiry(0);
+      // signUp creates a session when email confirmation is disabled. A pending
+      // account must never retain that session or enter the application.
+      await Supabase.instance.client.auth.signOut();
 
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/menu');
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.hourglass_top_rounded, size: 40),
+          title: const Text('Registration submitted'),
+          content: const Text(
+            'Your account is waiting for administrator validation. After it is activated and permissions are assigned, you can sign in.',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Back to login'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/login');
     } on AuthException catch (e) {
+      if (authUserCreated) {
+        try {
+          await Supabase.instance.client.auth.signOut();
+        } catch (_) {}
+      }
       _snack('Error: ${e.message}');
     } catch (e) {
+      if (authUserCreated) {
+        try {
+          await Supabase.instance.client.auth.signOut();
+        } catch (_) {}
+      }
       _snack('Error: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -117,15 +157,19 @@ class _RegisterPageState extends State<RegisterPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.person_add_outlined,
-                      size: 52,
-                      color: Theme.of(context).colorScheme.primary),
+                  Icon(
+                    Icons.person_add_outlined,
+                    size: 52,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   const SizedBox(height: 12),
-                  const Text('Create account',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Create account',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Create your account to get started.',
+                    'Create an account request. An administrator must validate it and assign access before you can sign in.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 13, color: Colors.grey),
                   ),
@@ -162,9 +206,11 @@ class _RegisterPageState extends State<RegisterPage> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
-                        icon: Icon(_showPassword
-                            ? Icons.visibility_off
-                            : Icons.visibility),
+                        icon: Icon(
+                          _showPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
                         onPressed: () =>
                             setState(() => _showPassword = !_showPassword),
                       ),
@@ -181,27 +227,36 @@ class _RegisterPageState extends State<RegisterPage> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
-                        icon: Icon(_showConfirmPassword
-                            ? Icons.visibility_off
-                            : Icons.visibility),
+                        icon: Icon(
+                          _showConfirmPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
                         onPressed: () => setState(
-                            () => _showConfirmPassword = !_showConfirmPassword),
+                          () => _showConfirmPassword = !_showConfirmPassword,
+                        ),
                       ),
                     ),
                   ),
 
                   // ── Optional fields ────────────────────────────────────────
                   const SizedBox(height: 20),
-                  Row(children: [
-                    const Expanded(child: Divider()),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Text('Optional',
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          'Optional',
                           style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade500)),
-                    ),
-                    const Expanded(child: Divider()),
-                  ]),
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
                   const SizedBox(height: 14),
 
                   TextField(
@@ -246,7 +301,10 @@ class _RegisterPageState extends State<RegisterPage> {
                               height: 18,
                               width: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                           : const Text('Register'),
                     ),
                   ),

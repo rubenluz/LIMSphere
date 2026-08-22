@@ -198,8 +198,10 @@ class _FishStocksPageState extends State<FishStocksPage> {
   }
 
   Future<void> _loadStocks() async {
+    if (!mounted) return;
     final cached = await DataCache.read('fish_stocks_stocks');
-    if (cached != null && mounted) {
+    if (!mounted) return;
+    if (cached != null) {
       _stocks = cached.cast<Map<String, dynamic>>().map(_stockFromRow).toList();
       _applyFilters();
       setState(() {

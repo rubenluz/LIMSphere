@@ -24,6 +24,7 @@ import 'detail_widgets.dart';
 import 'location_model.dart';
 import 'location_detail_page.dart';
 import 'room_detail_page.dart';
+import 'room_inventory_pdf.dart';
 
 part 'locations_widgets.dart';
 
@@ -45,6 +46,7 @@ class _LocationsPageState extends State<LocationsPage> {
   List<LocationModel> _orphans = [];
   List<Map<String, dynamic>> _users = [];
   bool _loading = true;
+  int? _exportingRoomPdfId;
   String _search = '';
   final _searchCtrl = TextEditingController();
 
@@ -114,7 +116,9 @@ class _LocationsPageState extends State<LocationsPage> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     final cached = await DataCache.read('storage_locations');
+    if (!mounted) return;
     if (cached != null) {
       await _applyRawRows(cached);
     } else if (mounted) {
@@ -142,7 +146,7 @@ class _LocationsPageState extends State<LocationsPage> {
     }
     try {
       final userRows = await Supabase.instance.client
-          .from('users')
+          .from('user_directory')
           .select(
             'user_id, user_email, user_name, user_phone, '
             'user_institution, user_group, user_role',
@@ -364,15 +368,18 @@ class _LocationsPageState extends State<LocationsPage> {
 
   // ── Actions ───────────────────────────────────────────────────────────────────
 
-  void _navigate(LocationModel loc) => Navigator.push(
-    context,
-    modulePageRoute(
-      context: context,
-      child: loc.isRoom
-          ? RoomDetailPage(locationId: loc.id)
-          : LocationDetailPage(locationId: loc.id),
-    ),
-  ).then((_) => _load());
+  void _navigate(LocationModel loc) =>
+      Navigator.push(
+        context,
+        modulePageRoute(
+          context: context,
+          child: loc.isRoom
+              ? RoomDetailPage(locationId: loc.id)
+              : LocationDetailPage(locationId: loc.id),
+        ),
+      ).then((_) {
+        if (mounted) _load();
+      });
 
   Future<void> _showEditAllDialog(
     LocationModel room,
@@ -390,6 +397,7 @@ class _LocationsPageState extends State<LocationsPage> {
         children: children,
       ),
     );
+    if (!mounted) return;
     if (ok == true) _load();
   }
 
@@ -409,6 +417,7 @@ class _LocationsPageState extends State<LocationsPage> {
             : LocationModel.genericLocationType,
       ),
     );
+    if (!mounted) return;
     if (ok == true) _load();
   }
 
@@ -456,6 +465,92 @@ class _LocationsPageState extends State<LocationsPage> {
     }
   }
 
+  Future<void> _exportRoomPdf(LocationModel room) async {
+    if (_exportingRoomPdfId != null) return;
+    if (!context.requireModuleAction(ModuleAction.export)) return;
+    setState(() => _exportingRoomPdfId = room.id);
+    try {
+      final locations = List<LocationModel>.from(_childMap[room.id] ?? const [])
+        ..sort(_bySortOrderThenName);
+      final locationIds = <int>[room.id, ...locations.map((item) => item.id)];
+      final rows = await Supabase.instance.client
+          .from('reagents')
+          .select(
+            'reagent_name, reagent_code, reagent_location_id, '
+            'reagent_responsible, reagent_storage_temp, reagent_unit, '
+            'reagent_remaining_amount, reagent_container_count, '
+            'reagent_expiry_date',
+          )
+          .inFilter('reagent_location_id', locationIds)
+          .order('reagent_name');
+      final reagents = <RoomInventoryReagent>[
+        for (final raw in rows as List<dynamic>)
+          _roomInventoryReagent(Map<String, dynamic>.from(raw as Map)),
+      ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      final pdf = await RoomInventoryPdf.build(
+        room: room,
+        roomCode:
+            room.code ??
+            roomCode(_rooms.indexWhere((item) => item.id == room.id)),
+        locations: locations,
+        reagents: reagents,
+        responsiblePeople: RoomInventoryPdf.resolveResponsiblePeople(
+          room: room,
+          locations: locations,
+          users: _users,
+        ),
+      );
+      final directory =
+          await getDownloadsDirectory() ??
+          await getApplicationDocumentsDirectory();
+      final safeRoomName = room.name
+          .trim()
+          .replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_')
+          .replaceAll(RegExp(r'_+'), '_');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final file = File(
+        '${directory.path}/room_${safeRoomName.isEmpty ? room.id : safeRoomName}_$timestamp.pdf',
+      );
+      await file.writeAsBytes(pdf, flush: true);
+      final openResult = await OpenFilex.open(file.path);
+      if (!mounted) return;
+      if (openResult.type != ResultType.done) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('PDF saved to ${file.path}')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Room PDF export failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _exportingRoomPdfId = null);
+    }
+  }
+
+  RoomInventoryReagent _roomInventoryReagent(Map<String, dynamic> row) {
+    final amount = row['reagent_remaining_amount'];
+    final count = row['reagent_container_count'];
+    final unit = (row['reagent_unit'] as String?)?.trim();
+    final quantityParts = <String>[
+      if (amount != null)
+        '$amount${unit == null || unit.isEmpty ? '' : ' $unit'}',
+      if (count != null) '$count container${count == 1 ? '' : 's'}',
+    ];
+    return RoomInventoryReagent(
+      name: (row['reagent_name'] as String?)?.trim().isNotEmpty == true
+          ? (row['reagent_name'] as String).trim()
+          : 'Unnamed reagent',
+      code: row['reagent_code'] as String?,
+      locationId: (row['reagent_location_id'] as num?)?.toInt(),
+      responsible: row['reagent_responsible'] as String?,
+      storageTemperature: row['reagent_storage_temp'] as String?,
+      quantity: quantityParts.isEmpty ? null : quantityParts.join(' / '),
+      expiryDate: row['reagent_expiry_date']?.toString(),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
@@ -473,6 +568,7 @@ class _LocationsPageState extends State<LocationsPage> {
   }
 
   Widget _buildToolbar(BuildContext context) {
+    final viewportWidth = MediaQuery.sizeOf(context).width;
     return Container(
       height: 56,
       decoration: BoxDecoration(
@@ -482,7 +578,7 @@ class _LocationsPageState extends State<LocationsPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          if (MediaQuery.of(context).size.width < 700) ...[
+          if (viewportWidth < 700) ...[
             IconButton(
               icon: const Icon(Icons.menu_rounded, size: 20),
               color: context.appTextSecondary,
@@ -491,15 +587,17 @@ class _LocationsPageState extends State<LocationsPage> {
             ),
           ],
           const Icon(Icons.place_outlined, color: Color(0xFF6366F1), size: 18),
-          const SizedBox(width: 8),
-          Text(
-            'Rooms & Locations',
-            style: GoogleFonts.spaceGrotesk(
-              color: context.appTextPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+          if (viewportWidth >= 620) ...[
+            const SizedBox(width: 8),
+            Text(
+              'Rooms & Locations',
+              style: GoogleFonts.spaceGrotesk(
+                color: context.appTextPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+          ],
           const SizedBox(width: 16),
           Expanded(
             child: SizedBox(
@@ -555,7 +653,7 @@ class _LocationsPageState extends State<LocationsPage> {
             ),
           ),
           const SizedBox(width: 8),
-          if (!_loading) ...[
+          if (!_loading && viewportWidth >= 1100) ...[
             _buildSummaryChip(
               context,
               icon: Icons.meeting_room_outlined,
@@ -773,6 +871,10 @@ class _LocationsPageState extends State<LocationsPage> {
                                   ),
                           },
                           onTap: () => _navigate(room),
+                          onExportPdf: _exportingRoomPdfId == null
+                              ? () => _exportRoomPdf(room)
+                              : null,
+                          exportingPdf: _exportingRoomPdfId == room.id,
                           onTapChild: _navigate,
                           onAddChild: () => _showDialog(
                             defaultParentId: room.id,

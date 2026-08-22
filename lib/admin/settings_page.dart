@@ -58,13 +58,13 @@ class _SettingsPageState extends State<SettingsPage> {
       'culture_collection',
       'Culture Collection',
       Icons.inventory_2_outlined,
-      'Strains, samples, requests and SOPs',
+      'Strains, samples, collection records and map',
     ),
     _GroupDef(
       'fish_facility',
       'Fish Facility',
       Icons.water_outlined,
-      'Fish stock, tank map, lines and SOPs',
+      'Fish stock, tank map, lines and water quality',
     ),
     _GroupDef(
       'resources',
@@ -139,31 +139,34 @@ class _SettingsPageState extends State<SettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            height: 56,
+            height: AppDS.moduleToolbarHeight,
             decoration: BoxDecoration(
               color: context.appSurface2,
               border: Border(bottom: BorderSide(color: context.appBorder)),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: AppDS.moduleToolbarPadding,
             child: Row(
               children: [
                 if (MediaQuery.of(context).size.width < 700) ...[
                   IconButton(
-                    icon: const Icon(Icons.menu_rounded, size: 20),
+                    icon: const Icon(
+                      Icons.menu_rounded,
+                      size: AppDS.moduleMenuIconSize,
+                    ),
                     color: context.appTextSecondary,
                     tooltip: 'Menu',
                     onPressed: () => Scaffold.of(context).openDrawer(),
                   ),
                 ],
-                const Icon(Icons.settings_outlined, color: _accent, size: 20),
-                const SizedBox(width: 10),
+                const Icon(
+                  Icons.settings_outlined,
+                  color: _accent,
+                  size: AppDS.moduleTitleIconSize,
+                ),
+                const SizedBox(width: 8),
                 Text(
                   'App Settings',
-                  style: TextStyle(
-                    color: context.appTextPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppDS.moduleTitle(context.appTextPrimary),
                 ),
                 const Spacer(),
                 if (_saving)

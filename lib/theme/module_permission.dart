@@ -12,12 +12,14 @@ const kModulePermissionColumns = <String, String>{
   'backups': 'user_table_backups',
   'strains': 'user_table_culture_collection',
   'samples': 'user_table_culture_collection',
+  'culture_map': 'user_table_culture_collection',
   'sops_inventory': 'user_table_culture_collection',
   'fish_stock': 'user_table_fish_facility',
   'fish_tankmap': 'user_table_fish_facility',
   'fish_lines': 'user_table_fish_facility',
   'fish_water_qc': 'user_table_fish_facility',
   'sops_fish': 'user_table_fish_facility',
+  'sops_resources': 'user_table_resources',
   'lab': 'user_table_resources',
   'locations': 'user_table_resources',
   'reagents': 'user_table_resources',
@@ -33,12 +35,14 @@ const kModuleRequiredRoles = <String, String?>{
   'tools': null,
   'strains': null,
   'samples': 'technician',
+  'culture_map': 'technician',
   'sops_inventory': 'technician',
   'fish_stock': null,
   'fish_tankmap': 'technician',
   'fish_lines': 'technician',
   'fish_water_qc': 'technician',
   'sops_fish': 'technician',
+  'sops_resources': 'technician',
   'lab': 'technician',
   'locations': 'technician',
   'reagents': 'technician',
@@ -59,12 +63,14 @@ const kPermissionModuleLabels = <String, String>{
   'tools': 'Tools',
   'strains': 'Strains',
   'samples': 'Samples',
+  'culture_map': 'Map',
   'sops_inventory': 'Culture SOPs',
   'fish_stock': 'Fish Stock',
   'fish_tankmap': 'Tank Map',
   'fish_lines': 'Fish Lines',
   'fish_water_qc': 'Water QC',
   'sops_fish': 'Fish SOPs',
+  'sops_resources': 'Laboratory SOPs',
   'lab': 'Lab Map',
   'locations': 'Locations',
   'reagents': 'Reagents',
@@ -76,8 +82,8 @@ const kPermissionModuleLabels = <String, String>{
 };
 
 const kPermissionModuleGroups = <String, List<String>>{
-  'Overview': ['dashboard', 'labels', 'chat', 'backups', 'requests', 'tools'],
-  'Culture Collection': ['strains', 'samples', 'sops_inventory'],
+  'Overview': ['dashboard', 'labels', 'chat', 'backups', 'requests'],
+  'Culture Collection': ['strains', 'samples', 'culture_map', 'sops_inventory'],
   'Fish Facility': [
     'fish_stock',
     'fish_tankmap',
@@ -85,7 +91,14 @@ const kPermissionModuleGroups = <String, List<String>>{
     'fish_water_qc',
     'sops_fish',
   ],
-  'Resources': ['lab', 'locations', 'reagents', 'equipment', 'reservations'],
+  'Resources': [
+    'lab',
+    'locations',
+    'reagents',
+    'equipment',
+    'reservations',
+    'sops_resources',
+  ],
   'Admin': ['audit', 'users', 'settings'],
 };
 
@@ -285,6 +298,17 @@ ModuleAccess resolveModuleAccess({
   required String moduleId,
   required Map<String, dynamic> userRow,
 }) {
+  // A role or permission assignment never validates an account. When status is
+  // present, only an explicitly active profile can receive module access.
+  final status = userRow['user_status']?.toString().trim().toLowerCase();
+  if (status != null && status != 'active') {
+    return ModuleAccess.none(moduleId: moduleId);
+  }
+
+  // Lab Tools are utility calculators available to every active signed-in
+  // user; granular page/action permissions do not apply to them.
+  if (moduleId == 'tools') return const ModuleAccess.full(moduleId: 'tools');
+
   final userRole = userRow['user_role']?.toString() ?? '';
   if (_hasRole(userRole, 'superadmin')) {
     return ModuleAccess.full(moduleId: moduleId);

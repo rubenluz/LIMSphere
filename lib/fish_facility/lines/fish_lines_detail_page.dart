@@ -344,6 +344,7 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
 
   // ── Supabase ───────────────────────────────────────────────────────────────
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final id = widget.fishLine.fishlineId;
@@ -470,6 +471,7 @@ class _FishLineDetailPageState extends State<FishLineDetailPage> {
             .from(FishSch.linesTable)
             .upsert(payload, onConflict: FishSch.lineName);
       }
+      if (!mounted) return;
       setState(
         () => _data[FishSch.lineUpdatedAt] = payload[FishSch.lineUpdatedAt],
       );

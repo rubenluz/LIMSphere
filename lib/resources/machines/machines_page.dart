@@ -12,6 +12,7 @@ import 'dart:io';
 
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 
 import '/core/data_cache.dart';
@@ -34,10 +35,12 @@ class MachinesPage extends StatefulWidget {
 }
 
 class _MachinesPageState extends State<MachinesPage> {
+  static const _actionWidth = 60.0;
   List<MachineModel> _all = [];
   List<MachineModel> _filtered = [];
   bool _loading = true;
   String _statusFilter = 'all';
+  bool _showFilters = false;
   final _searchCtrl = TextEditingController();
   String _sortKey = 'name';
   bool _sortAsc = true;
@@ -46,6 +49,19 @@ class _MachinesPageState extends State<MachinesPage> {
   final _horizCtrl = ScrollController();
   final _hOffset = ValueNotifier<double>(0);
   final _vOffset = ValueNotifier<double>(0);
+  final Map<String, double> _columnWidths = {};
+
+  double _columnWidth((String, String, double) column) =>
+      _columnWidths[column.$1] ?? column.$3;
+
+  double _widthFor(String key) =>
+      _columnWidth(_cols.firstWhere((column) => column.$1 == key));
+
+  double get _tableWidth =>
+      _actionWidth +
+      _cols.fold(0.0, (sum, column) => sum + _columnWidth(column));
+
+  bool get _hasActiveFilter => _statusFilter != 'all';
 
   static const _cols = [
     ('name', 'Name', 180.0),
@@ -64,8 +80,31 @@ class _MachinesPageState extends State<MachinesPage> {
   @override
   void initState() {
     super.initState();
+    _loadColumnWidths();
     _load();
     _searchCtrl.addListener(_applyFilters);
+  }
+
+  Future<void> _loadColumnWidths() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    final savedWidths = <String, double>{};
+    for (final column in _cols) {
+      final width = preferences.getDouble('machines.column_width.${column.$1}');
+      if (width != null) savedWidths[column.$1] = width;
+    }
+    if (savedWidths.isNotEmpty) {
+      setState(() => _columnWidths.addAll(savedWidths));
+    }
+  }
+
+  Future<void> _saveColumnWidth(String key) async {
+    final preferences = await SharedPreferences.getInstance();
+    final column = _cols.firstWhere((item) => item.$1 == key);
+    await preferences.setDouble(
+      'machines.column_width.$key',
+      _columnWidth(column),
+    );
   }
 
   @override
@@ -91,8 +130,10 @@ class _MachinesPageState extends State<MachinesPage> {
       }).toList();
 
   Future<void> _load() async {
+    if (!mounted) return;
     final cached = await DataCache.read('equipment');
-    if (cached != null && mounted) {
+    if (!mounted) return;
+    if (cached != null) {
       setState(() {
         _all = _machinesFromRaw(cached);
         _loading = false;
@@ -240,16 +281,15 @@ class _MachinesPageState extends State<MachinesPage> {
       await file.writeAsString(buf.toString());
       await OpenFilex.open(file.path);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final tableWidth = _cols.fold(0.0, (s, c) => s + c.$3) + 56;
-
     return Column(
       children: [
         // ── Toolbar ──────────────────────────────────────────────────────────────
@@ -272,7 +312,7 @@ class _MachinesPageState extends State<MachinesPage> {
               ],
               const Icon(
                 Icons.precision_manufacturing_outlined,
-                color: Color(0xFF14B8A6),
+                color: AppDS.machinesAccent,
                 size: 18,
               ),
               const SizedBox(width: 8),
@@ -288,14 +328,88 @@ class _MachinesPageState extends State<MachinesPage> {
               Expanded(
                 child: SizedBox(
                   height: 36,
-                  child: AppSearchBar(
+                  child: TextField(
                     controller: _searchCtrl,
-                    hint: 'Search machines\u2026',
-                    onClear: _applyFilters,
+                    style: GoogleFonts.spaceGrotesk(
+                      color: context.appTextPrimary,
+                      fontSize: 13,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search machines...',
+                      hintStyle: GoogleFonts.spaceGrotesk(
+                        color: context.appTextMuted,
+                        fontSize: 13,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: context.appTextMuted,
+                        size: 16,
+                      ),
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.clear,
+                                size: 14,
+                                color: context.appTextMuted,
+                              ),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                _applyFilters();
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: context.appSurface3,
+                      contentPadding: EdgeInsets.zero,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: context.appBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: context.appBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                          color: AppDS.machinesAccent,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+              Tooltip(
+                message: _showFilters ? 'Hide filters' : 'Show filters',
+                child: Stack(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.tune,
+                        color: _showFilters
+                            ? AppDS.machinesAccent
+                            : context.appTextSecondary,
+                        size: 18,
+                      ),
+                      onPressed: () =>
+                          setState(() => _showFilters = !_showFilters),
+                    ),
+                    if (_hasActiveFilter)
+                      const Positioned(
+                        right: 6,
+                        top: 6,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppDS.machinesAccent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: SizedBox(width: 7, height: 7),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
               Tooltip(
                 message: 'Export CSV',
                 child: IconButton(
@@ -310,7 +424,7 @@ class _MachinesPageState extends State<MachinesPage> {
               const SizedBox(width: 4),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF14B8A6),
+                  backgroundColor: AppDS.machinesAccent,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -324,7 +438,7 @@ class _MachinesPageState extends State<MachinesPage> {
                 onPressed: () => _showAddEditDialog(),
                 icon: const Icon(Icons.add, size: 16),
                 label: Text(
-                  'Add Machine',
+                  'Add',
                   style: GoogleFonts.spaceGrotesk(fontSize: 13),
                 ),
               ),
@@ -333,73 +447,80 @@ class _MachinesPageState extends State<MachinesPage> {
         ),
 
         // ── Status filter chips ──────────────────────────────────────────────────
-        Container(
-          height: 44,
-          decoration: BoxDecoration(
-            color: context.appBg,
-            border: Border(bottom: BorderSide(color: context.appBorder)),
+        if (_showFilters)
+          Container(
+            decoration: BoxDecoration(
+              color: context.appSurface,
+              border: Border(bottom: BorderSide(color: context.appBorder)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Text(
+                  'Status',
+                  style: GoogleFonts.spaceGrotesk(
+                    color: context.appTextMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _Chip(
+                  label: 'All (${_all.length})',
+                  selected: _statusFilter == 'all',
+                  color: AppDS.machinesAccent,
+                  onTap: () {
+                    _statusFilter = 'all';
+                    _applyFilters();
+                  },
+                ),
+                const SizedBox(width: 8),
+                _Chip(
+                  label:
+                      'Operational (${_all.where((m) => m.status == 'operational').length})',
+                  selected: _statusFilter == 'operational',
+                  color: AppDS.green,
+                  onTap: () {
+                    _statusFilter = 'operational';
+                    _applyFilters();
+                  },
+                ),
+                const SizedBox(width: 8),
+                _Chip(
+                  label:
+                      'Maintenance (${_all.where((m) => m.status == 'maintenance').length})',
+                  selected: _statusFilter == 'maintenance',
+                  color: AppDS.orange,
+                  onTap: () {
+                    _statusFilter = 'maintenance';
+                    _applyFilters();
+                  },
+                ),
+                const SizedBox(width: 8),
+                _Chip(
+                  label:
+                      'Broken (${_all.where((m) => m.status == 'broken').length})',
+                  selected: _statusFilter == 'broken',
+                  color: AppDS.red,
+                  onTap: () {
+                    _statusFilter = 'broken';
+                    _applyFilters();
+                  },
+                ),
+                const SizedBox(width: 8),
+                _Chip(
+                  label:
+                      'Retired (${_all.where((m) => m.status == 'retired').length})',
+                  selected: _statusFilter == 'retired',
+                  color: AppDS.textMuted,
+                  onTap: () {
+                    _statusFilter = 'retired';
+                    _applyFilters();
+                  },
+                ),
+              ],
+            ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              _Chip(
-                label: 'All (${_all.length})',
-                selected: _statusFilter == 'all',
-                color: AppDS.accent,
-                onTap: () {
-                  _statusFilter = 'all';
-                  _applyFilters();
-                },
-              ),
-              const SizedBox(width: 8),
-              _Chip(
-                label:
-                    'Operational (${_all.where((m) => m.status == 'operational').length})',
-                selected: _statusFilter == 'operational',
-                color: AppDS.green,
-                onTap: () {
-                  _statusFilter = 'operational';
-                  _applyFilters();
-                },
-              ),
-              const SizedBox(width: 8),
-              _Chip(
-                label:
-                    'Maintenance (${_all.where((m) => m.status == 'maintenance').length})',
-                selected: _statusFilter == 'maintenance',
-                color: AppDS.orange,
-                onTap: () {
-                  _statusFilter = 'maintenance';
-                  _applyFilters();
-                },
-              ),
-              const SizedBox(width: 8),
-              _Chip(
-                label:
-                    'Broken (${_all.where((m) => m.status == 'broken').length})',
-                selected: _statusFilter == 'broken',
-                color: AppDS.red,
-                onTap: () {
-                  _statusFilter = 'broken';
-                  _applyFilters();
-                },
-              ),
-              const SizedBox(width: 8),
-              _Chip(
-                label:
-                    'Retired (${_all.where((m) => m.status == 'retired').length})',
-                selected: _statusFilter == 'retired',
-                color: AppDS.textMuted,
-                onTap: () {
-                  _statusFilter = 'retired';
-                  _applyFilters();
-                },
-              ),
-            ],
-          ),
-        ),
-
-        Container(height: 1, color: context.appBorder),
 
         // ── Table ─────────────────────────────────────────────────────────────────
         Expanded(
@@ -470,7 +591,7 @@ class _MachinesPageState extends State<MachinesPage> {
                                     controller: _horizCtrl,
                                     scrollDirection: Axis.horizontal,
                                     child: SizedBox(
-                                      width: tableWidth,
+                                      width: _tableWidth,
                                       child: Column(
                                         children: [
                                           // Sticky header
@@ -479,24 +600,11 @@ class _MachinesPageState extends State<MachinesPage> {
                                             color: context.appHeaderBg,
                                             child: Row(
                                               children: [
-                                                const SizedBox(width: 56),
+                                                const SizedBox(
+                                                  width: _actionWidth,
+                                                ),
                                                 ..._cols.map(
-                                                  (c) => SizedBox(
-                                                    width: c.$3,
-                                                    child: Padding(
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 6,
-                                                          ),
-                                                      child: SortHeader(
-                                                        label: c.$2,
-                                                        columnKey: c.$1,
-                                                        sortKey: _sortKey,
-                                                        sortAsc: _sortAsc,
-                                                        onSort: _sort,
-                                                      ),
-                                                    ),
-                                                  ),
+                                                  _buildResizableHeader,
                                                 ),
                                               ],
                                             ),
@@ -546,7 +654,7 @@ class _MachinesPageState extends State<MachinesPage> {
                       ),
                       const SizedBox(height: 4),
                       AppHorizontalThumb(
-                        contentWidth: tableWidth,
+                        contentWidth: _tableWidth,
                         offset: _hOffset,
                         onScrollTo: (x) {
                           final max = _horizCtrl.hasClients
@@ -566,16 +674,58 @@ class _MachinesPageState extends State<MachinesPage> {
   }
 
   // ── Row builder ─────────────────────────────────────────────────────────────
+  Widget _buildResizableHeader((String, String, double) column) {
+    final width = _columnWidth(column);
+    return SizedBox(
+      width: width,
+      height: AppDS.tableHeaderH,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 6, right: 12),
+              child: SortHeader(
+                label: column.$2,
+                columnKey: column.$1,
+                sortKey: _sortKey,
+                sortAsc: _sortAsc,
+                onSort: _sort,
+              ),
+            ),
+          ),
+          Positioned(
+            right: -4,
+            top: 0,
+            bottom: 0,
+            width: 8,
+            child: AppColumnResizeHandle(
+              color: AppDS.machinesAccent,
+              onDrag: (delta) => setState(
+                () => _columnWidths[column.$1] = (_columnWidth(column) + delta)
+                    .clamp(56.0, 600.0),
+              ),
+              onDragEnd: () => _saveColumnWidth(column.$1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRow(MachineModel m, int rowIndex) {
     final rowBg = rowIndex.isEven ? context.appSurface : context.appSurface2;
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        modulePageRoute(
-          context: context,
-          child: MachineDetailPage(machineId: m.id),
-        ),
-      ).then((_) => _load()),
+      onTap: () =>
+          Navigator.push(
+            context,
+            modulePageRoute(
+              context: context,
+              child: MachineDetailPage(machineId: m.id),
+            ),
+          ).then((_) {
+            if (mounted) _load();
+          }),
       child: Container(
         decoration: BoxDecoration(
           color: rowBg,
@@ -586,22 +736,25 @@ class _MachinesPageState extends State<MachinesPage> {
         child: Row(
           children: [
             SizedBox(
-              width: 28,
+              width: 30,
               child: AppIconButton(
                 icon: Icons.open_in_new,
                 tooltip: 'Open detail',
                 color: AppDS.textMuted,
-                onPressed: () => Navigator.push(
-                  context,
-                  modulePageRoute(
-                    context: context,
-                    child: MachineDetailPage(machineId: m.id),
-                  ),
-                ).then((_) => _load()),
+                onPressed: () =>
+                    Navigator.push(
+                      context,
+                      modulePageRoute(
+                        context: context,
+                        child: MachineDetailPage(machineId: m.id),
+                      ),
+                    ).then((_) {
+                      if (mounted) _load();
+                    }),
               ),
             ),
             SizedBox(
-              width: 28,
+              width: 30,
               child: AppIconButton(
                 icon: Icons.event_available_outlined,
                 tooltip: 'Quick Reservation',
@@ -613,22 +766,22 @@ class _MachinesPageState extends State<MachinesPage> {
                 ),
               ),
             ),
-            _textCell(m.name, 180, bold: true),
-            _statusCell(m, 110),
-            _textCell(m.type, 130),
-            _textCell(m.brand, 120),
-            _textCell(m.model, 120),
-            _textCell(m.serialNumber, 120, mono: true),
-            _textCell(m.locationName, 140),
-            _textCell(m.room, 90),
-            _textCell(m.responsible, 130),
+            _textCell(m.name, _widthFor('name'), bold: true),
+            _statusCell(m, _widthFor('status')),
+            _textCell(m.type, _widthFor('type')),
+            _textCell(m.brand, _widthFor('brand')),
+            _textCell(m.model, _widthFor('model')),
+            _textCell(m.serialNumber, _widthFor('serial'), mono: true),
+            _textCell(m.locationName, _widthFor('location')),
+            _textCell(m.room, _widthFor('room')),
+            _textCell(m.responsible, _widthFor('responsible')),
             _maintDateCell(
               m.nextMaintenance,
-              110,
+              _widthFor('nextMaint'),
               overdue: m.maintenanceOverdue,
               soon: m.maintenanceDueSoon,
             ),
-            _maintDateCell(m.nextCalibration, 110),
+            _maintDateCell(m.nextCalibration, _widthFor('nextCal')),
           ],
         ),
       ),

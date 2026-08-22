@@ -81,9 +81,7 @@ const _groups = <({String title, String icon, List<_Field> fields})>[
       ),
       (key: 'sample_parish', label: 'Parish', readOnly: false, lines: 1),
       (key: 'sample_local', label: 'Local', readOnly: false, lines: 1),
-      (key: 'sample_gps', label: 'GPS', readOnly: true, lines: 1),
-      (key: 'sample_latitude', label: 'Latitude', readOnly: false, lines: 1),
-      (key: 'sample_longitude', label: 'Longitude', readOnly: false, lines: 1),
+      (key: 'sample_gps', label: 'GPS', readOnly: false, lines: 1),
       (
         key: 'sample_altitude_m',
         label: 'Altitude (m)',
@@ -362,19 +360,28 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         for (final f in group.fields) {
           if (!f.readOnly || f.key == 'sample_gps') {
             final v = _ctrl[f.key]?.text.trim() ?? '';
-            if (f.key == 'sample_latitude' || f.key == 'sample_longitude') {
-              final parsed = parseSampleCoordinateValue(
-                v,
-                isLatitude: f.key == 'sample_latitude',
-              );
-              if (v.isNotEmpty && parsed == null) {
-                throw FormatException(
-                  f.key == 'sample_latitude'
-                      ? 'Latitude must be between -90 and 90.'
-                      : 'Longitude must be between -180 and 180.',
-                );
+            if (f.key == 'sample_gps') {
+              if (v.isEmpty) {
+                update.addAll({
+                  'sample_gps': null,
+                  'sample_latitude': null,
+                  'sample_longitude': null,
+                });
+              } else {
+                final coordinates = parseSampleCoordinates(gps: v);
+                if (coordinates == null) {
+                  throw const FormatException(
+                    'Enter GPS as latitude, longitude (for example 37.733, -25.293).',
+                  );
+                }
+                final latitude = coordinates.latitude.toStringAsFixed(6);
+                final longitude = coordinates.longitude.toStringAsFixed(6);
+                update.addAll({
+                  'sample_gps': '$latitude, $longitude',
+                  'sample_latitude': coordinates.latitude,
+                  'sample_longitude': coordinates.longitude,
+                });
               }
-              update[f.key] = parsed;
             } else {
               update[f.key] = v.isEmpty ? null : v;
             }
@@ -382,6 +389,8 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
         }
       }
       await _supabase.from('samples').update(update).eq('sample_id', sampleId);
+      _data = {..._data, ...update};
+      _ctrl['sample_gps']?.text = update['sample_gps']?.toString() ?? '';
       widget.onSaved?.call();
       _snack('Saved successfully.');
     } catch (e) {
@@ -558,8 +567,8 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
   Future<void> _openGpsPicker() async {
     final coordinates = parseSampleCoordinates(
       gps: _ctrl['sample_gps']?.text,
-      latitude: _ctrl['sample_latitude']?.text,
-      longitude: _ctrl['sample_longitude']?.text,
+      latitude: _data['sample_latitude']?.toString(),
+      longitude: _data['sample_longitude']?.toString(),
     );
     final result = await Navigator.push<SampleCoordinates>(
       context,
@@ -576,13 +585,11 @@ class _SampleDetailPageState extends State<SampleDetailPage> {
     final latitude = result.latitude.toStringAsFixed(6);
     final longitude = result.longitude.toStringAsFixed(6);
     setState(() {
-      _ctrl['sample_latitude']?.text = latitude;
-      _ctrl['sample_longitude']?.text = longitude;
       _ctrl['sample_gps']?.text = '$latitude, $longitude';
       _data = {
         ..._data,
-        'sample_latitude': latitude,
-        'sample_longitude': longitude,
+        'sample_latitude': result.latitude,
+        'sample_longitude': result.longitude,
         'sample_gps': '$latitude, $longitude',
       };
     });

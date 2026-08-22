@@ -70,6 +70,7 @@ class _ToDoWidgetState extends State<ToDoWidget> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final data = await Supabase.instance.client

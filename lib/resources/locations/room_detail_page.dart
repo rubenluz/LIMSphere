@@ -1,5 +1,5 @@
 // room_detail_page.dart - Room detail editor.
-// Fields: name, responsible, notes. Sub-locations sorted numerically by L#.# suffix.
+// Fields: name, temperature, responsible, notes. Sub-locations sorted numerically by L#.# suffix.
 // Pushed via Navigator with its own Scaffold + AppBar.
 
 import 'package:flutter/material.dart';
@@ -31,6 +31,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   final Set<int> _expanded = {0, 1, 2};
 
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _temperatureCtrl;
   late final TextEditingController _responsibleCtrl;
   late final TextEditingController _notesCtrl;
 
@@ -38,6 +39,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController();
+    _temperatureCtrl = TextEditingController();
     _responsibleCtrl = TextEditingController();
     _notesCtrl = TextEditingController();
     _load();
@@ -46,12 +48,14 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _temperatureCtrl.dispose();
     _responsibleCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client
@@ -89,7 +93,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       List<Map<String, dynamic>> users = [];
       try {
         final userRows = await Supabase.instance.client
-            .from('users')
+            .from('user_directory')
             .select(
               'user_id, user_email, user_name, user_phone, '
               'user_institution, user_group, user_role',
@@ -109,6 +113,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
       if (mounted) {
         _nameCtrl.text = stripLocationCodePrefix(room.name);
+        _temperatureCtrl.text = room.temperature?.trim().isNotEmpty == true
+            ? room.temperature!.trim()
+            : 'RT';
         _responsibleCtrl.text = room.responsible ?? '';
         _notesCtrl.text = room.notes ?? '';
 
@@ -158,7 +165,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             ? null
             : _notesCtrl.text.trim(),
         'location_parent_id': null,
-        'location_temperature': null,
+        'location_temperature': _temperatureCtrl.text.trim().isEmpty
+            ? null
+            : _temperatureCtrl.text.trim(),
         'location_capacity': null,
       };
       await Supabase.instance.client
@@ -479,6 +488,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               controller: _nameCtrl,
               readOnly: ro,
             ),
+            DetailInlineField(
+              label: 'Temperature (RT if empty)',
+              controller: _temperatureCtrl,
+              readOnly: ro,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        DetailFieldRow(
+          children: [
             DetailResponsibleField(
               label: 'Responsible',
               controller: _responsibleCtrl,

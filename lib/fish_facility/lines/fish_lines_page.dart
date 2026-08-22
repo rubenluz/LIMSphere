@@ -120,9 +120,11 @@ class _FishLinesPageState extends State<FishLinesPage> {
   }
 
   Future<void> _loadLines() async {
+    if (!mounted) return;
     final cachedLines = await DataCache.read('fish_lines');
     final cachedCounts = await DataCache.read('fish_stocks_counts');
-    if (cachedLines != null && cachedCounts != null && mounted) {
+    if (!mounted) return;
+    if (cachedLines != null && cachedCounts != null) {
       _lines = cachedLines
           .cast<Map<String, dynamic>>()
           .map(FishLine.fromMap)

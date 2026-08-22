@@ -4,7 +4,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '/theme/theme.dart';
 
 class TankCleaningTimelineWidget extends StatefulWidget {
@@ -37,12 +39,14 @@ class _TankCleaningTimelineWidgetState
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client
           .from('fish_stocks')
           .select(
-              'fish_stocks_tank_id, fish_stocks_line, fish_stocks_last_tank_cleaning, fish_stocks_cleaning_interval_days')
+            'fish_stocks_tank_id, fish_stocks_line, fish_stocks_last_tank_cleaning, fish_stocks_cleaning_interval_days',
+          )
           .eq('fish_stocks_status', 'active');
 
       final now = DateTime.now();
@@ -52,14 +56,20 @@ class _TankCleaningTimelineWidgetState
       for (final row in rows as List) {
         final lastRaw = row['fish_stocks_last_tank_cleaning'];
         final intervalRaw = row['fish_stocks_cleaning_interval_days'];
-        if (lastRaw == null || intervalRaw == null) { continue; }
+        if (lastRaw == null || intervalRaw == null) {
+          continue;
+        }
 
         final last = DateTime.tryParse(lastRaw.toString());
         final interval = int.tryParse(intervalRaw.toString());
-        if (last == null || interval == null || interval <= 0) { continue; }
+        if (last == null || interval == null || interval <= 0) {
+          continue;
+        }
 
         final next = last.add(Duration(days: interval));
-        if (next.isAfter(cutoff)) { continue; }
+        if (next.isAfter(cutoff)) {
+          continue;
+        }
 
         final tankId = (row['fish_stocks_tank_id'] ?? '').toString();
         final line = (row['fish_stocks_line'] ?? '').toString();
@@ -71,31 +81,59 @@ class _TankCleaningTimelineWidgetState
       }
 
       events.sort((a, b) => a.date.compareTo(b.date));
-      if (mounted) { setState(() { _events = events; _loading = false; }); }
+      if (mounted) {
+        setState(() {
+          _events = events;
+          _loading = false;
+        });
+      }
     } catch (e) {
       debugPrint('TankCleaningTimelineWidget error: $e');
-      if (mounted) { setState(() => _loading = false); }
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Color _color(int daysLeft) {
-    if (daysLeft < 0) { return Colors.red; }
-    if (daysLeft == 0) { return Colors.orange; }
-    if (daysLeft <= 3) { return Colors.amber; }
+    if (daysLeft < 0) {
+      return Colors.red;
+    }
+    if (daysLeft == 0) {
+      return Colors.orange;
+    }
+    if (daysLeft <= 3) {
+      return Colors.amber;
+    }
     return AppDS.green;
   }
 
   String _badge(int daysLeft) {
-    if (daysLeft < 0) { return '${daysLeft.abs()}d overdue'; }
-    if (daysLeft == 0) { return 'Today'; }
+    if (daysLeft < 0) {
+      return '${daysLeft.abs()}d overdue';
+    }
+    if (daysLeft == 0) {
+      return 'Today';
+    }
     return 'in ${daysLeft}d';
   }
 
   static String _weekday(int d) =>
       ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1];
-  static String _month(int m) =>
-      ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1];
+  static String _month(int m) => [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ][m - 1];
 
   Widget _buildContent() {
     if (_loading) {
@@ -107,8 +145,10 @@ class _TankCleaningTimelineWidgetState
     if (_events.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(24),
-        child: Text('No tank cleanings due in the next 30 days.',
-            style: TextStyle(color: context.appTextSecondary, fontSize: 13)),
+        child: Text(
+          'No tank cleanings due in the next 30 days.',
+          style: TextStyle(color: context.appTextSecondary, fontSize: 13),
+        ),
       );
     }
 
@@ -140,18 +180,22 @@ class _TankCleaningTimelineWidgetState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Timeline spine
-                Column(children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration:
-                        BoxDecoration(color: color, shape: BoxShape.circle),
-                  ),
-                  if (!isLast)
-                    Expanded(
-                      child: Container(width: 2, color: context.appBorder),
+                Column(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                ]),
+                    if (!isLast)
+                      Expanded(
+                        child: Container(width: 2, color: context.appBorder),
+                      ),
+                  ],
+                ),
                 const SizedBox(width: 10),
                 // Content
                 Expanded(
@@ -160,36 +204,51 @@ class _TankCleaningTimelineWidgetState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(children: [
-                          Text(dateLabel,
+                        Row(
+                          children: [
+                            Text(
+                              dateLabel,
                               style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: color)),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: color,
+                              ),
                             ),
-                            child: Text(_badge(daysLeft),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _badge(daysLeft),
                                 style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: color)),
-                          ),
-                        ]),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: color,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 4),
-                        ...events.map((e) => Padding(
-                              padding: const EdgeInsets.only(bottom: 2),
-                              child: Text('· ${e.label}',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: context.appTextPrimary),
-                                  overflow: TextOverflow.ellipsis),
-                            )),
+                        ...events.map(
+                          (e) => Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Text(
+                              '· ${e.label}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.appTextPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -217,18 +276,26 @@ class _TankCleaningTimelineWidgetState
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.cleaning_services_outlined,
-                  size: 20, color: AppDS.accent),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Cleaning Timeline',
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.cleaning_services_outlined,
+                  size: 20,
+                  color: AppDS.accent,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Cleaning Timeline',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: context.appTextPrimary)),
-              ),
-            ]),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           Divider(height: 1, color: context.appBorder),
           if (desktop)

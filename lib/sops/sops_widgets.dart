@@ -91,6 +91,10 @@ class _SopCard extends StatelessWidget {
                   spacing: 6,
                   children: [
                     _Badge(
+                      label: FacilitySop.contextLabel(sop.sopContext),
+                      color: _DS.contextColor(sop.sopContext),
+                    ),
+                    _Badge(
                       label: FacilitySop.typeLabel(sop.type),
                       color: _DS.typeColor(sop.type),
                     ),
@@ -278,8 +282,8 @@ class _SopCard extends StatelessWidget {
 // ═════════════════════════════════════════════════════════════════════════════
 class _SopDialog extends StatefulWidget {
   final FacilitySop? sop;
-  final String sopContext;
-  const _SopDialog({this.sop, required this.sopContext});
+  final List<String> allowedContexts;
+  const _SopDialog({this.sop, required this.allowedContexts});
 
   @override
   State<_SopDialog> createState() => _SopDialogState();
@@ -301,6 +305,7 @@ class _SopDialogState extends State<_SopDialog> {
 
   String _type = 'sop';
   String _status = 'draft';
+  late String _sopContext;
   DateTime? _effectiveDate;
   DateTime? _reviewDate;
   DateTime? _lastReviewed;
@@ -336,6 +341,7 @@ class _SopDialogState extends State<_SopDialog> {
     _tags = TextEditingController(text: s?.tags ?? '');
     _type = s?.type ?? 'sop';
     _status = s?.status ?? 'draft';
+    _sopContext = s?.sopContext ?? widget.allowedContexts.first;
     _effectiveDate = s?.effectiveDate;
     _reviewDate = s?.reviewDate;
     _lastReviewed = s?.lastReviewed;
@@ -378,6 +384,7 @@ class _SopDialogState extends State<_SopDialog> {
     if (result.isEmpty) return;
     final file = result.first;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
     setState(() {
       _pdfBytes = bytes;
       _pdfName = file.name;
@@ -393,6 +400,7 @@ class _SopDialogState extends State<_SopDialog> {
     if (result.isEmpty) return;
     final file = result.first;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
     setState(() {
       _txtBytes = bytes;
       _txtName = file.name;
@@ -408,6 +416,7 @@ class _SopDialogState extends State<_SopDialog> {
     if (result.isEmpty) return;
     final file = result.first;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
     setState(() {
       _docBytes = bytes;
       _docName = file.name;
@@ -445,7 +454,7 @@ class _SopDialogState extends State<_SopDialog> {
         SopSch.revisionNotes: _revisionNotes.text.trim().isEmpty
             ? null
             : _revisionNotes.text.trim(),
-        SopSch.context: widget.sopContext,
+        SopSch.context: _sopContext,
         SopSch.effectiveDate: _effectiveDate?.toIso8601String().substring(
           0,
           10,
@@ -668,6 +677,16 @@ class _SopDialogState extends State<_SopDialog> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      _DropField(
+                        label: 'Subcategory',
+                        value: _sopContext,
+                        options: widget.allowedContexts,
+                        labelOf: FacilitySop.contextLabel,
+                        onChanged: (value) =>
+                            setState(() => _sopContext = value ?? _sopContext),
                       ),
                       const SizedBox(height: 12),
 

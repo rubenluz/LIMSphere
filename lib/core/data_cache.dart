@@ -4,7 +4,10 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+
 import 'package:path_provider/path_provider.dart';
+
 import '../supabase/supabase_manager.dart';
 
 /// File-based JSON cache for stale-while-revalidate offline support.
@@ -23,8 +26,9 @@ class DataCache {
   static Future<List<dynamic>?> read(String key) async {
     try {
       final file = File(await _filePath(key));
-      if (!file.existsSync()) return null;
-      return jsonDecode(file.readAsStringSync()) as List<dynamic>;
+      if (!await file.exists()) return null;
+      final contents = await file.readAsString();
+      return await Isolate.run(() => jsonDecode(contents) as List<dynamic>);
     } catch (_) {
       return null;
     }
@@ -33,7 +37,8 @@ class DataCache {
   /// Persists fresh data to disk.
   static Future<void> write(String key, List<dynamic> data) async {
     try {
-      File(await _filePath(key)).writeAsStringSync(jsonEncode(data));
+      final encoded = await Isolate.run(() => jsonEncode(data));
+      await File(await _filePath(key)).writeAsString(encoded, flush: true);
     } catch (_) {}
   }
 
@@ -41,7 +46,7 @@ class DataCache {
   static Future<void> clear(String key) async {
     try {
       final file = File(await _filePath(key));
-      if (file.existsSync()) file.deleteSync();
+      if (await file.exists()) await file.delete();
     } catch (_) {}
   }
 }

@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide LocalStorage;
 
 import '../core/local_storage.dart';
+import '../database_connection/database_initializer.dart';
+import 'account_access.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -123,10 +125,9 @@ class _LoginPageState extends State<LoginPage> {
       }
       final userRow = userRows[0];
 
-      if (userRow['user_role'] != 'superadmin' &&
-          userRow['user_status'] == 'pending') {
+      if (!hasActiveAccount(Map<String, dynamic>.from(userRow as Map))) {
         await Supabase.instance.client.auth.signOut();
-        _snack('Your account is pending admin approval.');
+        _snack(accountAccessMessage(Map<String, dynamic>.from(userRow)));
         return;
       }
 
@@ -149,6 +150,9 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.pushReplacementNamed(context, '/menu');
     } on AuthException catch (e) {
       _snack('Login error: ${e.message}');
+    } on PostgrestException catch (e) {
+      final result = DatabaseInitializer.classifyError(e);
+      _snack('${result.title}: ${result.message}');
     } catch (e) {
       _snack('Error: $e');
     } finally {

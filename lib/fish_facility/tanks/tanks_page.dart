@@ -181,8 +181,10 @@ class _FishTanksPageState extends State<FishTanksPage> {
   }
 
   Future<void> _loadFromSupabase() async {
+    if (!mounted) return;
     final cached = await DataCache.read('fish_stocks_tanks');
-    if (cached != null && mounted) {
+    if (!mounted) return;
+    if (cached != null) {
       _racks.clear();
       _racks['R1'] = _buildDefaultRack('R1');
       _applyStockRows(cached);
@@ -1962,6 +1964,7 @@ class _FishTanksPageState extends State<FishTanksPage> {
                   BackupService.instance.notifyCrudChange('fish_stocks'),
                 );
               } catch (_) {}
+              if (!mounted) return;
               final remaining = _racks.keys.where((k) => k != rackId).toList()
                 ..sort();
               setState(() {

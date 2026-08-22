@@ -21,6 +21,7 @@ class _ReagentRow extends StatelessWidget {
   final VoidCallback onAdvance;
   final VoidCallback onAdvanceBack;
   final VoidCallback onCancel;
+  final VoidCallback onCommitAndClose;
   final VoidCallback onAddNewRow;
   final void Function(int id, String value) onCommitStockStatus;
   final void Function(int id, String value) onCommitCategory;
@@ -31,6 +32,7 @@ class _ReagentRow extends StatelessWidget {
   final void Function(int id, int? value) onCommitRoom;
   final void Function(int id, int? value) onCommitLocation;
   final List<Map<String, dynamic>> locations;
+  final double Function(String key) columnWidth;
 
   const _ReagentRow({
     required this.reagent,
@@ -48,6 +50,7 @@ class _ReagentRow extends StatelessWidget {
     required this.onAdvance,
     required this.onAdvanceBack,
     required this.onCancel,
+    required this.onCommitAndClose,
     required this.onAddNewRow,
     required this.onCommitStockStatus,
     required this.onCommitCategory,
@@ -58,6 +61,7 @@ class _ReagentRow extends StatelessWidget {
     required this.onCommitRoom,
     required this.onCommitLocation,
     required this.locations,
+    required this.columnWidth,
   });
 
   static String _unitDisplay(String? u) {
@@ -239,7 +243,6 @@ class _ReagentRow extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.tab): onAdvance,
         const SingleActivator(LogicalKeyboardKey.tab, shift: true):
             onAdvanceBack,
-        const SingleActivator(LogicalKeyboardKey.enter): onAdvance,
         const SingleActivator(LogicalKeyboardKey.enter, control: true):
             onAddNewRow,
         const SingleActivator(LogicalKeyboardKey.escape): onCancel,
@@ -248,6 +251,9 @@ class _ReagentRow extends StatelessWidget {
         controller: editController,
         focusNode: editFocus,
         keyboardType: keyboardType,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => onCommitAndClose(),
+        onTapOutside: (_) => onCommitAndClose(),
         style: ts,
         decoration: InputDecoration(
           isDense: true,
@@ -325,616 +331,632 @@ class _ReagentRow extends StatelessWidget {
           border: Border(bottom: BorderSide(color: context.appBorder)),
         ),
         child: Row(
-        children: [
-          // ── Action buttons ────────────────────────────────────────────────
-          if (selectionMode)
-            SizedBox(
-              width: _colBtn,
-              child: IgnorePointer(
-                child: Checkbox(
-                  value: selected,
-                  onChanged: (_) {},
+          children: [
+            // ── Action buttons ────────────────────────────────────────────────
+            if (selectionMode)
+              SizedBox(
+                width: _colBtn,
+                child: IgnorePointer(
+                  child: Checkbox(value: selected, onChanged: (_) {}),
+                ),
+              )
+            else ...[
+              SizedBox(
+                width: 30,
+                child: _RowBtn(
+                  Icons.open_in_new,
+                  'View detail',
+                  onViewMore,
+                  color: muted,
                 ),
               ),
-            )
-          else ...[
+              SizedBox(
+                width: 30,
+                child: _RowBtn(
+                  Icons.outbox_outlined,
+                  'Quick Request',
+                  onRequest,
+                  color: muted,
+                ),
+              ),
+            ],
+
+            // ── Code ──────────────────────────────────────────────────────────
             SizedBox(
-              width: 30,
-              child: _RowBtn(
-                Icons.open_in_new,
-                'View detail',
-                onViewMore,
-                color: muted,
-              ),
-            ),
-            SizedBox(
-              width: 30,
-              child: _RowBtn(
-                Icons.outbox_outlined,
-                'Quick Request',
-                onRequest,
-                color: muted,
-              ),
-            ),
-          ],
-
-          // ── Code ──────────────────────────────────────────────────────────
-          SizedBox(
-            width: _colCode,
-            child: _editCell(
-              context,
-              'code',
-              r.code ?? '',
-              r.code != null && r.code!.isNotEmpty
-                  ? _tip(
-                      r.code,
-                      Text(
-                        r.code!,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.jetBrainsMono(
-                          color: context.appTextPrimary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-              GoogleFonts.jetBrainsMono(fontSize: 12, color: primary),
-            ),
-          ),
-
-          // ── Stock Status ────────────────────────────────────────────────
-          SizedBox(
-            width: _colStock,
-            child: GestureDetector(
-              onDoubleTap: () =>
-                  onStartEdit(r.id, 'stockStatus', r.stockStatus),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: _isEditing('stockStatus')
-                    ? _ArrowDropdown<String>(
-                        values: ReagentModel.stockStatusOptions,
-                        current: r.stockStatus,
-                        labelOf: ReagentModel.stockStatusLabel,
-                        onSelect: (v) => onCommitStockStatus(r.id, v),
-                        onAdvance: onAdvance,
-                        onAdvanceBack: onAdvanceBack,
-                        onCancel: onCancel,
-                        onAddNewRow: onAddNewRow,
-                        autoOpen: true,
-                      )
-                    : _Badge(
-                        label: ReagentModel.stockStatusLabel(r.stockStatus),
-                        color: _stockColor[r.stockStatus] ?? AppDS.green,
-                      ),
-              ),
-            ),
-          ),
-
-          // ── Category ──────────────────────────────────────────────────────
-          SizedBox(
-            width: _colCategory,
-            child: GestureDetector(
-              onDoubleTap: () => onStartEdit(r.id, 'category', r.category),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: _isEditing('category')
-                    ? _ArrowDropdown<String>(
-                        values: ReagentModel.categoryOptionsSorted,
-                        current: r.category,
-                        labelOf: ReagentModel.categoryLabel,
-                        onSelect: (v) => onCommitCategory(r.id, v),
-                        onAdvance: onAdvance,
-                        onAdvanceBack: onAdvanceBack,
-                        onCancel: onCancel,
-                        onAddNewRow: onAddNewRow,
-                        autoOpen: true,
-                      )
-                    : _Badge(
-                        label: ReagentModel.categoryLabel(r.category),
-                        color: accent,
-                      ),
-              ),
-            ),
-          ),
-
-          // ── Subcategory ───────────────────────────────────────────────────
-          SizedBox(
-            width: _colSubcat,
-            child: GestureDetector(
-              onDoubleTap: () =>
-                  onStartEdit(r.id, 'subcategory', r.subcategory ?? ''),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: _isEditing('subcategory')
-                    ? _ArrowDropdown<String>(
-                        values: ReagentModel.subcategoryOptionsSorted(
-                          r.category,
-                        ),
-                        current: r.subcategory ?? '',
-                        labelOf: ReagentModel.subcategoryLabel,
-                        onSelect: (v) => onCommitSubcategory(r.id, v),
-                        onAdvance: onAdvance,
-                        onAdvanceBack: onAdvanceBack,
-                        onCancel: onCancel,
-                        onAddNewRow: onAddNewRow,
-                        autoOpen: true,
-                      )
-                    : _tip(
-                        r.subcategory != null
-                            ? ReagentModel.subcategoryLabel(r.subcategory!)
-                            : null,
+              width: columnWidth('code'),
+              child: _editCell(
+                context,
+                'code',
+                r.code ?? '',
+                r.code != null && r.code!.isNotEmpty
+                    ? _tip(
+                        r.code,
                         Text(
+                          r.code!,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.jetBrainsMono(
+                            color: context.appTextPrimary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+                GoogleFonts.jetBrainsMono(fontSize: 12, color: primary),
+              ),
+            ),
+
+            // ── Stock Status ────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('stockStatus'),
+              child: GestureDetector(
+                onDoubleTap: () =>
+                    onStartEdit(r.id, 'stockStatus', r.stockStatus),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  child: _isEditing('stockStatus')
+                      ? _ArrowDropdown<String>(
+                          values: ReagentModel.stockStatusOptions,
+                          current: r.stockStatus,
+                          labelOf: ReagentModel.stockStatusLabel,
+                          onSelect: (v) => onCommitStockStatus(r.id, v),
+                          onAdvance: onAdvance,
+                          onAdvanceBack: onAdvanceBack,
+                          onCancel: onCancel,
+                          onAddNewRow: onAddNewRow,
+                        )
+                      : _Badge(
+                          label: ReagentModel.stockStatusLabel(r.stockStatus),
+                          color: _stockColor[r.stockStatus] ?? AppDS.green,
+                        ),
+                ),
+              ),
+            ),
+
+            // ── Category ──────────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('category'),
+              child: GestureDetector(
+                onDoubleTap: () => onStartEdit(r.id, 'category', r.category),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  child: _isEditing('category')
+                      ? _ArrowDropdown<String>(
+                          values: ReagentModel.categoryOptionsSorted,
+                          current: r.category,
+                          labelOf: ReagentModel.categoryLabel,
+                          onSelect: (v) => onCommitCategory(r.id, v),
+                          onAdvance: onAdvance,
+                          onAdvanceBack: onAdvanceBack,
+                          onCancel: onCancel,
+                          onAddNewRow: onAddNewRow,
+                        )
+                      : _Badge(
+                          label: ReagentModel.categoryLabel(r.category),
+                          color: accent,
+                        ),
+                ),
+              ),
+            ),
+
+            // ── Subcategory ───────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('subcategory'),
+              child: GestureDetector(
+                onDoubleTap: () =>
+                    onStartEdit(r.id, 'subcategory', r.subcategory ?? ''),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  child: _isEditing('subcategory')
+                      ? _ArrowDropdown<String>(
+                          values: ReagentModel.subcategoryOptionsSorted(
+                            r.category,
+                          ),
+                          current: r.subcategory ?? '',
+                          labelOf: ReagentModel.subcategoryLabel,
+                          onSelect: (v) => onCommitSubcategory(r.id, v),
+                          onAdvance: onAdvance,
+                          onAdvanceBack: onAdvanceBack,
+                          onCancel: onCancel,
+                          onAddNewRow: onAddNewRow,
+                        )
+                      : _tip(
                           r.subcategory != null
                               ? ReagentModel.subcategoryLabel(r.subcategory!)
-                              : '—',
-                          overflow: TextOverflow.ellipsis,
-                          style: r.subcategory != null ? tsCell : tsMuted,
+                              : null,
+                          Text(
+                            r.subcategory != null
+                                ? ReagentModel.subcategoryLabel(r.subcategory!)
+                                : '—',
+                            overflow: TextOverflow.ellipsis,
+                            style: r.subcategory != null ? tsCell : tsMuted,
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
-          ),
 
-          // ── Tags (semicolon-separated) ────────────────────────────────────
-          SizedBox(
-            width: _colTags,
-            child: _editCell(
-              context,
-              'tags',
-              r.tags ?? '',
-              r.tagList.isEmpty
-                  ? Text('—', overflow: TextOverflow.ellipsis, style: tsMuted)
-                  : Wrap(
-                      spacing: 4,
-                      runSpacing: 2,
-                      children: [
-                        for (final t in r.tagList)
-                          Builder(
-                            builder: (_) {
-                              final c = _tagColor(t);
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 1,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: c.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(3),
-                                  border: Border.all(
-                                    color: c.withValues(alpha: 0.4),
+            // ── Tags (semicolon-separated) ────────────────────────────────────
+            SizedBox(
+              width: columnWidth('tags'),
+              child: _editCell(
+                context,
+                'tags',
+                r.tags ?? '',
+                r.tagList.isEmpty
+                    ? Text('—', overflow: TextOverflow.ellipsis, style: tsMuted)
+                    : Wrap(
+                        spacing: 4,
+                        runSpacing: 2,
+                        children: [
+                          for (final t in r.tagList)
+                            Builder(
+                              builder: (_) {
+                                final c = _tagColor(t);
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
                                   ),
-                                ),
-                                child: Text(
-                                  t,
-                                  style: AppDS.ui(
-                                    size: 10,
-                                    color: c,
-                                    weight: FontWeight.w600,
+                                  decoration: BoxDecoration(
+                                    color: c.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(3),
+                                    border: Border.all(
+                                      color: c.withValues(alpha: 0.4),
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                      ],
-                    ),
-              tsCell,
+                                  child: Text(
+                                    t,
+                                    style: AppDS.ui(
+                                      size: 10,
+                                      color: c,
+                                      weight: FontWeight.w600,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                tsCell,
+              ),
             ),
-          ),
 
-          // ── Name ──────────────────────────────────────────────────────────
-          SizedBox(
-            width: _colName,
-            child: _isEditing('name')
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    child: _editField(context, 'name', tsName),
-                  )
-                : GestureDetector(
-                    onDoubleTap: () => onStartEdit(r.id, 'name', r.name ?? ''),
-                    child: Padding(
+            // ── Name ──────────────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('name'),
+              child: _isEditing('name')
+                  ? Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
                         vertical: 3,
                       ),
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: _tip(
-                              r.name,
-                              Text(
-                                (r.name == null || r.name!.isEmpty)
-                                    ? '—'
-                                    : r.name!,
-                                overflow: TextOverflow.ellipsis,
-                                style: (r.name == null || r.name!.isEmpty)
-                                    ? tsMuted
-                                    : tsName,
+                      child: _editField(context, 'name', tsName),
+                    )
+                  : GestureDetector(
+                      onDoubleTap: () =>
+                          onStartEdit(r.id, 'name', r.name ?? ''),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: _tip(
+                                r.name,
+                                Text(
+                                  (r.name == null || r.name!.isEmpty)
+                                      ? '—'
+                                      : r.name!,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: (r.name == null || r.name!.isEmpty)
+                                      ? tsMuted
+                                      : tsName,
+                                ),
                               ),
                             ),
-                          ),
-                          if (r.isExpired) ...[
-                            const SizedBox(width: 4),
-                            _Badge(label: 'Expired', color: AppDS.red),
-                          ] else if (r.isExpiringSoon) ...[
-                            const SizedBox(width: 4),
-                            _Badge(label: 'Expiring', color: AppDS.yellow),
-                          ],
-                          if (r.isLowStock) ...[
-                            const SizedBox(width: 4),
-                            _Badge(label: 'Low', color: AppDS.orange),
-                          ],
-                          if (r.hazard != null && r.hazard!.isNotEmpty) ...[
-                            const SizedBox(width: 4),
-                            Tooltip(
-                              message: 'Hazard: ${r.hazard}',
-                              child: const Icon(
-                                Icons.warning_amber_outlined,
-                                size: 13,
-                                color: AppDS.yellow,
+                            if (r.isExpired) ...[
+                              const SizedBox(width: 4),
+                              _Badge(label: 'Expired', color: AppDS.red),
+                            ] else if (r.isExpiringSoon) ...[
+                              const SizedBox(width: 4),
+                              _Badge(label: 'Expiring', color: AppDS.yellow),
+                            ],
+                            if (r.isLowStock) ...[
+                              const SizedBox(width: 4),
+                              _Badge(label: 'Low', color: AppDS.orange),
+                            ],
+                            if (r.hazard != null && r.hazard!.isNotEmpty) ...[
+                              const SizedBox(width: 4),
+                              Tooltip(
+                                message: 'Hazard: ${r.hazard}',
+                                child: const Icon(
+                                  Icons.warning_amber_outlined,
+                                  size: 13,
+                                  color: AppDS.yellow,
+                                ),
                               ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
+            ),
+
+            // ── Room / Location ──────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('room'),
+              child: GestureDetector(
+                onDoubleTap: () => onStartEdit(r.id, 'room', ''),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
                   ),
-          ),
-
-          // ── Room / Location ──────────────────────────────────────────────
-          SizedBox(
-            width: _colRoom,
-            child: GestureDetector(
-              onDoubleTap: () => onStartEdit(r.id, 'room', ''),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: _isEditing('room')
-                    ? _ArrowDropdown<int?>(
-                        values: [
-                          null,
-                          ..._rooms.map(
-                            (room) => (room['location_id'] as num).toInt(),
+                  child: _isEditing('room')
+                      ? _ArrowDropdown<int?>(
+                          values: [
+                            null,
+                            ..._rooms.map(
+                              (room) => (room['location_id'] as num).toInt(),
+                            ),
+                          ],
+                          current: _selectedRoomId,
+                          labelOf: (id) {
+                            if (id == null) return 'None';
+                            final room = _locationById(id);
+                            return (room?['_display'] as String?) ??
+                                (room?['location_name'] as String?) ??
+                                '—';
+                          },
+                          onSelect: (value) => onCommitRoom(r.id, value),
+                          onAdvance: onAdvance,
+                          onAdvanceBack: onAdvanceBack,
+                          onCancel: onCancel,
+                          onAddNewRow: onAddNewRow,
+                        )
+                      : _tip(
+                          roomName,
+                          Text(
+                            roomName ?? '—',
+                            overflow: TextOverflow.ellipsis,
+                            style: roomName != null ? tsCell : tsMuted,
                           ),
-                        ],
-                        current: _selectedRoomId,
-                        labelOf: (id) {
-                          if (id == null) return 'None';
-                          final room = _locationById(id);
-                          return (room?['_display'] as String?) ??
-                              (room?['location_name'] as String?) ??
-                              '—';
-                        },
-                        onSelect: (value) => onCommitRoom(r.id, value),
-                        onAdvance: onAdvance,
-                        onAdvanceBack: onAdvanceBack,
-                        onCancel: onCancel,
-                        onAddNewRow: onAddNewRow,
-                        autoOpen: true,
-                      )
-                    : _tip(
-                        roomName,
-                        Text(
-                          roomName ?? '—',
-                          overflow: TextOverflow.ellipsis,
-                          style: roomName != null ? tsCell : tsMuted,
                         ),
-                      ),
-              ),
-            ),
-          ),
-          SizedBox(
-            width: _colLoc,
-            child: GestureDetector(
-              onDoubleTap: () => onStartEdit(r.id, 'location', ''),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: _isEditing('location')
-                    ? _ArrowDropdown<int?>(
-                        values: [
-                          null,
-                          ..._locationsInSelectedRoom.map(
-                            (l) => (l['location_id'] as num).toInt(),
-                          ),
-                        ],
-                        current: _selectedChildLocationId,
-                        labelOf: (id) {
-                          if (id == null) {
-                            return _selectedRoomId == null
-                                ? 'Select a room first'
-                                : '/';
-                          }
-                          final loc = locations.firstWhere(
-                            (l) => (l['location_id'] as num).toInt() == id,
-                            orElse: () => <String, dynamic>{},
-                          );
-                          return (loc['_display'] as String?) ??
-                              (loc['location_name'] as String?) ??
-                              '—';
-                        },
-                        onSelect: (value) =>
-                            onCommitLocation(r.id, value ?? _selectedRoomId),
-                        onAdvance: onAdvance,
-                        onAdvanceBack: onAdvanceBack,
-                        onCancel: onCancel,
-                        onAddNewRow: onAddNewRow,
-                        autoOpen: true,
-                      )
-                    : _tip(
-                        _locationDisplay(r.locationId),
-                        Text(
-                          _locationDisplay(r.locationId) ?? '—',
-                          overflow: TextOverflow.ellipsis,
-                          style: _locationDisplay(r.locationId) != null
-                              ? tsCell
-                              : tsMuted,
-                        ),
-                      ),
-              ),
-            ),
-          ),
-
-          // ── Storage Temp ────────────────────────────────────────────────
-          SizedBox(
-            width: _colStorage,
-            child: GestureDetector(
-              onDoubleTap: () =>
-                  onStartEdit(r.id, 'storageTemp', r.storageTemp ?? ''),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: _isEditing('storageTemp')
-                    ? _ArrowDropdown<String?>(
-                        values: [null, ...ReagentModel.tempOptions],
-                        current: r.storageTemp,
-                        labelOf: (v) => v ?? '—',
-                        onSelect: (v) => onCommitStorageTemp(r.id, v),
-                        onAdvance: onAdvance,
-                        onAdvanceBack: onAdvanceBack,
-                        onCancel: onCancel,
-                        onAddNewRow: onAddNewRow,
-                        autoOpen: true,
-                      )
-                    : r.storageTemp != null
-                    ? _Badge(
-                        label: r.storageTemp!,
-                        color: switch (r.storageTemp!) {
-                          'RT' => const Color(0xFFF59E0B),
-                          '4°C' => const Color(0xFF22C55E),
-                          '-20°C' => const Color(0xFF38BDF8),
-                          '-80°C' => const Color(0xFF6366F1),
-                          'liquid N2' => const Color(0xFFA855F7),
-                          _ => const Color(0xFF64748B),
-                        },
-                      )
-                    : Text('—', style: tsMuted),
-              ),
-            ),
-          ),
-
-          // ── Physical State ────────────────────────────────────────────────
-          SizedBox(
-            width: _colState,
-            child: GestureDetector(
-              onDoubleTap: () =>
-                  onStartEdit(r.id, 'physicalState', r.physicalState ?? ''),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: _isEditing('physicalState')
-                    ? _ArrowDropdown<String?>(
-                        values: [null, ...ReagentModel.physicalStateOptions],
-                        current: r.physicalState,
-                        labelOf: (v) => v == null
-                            ? '—'
-                            : ReagentModel.physicalStateLabel(v),
-                        onSelect: (v) => onCommitPhysicalState(r.id, v),
-                        onAdvance: onAdvance,
-                        onAdvanceBack: onAdvanceBack,
-                        onCancel: onCancel,
-                        onAddNewRow: onAddNewRow,
-                        autoOpen: true,
-                      )
-                    : r.physicalState != null
-                    ? _Badge(
-                        label: ReagentModel.physicalStateLabel(
-                          r.physicalState!,
-                        ),
-                        color: switch (r.physicalState!) {
-                          'liquid' => const Color(0xFF38BDF8),
-                          'solid' => const Color(0xFF94A3B8),
-                          'gas' => const Color(0xFFA78BFA),
-                          _ => const Color(0xFF64748B),
-                        },
-                      )
-                    : Text('—', style: tsMuted),
-              ),
-            ),
-          ),
-
-          // ── CAS Number ────────────────────────────────────────────────────
-          SizedBox(
-            width: _colCas,
-            child: _editCell(
-              context,
-              'casNumber',
-              r.casNumber ?? '',
-              _tip(
-                r.casNumber,
-                Text(
-                  r.casNumber ?? '—',
-                  overflow: TextOverflow.ellipsis,
-                  style: r.casNumber != null ? tsMono : tsMonoMut,
                 ),
               ),
-              tsMono,
             ),
-          ),
-
-          // ── Formula ───────────────────────────────────────────────────────
-          SizedBox(
-            width: _colFormula,
-            child: _editCell(
-              context,
-              'formula',
-              r.formula ?? '',
-              _tip(
-                r.formula,
-                Text(
-                  r.formula ?? '—',
-                  overflow: TextOverflow.ellipsis,
-                  style: r.formula != null ? tsMono : tsMonoMut,
+            SizedBox(
+              width: columnWidth('location'),
+              child: GestureDetector(
+                onDoubleTap: () => onStartEdit(r.id, 'location', ''),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  child: _isEditing('location')
+                      ? _ArrowDropdown<int?>(
+                          values: [
+                            null,
+                            ..._locationsInSelectedRoom.map(
+                              (l) => (l['location_id'] as num).toInt(),
+                            ),
+                          ],
+                          current: _selectedChildLocationId,
+                          labelOf: (id) {
+                            if (id == null) {
+                              return _selectedRoomId == null
+                                  ? 'Select a room first'
+                                  : '/';
+                            }
+                            final loc = locations.firstWhere(
+                              (l) => (l['location_id'] as num).toInt() == id,
+                              orElse: () => <String, dynamic>{},
+                            );
+                            return (loc['_display'] as String?) ??
+                                (loc['location_name'] as String?) ??
+                                '—';
+                          },
+                          onSelect: (value) =>
+                              onCommitLocation(r.id, value ?? _selectedRoomId),
+                          onAdvance: onAdvance,
+                          onAdvanceBack: onAdvanceBack,
+                          onCancel: onCancel,
+                          onAddNewRow: onAddNewRow,
+                        )
+                      : _tip(
+                          _locationDisplay(r.locationId),
+                          Text(
+                            _locationDisplay(r.locationId) ?? '—',
+                            overflow: TextOverflow.ellipsis,
+                            style: _locationDisplay(r.locationId) != null
+                                ? tsCell
+                                : tsMuted,
+                          ),
+                        ),
                 ),
               ),
-              tsMono,
             ),
-          ),
 
-          // ── Opened Date ───────────────────────────────────────────────────
-          SizedBox(
-            width: _colOpened,
-            child: _editCell(
-              context,
-              'openedDate',
-              r.openedDate != null
-                  ? '${r.openedDate!.year}-${r.openedDate!.month.toString().padLeft(2, '0')}-${r.openedDate!.day.toString().padLeft(2, '0')}'
-                  : '',
-              Text(
+            // ── Storage Temp ────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('storageTemp'),
+              child: GestureDetector(
+                onDoubleTap: () =>
+                    onStartEdit(r.id, 'storageTemp', r.storageTemp ?? ''),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  child: _isEditing('storageTemp')
+                      ? _ArrowDropdown<String?>(
+                          values: [null, ...ReagentModel.tempOptions],
+                          current: r.storageTemp,
+                          labelOf: (v) => v ?? '—',
+                          onSelect: (v) => onCommitStorageTemp(r.id, v),
+                          onAdvance: onAdvance,
+                          onAdvanceBack: onAdvanceBack,
+                          onCancel: onCancel,
+                          onAddNewRow: onAddNewRow,
+                        )
+                      : r.storageTemp != null
+                      ? _Badge(
+                          label: r.storageTemp!,
+                          color: switch (r.storageTemp!) {
+                            'RT' => const Color(0xFFF59E0B),
+                            '4°C' => const Color(0xFF22C55E),
+                            '-20°C' => const Color(0xFF38BDF8),
+                            '-80°C' => const Color(0xFF6366F1),
+                            'liquid N2' => const Color(0xFFA855F7),
+                            _ => const Color(0xFF64748B),
+                          },
+                        )
+                      : Text('—', style: tsMuted),
+                ),
+              ),
+            ),
+
+            // ── Physical State ────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('physicalState'),
+              child: GestureDetector(
+                onDoubleTap: () =>
+                    onStartEdit(r.id, 'physicalState', r.physicalState ?? ''),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  child: _isEditing('physicalState')
+                      ? _ArrowDropdown<String?>(
+                          values: [null, ...ReagentModel.physicalStateOptions],
+                          current: r.physicalState,
+                          labelOf: (v) => v == null
+                              ? '—'
+                              : ReagentModel.physicalStateLabel(v),
+                          onSelect: (v) => onCommitPhysicalState(r.id, v),
+                          onAdvance: onAdvance,
+                          onAdvanceBack: onAdvanceBack,
+                          onCancel: onCancel,
+                          onAddNewRow: onAddNewRow,
+                        )
+                      : r.physicalState != null
+                      ? _Badge(
+                          label: ReagentModel.physicalStateLabel(
+                            r.physicalState!,
+                          ),
+                          color: switch (r.physicalState!) {
+                            'liquid' => const Color(0xFF38BDF8),
+                            'solid' => const Color(0xFF94A3B8),
+                            'gas' => const Color(0xFFA78BFA),
+                            _ => const Color(0xFF64748B),
+                          },
+                        )
+                      : Text('—', style: tsMuted),
+                ),
+              ),
+            ),
+
+            // ── CAS Number ────────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('casNumber'),
+              child: _editCell(
+                context,
+                'casNumber',
+                r.casNumber ?? '',
+                _tip(
+                  r.casNumber,
+                  Text(
+                    r.casNumber ?? '—',
+                    overflow: TextOverflow.ellipsis,
+                    style: r.casNumber != null ? tsMono : tsMonoMut,
+                  ),
+                ),
+                tsMono,
+              ),
+            ),
+
+            // ── Formula ───────────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('formula'),
+              child: _editCell(
+                context,
+                'formula',
+                r.formula ?? '',
+                _tip(
+                  r.formula,
+                  Text(
+                    r.formula ?? '—',
+                    overflow: TextOverflow.ellipsis,
+                    style: r.formula != null ? tsMono : tsMonoMut,
+                  ),
+                ),
+                tsMono,
+              ),
+            ),
+
+            // ── Opened Date ───────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('openedDate'),
+              child: _editCell(
+                context,
+                'openedDate',
                 r.openedDate != null
                     ? '${r.openedDate!.year}-${r.openedDate!.month.toString().padLeft(2, '0')}-${r.openedDate!.day.toString().padLeft(2, '0')}'
-                    : '—',
-                overflow: TextOverflow.ellipsis,
-                style: r.openedDate != null ? tsMono : tsMonoMut,
-              ),
-              tsMono,
-            ),
-          ),
-
-          // ── Size (package/flask size) ─────────────────────────────────────
-          SizedBox(
-            width: _colPackSize,
-            child: _editCell(
-              context,
-              'packageSize',
-              r.packageSize?.toString() ?? '',
-              Text(
-                r.displayPackageSize,
-                overflow: TextOverflow.ellipsis,
-                style: r.packageSize != null ? tsMono : tsMonoMut,
-              ),
-              tsMono,
-              keyboardType: TextInputType.number,
-            ),
-          ),
-
-          // ── Unit ──────────────────────────────────────────────────────────
-          SizedBox(
-            width: _colUnit,
-            child: _editCell(
-              context,
-              'unit',
-              r.unit ?? '',
-              Text(
-                _unitDisplay(r.unit),
-                overflow: TextOverflow.ellipsis,
-                style: r.unit != null ? tsCell : tsMuted,
-              ),
-              tsCell,
-            ),
-          ),
-
-          // ── Container count ───────────────────────────────────────────────
-          SizedBox(
-            width: _colCount,
-            child: _editCell(
-              context,
-              'containerCount',
-              r.containerCount?.toString() ?? '',
-              Text(
-                r.containerCount?.toString() ?? '—',
-                overflow: TextOverflow.ellipsis,
-                style: r.isLowStock
-                    ? GoogleFonts.jetBrainsMono(
-                        fontSize: 12,
-                        color: AppDS.orange,
-                        fontWeight: FontWeight.w600,
-                      )
-                    : (r.containerCount != null ? tsMono : tsMonoMut),
-              ),
-              tsMono,
-              keyboardType: TextInputType.number,
-            ),
-          ),
-
-          // ── Container min ─────────────────────────────────────────────────
-          SizedBox(
-            width: _colMin,
-            child: _editCell(
-              context,
-              'containerMin',
-              r.containerMin?.toString() ?? '',
-              Text(
-                r.containerMin?.toString() ?? '—',
-                overflow: TextOverflow.ellipsis,
-                style: r.containerMin != null ? tsMonoMut : tsMonoMut,
-              ),
-              tsMonoMut,
-              keyboardType: TextInputType.number,
-            ),
-          ),
-
-          // ── Contamination ─────────────────────────────────────────────────
-          SizedBox(
-            width: _colContam,
-            child: GestureDetector(
-              onDoubleTap: () =>
-                  onStartEdit(r.id, 'contamination', r.contamination),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: _isEditing('contamination')
-                    ? _ArrowDropdown<String>(
-                        values: ReagentModel.contaminationOptions,
-                        current: r.contamination,
-                        labelOf: ReagentModel.contaminationLabel,
-                        onSelect: (v) => onCommitContamination(r.id, v),
-                        onAdvance: onAdvance,
-                        onAdvanceBack: onAdvanceBack,
-                        onCancel: onCancel,
-                        onAddNewRow: onAddNewRow,
-                        autoOpen: true,
-                      )
-                    : _Badge(
-                        label: ReagentModel.contaminationLabel(r.contamination),
-                        color: _contamColor[r.contamination] ?? muted,
-                      ),
+                    : '',
+                Text(
+                  r.openedDate != null
+                      ? '${r.openedDate!.year}-${r.openedDate!.month.toString().padLeft(2, '0')}-${r.openedDate!.day.toString().padLeft(2, '0')}'
+                      : '—',
+                  overflow: TextOverflow.ellipsis,
+                  style: r.openedDate != null ? tsMono : tsMonoMut,
+                ),
+                tsMono,
               ),
             ),
-          ),
 
-          // ── Brand ─────────────────────────────────────────────────────────
-          SizedBox(
-            width: _colBrand,
-            child: _editCell(
-              context,
-              'brand',
-              r.brand ?? '',
-              _stableChip(r.brand, tsMuted),
-              tsCell,
+            // ── Size (package/flask size) ─────────────────────────────────────
+            SizedBox(
+              width: columnWidth('packageSize'),
+              child: _editCell(
+                context,
+                'packageSize',
+                r.packageSize?.toString() ?? '',
+                Text(
+                  r.displayPackageSize,
+                  overflow: TextOverflow.ellipsis,
+                  style: r.packageSize != null ? tsMono : tsMonoMut,
+                ),
+                tsMono,
+                keyboardType: TextInputType.number,
+              ),
             ),
-          ),
 
-          // ── Supplier ──────────────────────────────────────────────────────
-          SizedBox(
-            width: _colSupp,
-            child: _editCell(
-              context,
-              'supplier',
-              r.supplier ?? '',
-              _stableChip(r.supplier, tsMuted),
-              tsCell,
+            // ── Unit ──────────────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('unit'),
+              child: _editCell(
+                context,
+                'unit',
+                r.unit ?? '',
+                Text(
+                  _unitDisplay(r.unit),
+                  overflow: TextOverflow.ellipsis,
+                  style: r.unit != null ? tsCell : tsMuted,
+                ),
+                tsCell,
+              ),
             ),
-          ),
-        ],
+
+            // ── Container count ───────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('containerCount'),
+              child: _editCell(
+                context,
+                'containerCount',
+                r.containerCount?.toString() ?? '',
+                Text(
+                  r.containerCount?.toString() ?? '—',
+                  overflow: TextOverflow.ellipsis,
+                  style: r.isLowStock
+                      ? GoogleFonts.jetBrainsMono(
+                          fontSize: 12,
+                          color: AppDS.orange,
+                          fontWeight: FontWeight.w600,
+                        )
+                      : (r.containerCount != null ? tsMono : tsMonoMut),
+                ),
+                tsMono,
+                keyboardType: TextInputType.number,
+              ),
+            ),
+
+            // ── Container min ─────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('containerMin'),
+              child: _editCell(
+                context,
+                'containerMin',
+                r.containerMin?.toString() ?? '',
+                Text(
+                  r.containerMin?.toString() ?? '—',
+                  overflow: TextOverflow.ellipsis,
+                  style: r.containerMin != null ? tsMonoMut : tsMonoMut,
+                ),
+                tsMonoMut,
+                keyboardType: TextInputType.number,
+              ),
+            ),
+
+            // ── Contamination ─────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('contamination'),
+              child: GestureDetector(
+                onDoubleTap: () =>
+                    onStartEdit(r.id, 'contamination', r.contamination),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  child: _isEditing('contamination')
+                      ? _ArrowDropdown<String>(
+                          values: ReagentModel.contaminationOptions,
+                          current: r.contamination,
+                          labelOf: ReagentModel.contaminationLabel,
+                          onSelect: (v) => onCommitContamination(r.id, v),
+                          onAdvance: onAdvance,
+                          onAdvanceBack: onAdvanceBack,
+                          onCancel: onCancel,
+                          onAddNewRow: onAddNewRow,
+                        )
+                      : _Badge(
+                          label: ReagentModel.contaminationLabel(
+                            r.contamination,
+                          ),
+                          color: _contamColor[r.contamination] ?? muted,
+                        ),
+                ),
+              ),
+            ),
+
+            // ── Brand ─────────────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('brand'),
+              child: _editCell(
+                context,
+                'brand',
+                r.brand ?? '',
+                _stableChip(r.brand, tsMuted),
+                tsCell,
+              ),
+            ),
+
+            // ── Supplier ──────────────────────────────────────────────────────
+            SizedBox(
+              width: columnWidth('supplier'),
+              child: _editCell(
+                context,
+                'supplier',
+                r.supplier ?? '',
+                _stableChip(r.supplier, tsMuted),
+                tsCell,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -972,7 +994,6 @@ class _ArrowDropdown<T> extends StatefulWidget {
   final VoidCallback onAdvanceBack;
   final VoidCallback onCancel;
   final VoidCallback? onAddNewRow;
-  final bool autoOpen;
   const _ArrowDropdown({
     required this.values,
     required this.current,
@@ -982,7 +1003,6 @@ class _ArrowDropdown<T> extends StatefulWidget {
     required this.onAdvanceBack,
     required this.onCancel,
     this.onAddNewRow,
-    this.autoOpen = false,
   });
 
   @override
@@ -992,6 +1012,8 @@ class _ArrowDropdown<T> extends StatefulWidget {
 class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
   late int _index;
   final _focus = FocusNode();
+  bool _menuOpen = false;
+  bool _closing = false;
 
   @override
   void initState() {
@@ -1000,11 +1022,7 @@ class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
     if (_index < 0) _index = 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (widget.autoOpen) {
-        _showMenu();
-      } else {
-        _focus.requestFocus();
-      }
+      _focus.requestFocus();
     });
   }
 
@@ -1017,6 +1035,7 @@ class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
   Future<void> _showMenu() async {
     final box = context.findRenderObject() as RenderBox;
     final pos = box.localToGlobal(Offset(0, box.size.height));
+    _menuOpen = true;
     final picked = await showMenu<int>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -1043,13 +1062,32 @@ class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
       ],
     );
     if (!mounted) return;
+    _menuOpen = false;
     if (picked != null) {
-      setState(() => _index = picked);
-      widget.onSelect(widget.values[picked]);
-      _focus.requestFocus();
+      _commitAndClose(picked);
     } else {
-      _focus.requestFocus();
+      _commitAndClose();
     }
+  }
+
+  void _commitAndClose([int? index]) {
+    if (_closing) return;
+    _closing = true;
+    widget.onSelect(widget.values[index ?? _index]);
+    widget.onCancel();
+  }
+
+  void _cancel() {
+    if (_closing) return;
+    _closing = true;
+    widget.onCancel();
+  }
+
+  void _commitAndAdvance(VoidCallback advance) {
+    if (_closing) return;
+    _closing = true;
+    widget.onSelect(widget.values[_index]);
+    advance();
   }
 
   @override
@@ -1065,24 +1103,20 @@ class _ArrowDropdownState<T> extends State<_ArrowDropdown<T>> {
                 (_index - 1 + widget.values.length) % widget.values.length,
           );
         },
-        const SingleActivator(LogicalKeyboardKey.enter): () =>
-            widget.onSelect(widget.values[_index]),
-        const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
-          widget.onSelect(widget.values[_index]);
-          widget.onAddNewRow?.call();
-        },
-        const SingleActivator(LogicalKeyboardKey.tab): () {
-          widget.onSelect(widget.values[_index]);
-          widget.onAdvance();
-        },
-        const SingleActivator(LogicalKeyboardKey.tab, shift: true): () {
-          widget.onSelect(widget.values[_index]);
-          widget.onAdvanceBack();
-        },
-        const SingleActivator(LogicalKeyboardKey.escape): widget.onCancel,
+        const SingleActivator(LogicalKeyboardKey.enter): _commitAndClose,
+        const SingleActivator(LogicalKeyboardKey.enter, control: true): () =>
+            _commitAndAdvance(widget.onAddNewRow ?? widget.onCancel),
+        const SingleActivator(LogicalKeyboardKey.tab): () =>
+            _commitAndAdvance(widget.onAdvance),
+        const SingleActivator(LogicalKeyboardKey.tab, shift: true): () =>
+            _commitAndAdvance(widget.onAdvanceBack),
+        const SingleActivator(LogicalKeyboardKey.escape): _cancel,
       },
       child: Focus(
         focusNode: _focus,
+        onFocusChange: (hasFocus) {
+          if (!hasFocus && !_menuOpen) _commitAndClose();
+        },
         child: GestureDetector(
           onTap: _showMenu,
           child: Container(
@@ -1441,7 +1475,7 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       debugPrint('ReagentFormDialog save error: $e');
-      setState(() => _saving = false);
+      if (mounted) setState(() => _saving = false);
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Failed to save: $e')));
@@ -2143,7 +2177,12 @@ class _ReagentFormDialogState extends State<_ReagentFormDialog> {
             fontSize: 13,
           ),
           items: items,
-          onChanged: onChanged,
+          onChanged: onChanged == null
+              ? null
+              : (value) {
+                  onChanged(value);
+                  FocusManager.instance.primaryFocus?.unfocus();
+                },
         ),
       ),
     );

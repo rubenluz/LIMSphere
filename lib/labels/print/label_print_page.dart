@@ -235,6 +235,7 @@ class _PrintLabelPageState extends State<_PrintLabelPage> {
   }
 
   Future<void> _loadFromDb() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _status = null;

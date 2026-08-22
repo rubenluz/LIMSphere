@@ -4,7 +4,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
+
 import '/theme/theme.dart';
 
 class TransferTimelineWidget extends StatefulWidget {
@@ -26,30 +28,46 @@ class _TransferTimelineWidgetState extends State<TransferTimelineWidget> {
   }
 
   bool _isDesktop(BuildContext context) {
-    if (kIsWeb) { return true; }
+    if (kIsWeb) {
+      return true;
+    }
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) { return true; }
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        return true;
+      }
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
 
   DateTime? _resolveDate(Map<String, dynamic> row) {
     final raw = row['strain_next_transfer'];
-    if (raw is DateTime) { return raw; }
+    if (raw is DateTime) {
+      return raw;
+    }
     if (raw is String && raw.trim().isNotEmpty) {
       final parsed = DateTime.tryParse(raw);
-      if (parsed != null) { return parsed; }
+      if (parsed != null) {
+        return parsed;
+      }
     }
     final lastRaw = row['strain_last_transfer'];
     final daysRaw = row['strain_periodicity'];
     DateTime? last;
-    if (lastRaw is DateTime) { last = lastRaw; }
-    else if (lastRaw is String) { last = DateTime.tryParse(lastRaw); }
+    if (lastRaw is DateTime) {
+      last = lastRaw;
+    } else if (lastRaw is String) {
+      last = DateTime.tryParse(lastRaw);
+    }
     int? days;
-    if (daysRaw is int) { days = daysRaw; }
-    else if (daysRaw is double) { days = daysRaw.toInt(); }
-    else if (daysRaw is String) { days = int.tryParse(daysRaw); }
-    else if (daysRaw is num) { days = daysRaw.toInt(); }
+    if (daysRaw is int) {
+      days = daysRaw;
+    } else if (daysRaw is double) {
+      days = daysRaw.toInt();
+    } else if (daysRaw is String) {
+      days = int.tryParse(daysRaw);
+    } else if (daysRaw is num) {
+      days = daysRaw.toInt();
+    }
     if (last != null && days != null && days > 0) {
       return last.add(Duration(days: days));
     }
@@ -58,63 +76,107 @@ class _TransferTimelineWidgetState extends State<TransferTimelineWidget> {
 
   int? _resolvePeriodicity(Map<String, dynamic> row) {
     final v = row['strain_periodicity'];
-    if (v is int) { return v; }
-    if (v is double) { return v.toInt(); }
-    if (v is num) { return v.toInt(); }
-    if (v is String) { return int.tryParse(v); }
+    if (v is int) {
+      return v;
+    }
+    if (v is double) {
+      return v.toInt();
+    }
+    if (v is num) {
+      return v.toInt();
+    }
+    if (v is String) {
+      return int.tryParse(v);
+    }
     return null;
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final rows = await Supabase.instance.client
           .from('strains')
-          .select('strain_periodicity, strain_next_transfer, strain_last_transfer')
+          .select(
+            'strain_periodicity, strain_next_transfer, strain_last_transfer',
+          )
           .neq('strain_status', 'DEAD');
 
       // For each periodicity, keep the earliest next-transfer date
       final Map<int, DateTime> earliest = {};
       for (final row in rows as List) {
         final period = _resolvePeriodicity(row);
-        if (period == null || period <= 0) { continue; }
+        if (period == null || period <= 0) {
+          continue;
+        }
         final date = _resolveDate(row);
-        if (date == null) { continue; }
+        if (date == null) {
+          continue;
+        }
         if (!earliest.containsKey(period) || date.isBefore(earliest[period]!)) {
           earliest[period] = date;
         }
       }
 
-      final groups = earliest.entries
-          .map((e) => _PeriodGroup(periodDays: e.key, nextDate: e.value))
-          .toList()
-        ..sort((a, b) => a.nextDate.compareTo(b.nextDate));
+      final groups =
+          earliest.entries
+              .map((e) => _PeriodGroup(periodDays: e.key, nextDate: e.value))
+              .toList()
+            ..sort((a, b) => a.nextDate.compareTo(b.nextDate));
 
-      if (mounted) { setState(() { _groups = groups; _loading = false; }); }
+      if (mounted) {
+        setState(() {
+          _groups = groups;
+          _loading = false;
+        });
+      }
     } catch (e) {
       debugPrint('TransferTimelineWidget error: $e');
-      if (mounted) { setState(() => _loading = false); }
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Color _color(int daysLeft) {
-    if (daysLeft < 0) { return Colors.red; }
-    if (daysLeft == 0) { return Colors.orange; }
-    if (daysLeft <= 3) { return Colors.amber; }
+    if (daysLeft < 0) {
+      return Colors.red;
+    }
+    if (daysLeft == 0) {
+      return Colors.orange;
+    }
+    if (daysLeft <= 3) {
+      return Colors.amber;
+    }
     return AppDS.accent;
   }
 
   String _badge(int daysLeft) {
-    if (daysLeft < 0) { return '${daysLeft.abs()}d overdue'; }
-    if (daysLeft == 0) { return 'Today'; }
+    if (daysLeft < 0) {
+      return '${daysLeft.abs()}d overdue';
+    }
+    if (daysLeft == 0) {
+      return 'Today';
+    }
     return 'in ${daysLeft}d';
   }
 
   static String _weekday(int d) =>
       ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1];
-  static String _month(int m) =>
-      ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1];
+  static String _month(int m) => [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ][m - 1];
 
   Widget _buildContent() {
     if (_loading) {
@@ -126,8 +188,10 @@ class _TransferTimelineWidgetState extends State<TransferTimelineWidget> {
     if (_groups.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(24),
-        child: Text('No transfer data available.',
-            style: TextStyle(color: context.appTextSecondary, fontSize: 13)),
+        child: Text(
+          'No transfer data available.',
+          style: TextStyle(color: context.appTextSecondary, fontSize: 13),
+        ),
       );
     }
 
@@ -140,7 +204,11 @@ class _TransferTimelineWidgetState extends State<TransferTimelineWidget> {
         mainAxisSize: MainAxisSize.min,
         children: List.generate(_groups.length, (i) {
           final g = _groups[i];
-          final date = DateTime(g.nextDate.year, g.nextDate.month, g.nextDate.day);
+          final date = DateTime(
+            g.nextDate.year,
+            g.nextDate.month,
+            g.nextDate.day,
+          );
           final daysLeft = date.difference(today).inDays;
           final color = _color(daysLeft);
           final isLast = i == _groups.length - 1;
@@ -152,14 +220,22 @@ class _TransferTimelineWidgetState extends State<TransferTimelineWidget> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Timeline spine
-                Column(children: [
-                  Container(
-                    width: 10, height: 10,
-                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                  ),
-                  if (!isLast)
-                    Expanded(child: Container(width: 2, color: context.appBorder)),
-                ]),
+                Column(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    if (!isLast)
+                      Expanded(
+                        child: Container(width: 2, color: context.appBorder),
+                      ),
+                  ],
+                ),
                 const SizedBox(width: 10),
                 // Content
                 Expanded(
@@ -171,30 +247,43 @@ class _TransferTimelineWidgetState extends State<TransferTimelineWidget> {
                         // Periodicity label
                         SizedBox(
                           width: 52,
-                          child: Text('${g.periodDays}d',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: color)),
+                          child: Text(
+                            '${g.periodDays}d',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: color,
+                            ),
+                          ),
                         ),
                         // Date
                         Expanded(
-                          child: Text(dateLabel,
-                              style: TextStyle(
-                                  fontSize: 12, color: context.appTextPrimary)),
+                          child: Text(
+                            dateLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.appTextPrimary,
+                            ),
+                          ),
                         ),
                         // Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: color.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Text(_badge(daysLeft),
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: color)),
+                          child: Text(
+                            _badge(daysLeft),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: color,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -223,22 +312,36 @@ class _TransferTimelineWidgetState extends State<TransferTimelineWidget> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-            child: Row(children: [
-              const Icon(Icons.timeline_rounded, size: 20, color: AppDS.accent),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Transfer Timeline',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14,
-                        color: context.appTextPrimary)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 16),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                onPressed: _load,
-                tooltip: 'Refresh',
-              ),
-            ]),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.timeline_rounded,
+                  size: 20,
+                  color: AppDS.accent,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Transfer Timeline',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: context.appTextPrimary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
           Divider(height: 1, color: context.appBorder),
           if (desktop)

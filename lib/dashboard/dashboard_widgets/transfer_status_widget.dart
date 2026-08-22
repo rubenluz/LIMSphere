@@ -4,6 +4,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dart:io' show Platform;
 
 /// Transfer Status Widget — Shows transfer urgency summary.
@@ -16,8 +17,8 @@ class TransferStatusWidget extends StatefulWidget {
 
 class _TransferStatusWidgetState extends State<TransferStatusWidget> {
   int _overdue = 0;
-  int _soon    = 0;
-  int _ok      = 0;
+  int _soon = 0;
+  int _ok = 0;
   int _unknown = 0;
   bool _loading = true;
 
@@ -30,7 +31,8 @@ class _TransferStatusWidgetState extends State<TransferStatusWidget> {
   bool _isDesktop(BuildContext context) {
     if (kIsWeb) return true;
     try {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        return true;
     } catch (_) {}
     return MediaQuery.of(context).size.width >= 600;
   }
@@ -72,12 +74,15 @@ class _TransferStatusWidgetState extends State<TransferStatusWidget> {
   }
 
   Future<void> _loadTransferStatus() async {
+    if (!mounted) return;
     setState(() => _loading = true);
 
     try {
       final data = await Supabase.instance.client
           .from('strains')
-          .select('strain_next_transfer, strain_last_transfer, strain_periodicity')
+          .select(
+            'strain_next_transfer, strain_last_transfer, strain_periodicity',
+          )
           .neq('strain_status', 'DEAD');
 
       int overdue = 0, soon = 0, ok = 0, unknown = 0;
@@ -105,8 +110,8 @@ class _TransferStatusWidgetState extends State<TransferStatusWidget> {
       if (!mounted) return;
       setState(() {
         _overdue = overdue;
-        _soon    = soon;
-        _ok      = ok;
+        _soon = soon;
+        _ok = ok;
         _unknown = unknown;
         _loading = false;
       });
@@ -125,26 +130,28 @@ class _TransferStatusWidgetState extends State<TransferStatusWidget> {
         border: Border.all(color: color.withAlpha(150)),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Row(children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 8),
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            count.toString(),
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              fontSize: 13,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              count.toString(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 13,
+              ),
             ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -163,13 +170,18 @@ class _TransferStatusWidgetState extends State<TransferStatusWidget> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildStatusCard('OVERDUE',    _overdue, Colors.red,    Icons.error),
+          _buildStatusCard('OVERDUE', _overdue, Colors.red, Icons.error),
           const SizedBox(height: 6),
-          _buildStatusCard('SOON (≤7d)', _soon,    Colors.orange, Icons.schedule),
+          _buildStatusCard('SOON (≤7d)', _soon, Colors.orange, Icons.schedule),
           const SizedBox(height: 6),
-          _buildStatusCard('OK',         _ok,      Colors.green,  Icons.check_circle),
+          _buildStatusCard('OK', _ok, Colors.green, Icons.check_circle),
           const SizedBox(height: 6),
-          _buildStatusCard('Unknown',    _unknown, Colors.grey,   Icons.help_outline),
+          _buildStatusCard(
+            'Unknown',
+            _unknown,
+            Colors.grey,
+            Icons.help_outline,
+          ),
         ],
       ),
     );
@@ -205,7 +217,10 @@ class _TransferStatusWidgetState extends State<TransferStatusWidget> {
                 IconButton(
                   icon: const Icon(Icons.refresh, size: 16),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
                   onPressed: _loadTransferStatus,
                   tooltip: 'Refresh',
                 ),

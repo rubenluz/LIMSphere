@@ -1,8 +1,49 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:limsphere/theme/module_permission.dart';
 
 void main() {
   group('module permissions', () {
+    test('laboratory SOP subcategories inherit Resources access', () {
+      final access = resolveModuleAccess(
+        moduleId: 'sops_resources',
+        userRow: const {
+          'user_status': 'active',
+          'user_role': 'technician',
+          'user_table_resources': 'read',
+        },
+      );
+
+      expect(access.canView, isTrue);
+      expect(access.canMutate, isFalse);
+    });
+
+    test(
+      'pending account gets no access even when permissions are assigned',
+      () {
+        final access = resolveModuleAccess(
+          moduleId: 'strains',
+          userRow: const {
+            'user_status': 'pending',
+            'user_role': 'admin',
+            'user_table_culture_collection': 'write',
+            'user_permissions_json': {
+              'pages': {
+                'strains': {
+                  'page_access': 'write',
+                  'actions': {'approve': true},
+                },
+              },
+            },
+          },
+        );
+
+        expect(access.canView, isFalse);
+        expect(access.canMutate, isFalse);
+        expect(access.canApprove, isFalse);
+      },
+    );
+
     test('legacy backups see permission resolves to read-only access', () {
       final access = resolveModuleAccess(
         moduleId: 'backups',
@@ -73,6 +114,114 @@ void main() {
       expect(access.allows('create'), isTrue);
       expect(access.allows('bulk'), isTrue);
       expect(access.allows('delete'), isFalse);
+    });
+
+    test('active superadmin has reagent insert and edit access', () {
+      final access = resolveModuleAccess(
+        moduleId: 'reagents',
+        userRow: const {
+          'user_status': 'active',
+          'user_role': 'superadmin',
+          'user_table_resources': 'none',
+        },
+      );
+
+      expect(access.canView, isTrue);
+      expect(access.canInsert, isTrue);
+      expect(access.canEdit, isTrue);
+    });
+
+    test('active users always have Tools access without permissions', () {
+      final access = resolveModuleAccess(
+        moduleId: 'tools',
+        userRow: const {
+          'user_status': 'active',
+          'user_role': 'viewer',
+          'user_permissions_json': {
+            'pages': {
+              'tools': {
+                'page_access': 'none',
+                'actions': {'view': false, 'export': false},
+              },
+            },
+          },
+        },
+      );
+
+      expect(access.canView, isTrue);
+      expect(access.canExport, isTrue);
+    });
+
+    test('active technician with Resources write can create reagents', () {
+      final access = resolveModuleAccess(
+        moduleId: 'reagents',
+        userRow: const {
+          'user_status': 'active',
+          'user_role': 'technician',
+          'user_table_resources': 'write',
+        },
+      );
+
+      expect(access.canView, isTrue);
+      expect(access.canInsert, isTrue);
+    });
+
+    test('granular reagent insert permission allows creation', () {
+      final access = resolveModuleAccess(
+        moduleId: 'reagents',
+        userRow: const {
+          'user_status': 'active',
+          'user_role': 'technician',
+          'user_table_resources': 'read',
+          'user_permissions_json': {
+            'pages': {
+              'reagents': {
+                'page_access': 'read',
+                'actions': {'insert': true, 'edit': false},
+              },
+            },
+          },
+        },
+      );
+
+      expect(access.canView, isTrue);
+      expect(access.canInsert, isTrue);
+      expect(access.canEdit, isFalse);
+    });
+
+    testWidgets('dialog can inherit reagent insert access', (tester) async {
+      const access = ModuleAccess.full(moduleId: 'reagents');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ModulePermission(
+            access: access,
+            child: Builder(
+              builder: (pageContext) => TextButton(
+                onPressed: () => showDialog<void>(
+                  context: pageContext,
+                  builder: (_) => ModulePermission.inherit(
+                    pageContext,
+                    Builder(
+                      builder: (dialogContext) => Text(
+                        dialogContext.canInsertModule
+                            ? 'insert allowed'
+                            : 'insert denied',
+                      ),
+                    ),
+                  ),
+                ),
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('insert allowed'), findsOneWidget);
     });
 
     test('mutating action implies view but export alone does not', () {

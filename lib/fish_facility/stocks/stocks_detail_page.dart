@@ -501,6 +501,7 @@ class _TankDetailPageState extends State<TankDetailPage> {
 
   // ── Supabase ──────────────────────────────────────────────────────────────
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final res = await Supabase.instance.client

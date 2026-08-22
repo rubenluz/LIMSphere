@@ -129,6 +129,7 @@ class _ReagentDetailPageState extends State<ReagentDetailPage> {
   // ── Data ───────────────────────────────────────────────────────────────────
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final results = await Future.wait([
@@ -1603,7 +1604,12 @@ class _InlineDropdown<T> extends StatelessWidget {
             fontSize: 13,
           ),
           items: items,
-          onChanged: readOnly ? null : onChanged,
+          onChanged: readOnly
+              ? null
+              : (value) {
+                  onChanged(value);
+                  FocusManager.instance.primaryFocus?.unfocus();
+                },
           disabledHint: _disabledHint(context),
           icon: readOnly
               ? const SizedBox.shrink()
